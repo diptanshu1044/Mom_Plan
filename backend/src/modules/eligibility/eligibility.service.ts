@@ -36,7 +36,7 @@ export class EligibilityService {
         children_ages: profile.children_ages as number[],
         monthly_income: profile.monthly_income,
         employment_status: profile.employment_status,
-        state: user.state,
+        state: user.state || '',
         pregnancy_status: profile.is_pregnant,
         disability_status: profile.has_disability,
         housing_status: profile.housing_status,
