@@ -24,6 +24,9 @@ export interface ProgramMetadata {
   supports_disability?: boolean;
   supports_seniors_and_disability?: boolean;
   priority_score?: number;
+  requires_citizenship?: boolean;
+  specific_states?: string[];
+  requires_housing_instability?: boolean;
 }
 
 export class RulesEngine {
@@ -116,6 +119,39 @@ export class RulesEngine {
     if (meta.supports_disability && context.disability_status) {
       score += 20;
       reasons.push('Priority given for disability status.');
+    }
+
+    // 6. Citizenship
+    if (meta.requires_citizenship) {
+      if (context.citizenship_status === 'citizen' || context.citizenship_status === 'eligible_non_citizen') {
+        score += 10;
+        reasons.push('Meets citizenship requirements.');
+      } else {
+        score -= 50;
+        reasons.push('Program requires verified citizenship or eligible non-citizen status.');
+      }
+    }
+
+    // 7. State
+    if (meta.specific_states && meta.specific_states.length > 0) {
+      if (meta.specific_states.includes(context.state)) {
+        score += 20;
+        reasons.push(`Resident of eligible state (${context.state}).`);
+      } else {
+        score -= 80;
+        reasons.push(`Program is only available in specific states, excluding ${context.state}.`);
+      }
+    }
+
+    // 8. Housing Status
+    if (meta.requires_housing_instability) {
+      if (context.housing_status === 'homeless' || context.housing_status === 'at_risk') {
+        score += 25;
+        reasons.push('Priority given due to housing instability.');
+      } else {
+        score -= 20;
+        reasons.push('Program specifically targets individuals with housing instability.');
+      }
     }
 
     // Normalize score
