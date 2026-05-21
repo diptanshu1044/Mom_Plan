@@ -1,4 +1,3 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
 import { prisma } from '../../config/prisma';
 
 /**
@@ -31,48 +30,37 @@ export interface GovApiProvider {
  * Handles caching, retries, and normalization of state/federal data
  */
 export class GovApiIntegrationService {
-  private client: AxiosInstance;
   private providers: Map<string, GovApiProvider> = new Map();
   // Simple in-memory cache for API responses to prevent rate-limiting (can be replaced by Redis)
   private cache: Map<string, { data: any; expiresAt: number }> = new Map();
 
-  constructor() {
-    this.client = axios.create({
-      timeout: 15000,
-      headers: {
-        'User-Agent': 'MomPlan-Integration-Agent/1.0',
-        'Accept': 'application/json',
-      },
-    });
+  constructor() {}
 
-    // Setup retry interceptor for resilient external connections
-    this.setupRetryInterceptor();
-  }
-
-  private setupRetryInterceptor() {
-    this.client.interceptors.response.use(
-      (response) => response,
-      async (error: AxiosError) => {
-        const config = error.config as any;
-        if (!config || !config.retry) {
-          return Promise.reject(error);
+  /**
+   * Helper for retrying fetches without external dependencies
+   */
+  private async fetchWithRetry(url: string, options: RequestInit = {}, retries = 3, delay = 2000): Promise<Response> {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const res = await fetch(url, {
+          ...options,
+          headers: {
+            'User-Agent': 'MomPlan-Integration-Agent/1.0',
+            'Accept': 'application/json',
+            ...(options.headers || {})
+          }
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
         }
-
-        config.retryCount = config.retryCount || 0;
-
-        if (config.retryCount >= config.retry) {
-          return Promise.reject(error);
-        }
-
-        config.retryCount += 1;
-        const delay = config.retryDelay || 1000 * config.retryCount;
-        
-        console.warn(`[GovApi] Retrying request to ${config.url} (Attempt ${config.retryCount}) in ${delay}ms...`);
-        
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        return this.client(config);
+        return res;
+      } catch (error: any) {
+        if (i === retries - 1) throw error;
+        console.warn(`[GovApi] Retrying request to ${url} (Attempt ${i + 1}) in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-    );
+    }
+    throw new Error('Unreachable');
   }
 
   /**
@@ -92,17 +80,15 @@ export class GovApiIntegrationService {
       return cached.data;
     }
 
-    const response = await this.client.get(url, {
-      // Custom config property for retries
-      ...({ retry: 3, retryDelay: 2000 } as any),
-    });
+    const response = await this.fetchWithRetry(url, {}, 3, 2000);
+    const data = await response.json();
 
     this.cache.set(url, {
-      data: response.data,
+      data,
       expiresAt: Date.now() + ttlMs,
     });
 
-    return response.data;
+    return data;
   }
 
   /**
@@ -127,23 +113,38 @@ export class GovApiIntegrationService {
             // Future automation hook: Check for program changes before upserting
             // Example: if status changed from inactive to active, trigger an alert queue
             
-            await prisma.program.upsert({
-              where: { name: normalized.name }, // ideally a unique external_id mapping
-              update: {
-                description: normalized.description,
-                category: normalized.category,
-                // Do not override manual overrides if they exist in the future
-              },
-              create: {
-                name: normalized.name,
-                description: normalized.description,
-                category: normalized.category,
-                // Provide dummy state/zip arrays for structural compatibility
-                state_eligibility: [],
-                zip_eligibility: [],
-                income_limit: 0,
-              },
+            const programData = {
+              name: normalized.name,
+              agency: normalized.agency,
+              program_type: normalized.category,
+              federal_or_state: 'federal',
+              description: normalized.description,
+              eligibility_criteria: {},
+              estimated_monthly_value_min: 0,
+              estimated_monthly_value_max: 0,
+              application_url: normalized.url,
+              is_active: normalized.status === 'active',
+              metadata: rawItem
+            };
+
+            const existingProgram = await prisma.benefitProgram.findFirst({
+              where: { name: normalized.name }
             });
+
+            if (existingProgram) {
+              await prisma.benefitProgram.update({
+                where: { id: existingProgram.id },
+                data: {
+                  description: programData.description,
+                  program_type: programData.program_type,
+                  is_active: programData.is_active,
+                }
+              });
+            } else {
+              await prisma.benefitProgram.create({
+                data: programData
+              });
+            }
             successCount++;
           }
         }
