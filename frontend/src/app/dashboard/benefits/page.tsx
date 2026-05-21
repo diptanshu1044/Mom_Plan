@@ -230,11 +230,23 @@ export default function BenefitsPage() {
                     </span>
                   </div>
                   {["qualified", "likely_qualified"].includes(result.status) && (
-                    <Button asChild variant="secondary" size="sm">
-                      <a href={result.program?.application_url || "#"} target="_blank" rel="noopener noreferrer">
-                        Apply Now
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </a>
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (result.program?.id) {
+                          api.post("/api/applications", { program_id: result.program.id })
+                            .then(() => queryClient.invalidateQueries({ queryKey: ["applications"] }))
+                            .catch(console.error);
+                        }
+                        if (result.program?.application_url) {
+                          window.open(result.program.application_url, "_blank", "noopener,noreferrer");
+                        }
+                      }}
+                    >
+                      Apply Now
+                      <ArrowRight className="w-3.5 h-3.5" />
                     </Button>
                   )}
                 </div>

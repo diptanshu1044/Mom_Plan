@@ -11,6 +11,7 @@ import { formatDate } from "@/lib/utils";
 
 export default function DocumentsPage() {
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -23,17 +24,40 @@ export default function DocumentsPage() {
   const handleUpload = async (file: File) => {
     setUploading(true);
     setUploadError("");
+    setUploadProgress(0);
     const formData = new FormData();
-    formData.append("document", file);
+    formData.append("file", file);
+    formData.append("document_type", "other");
     try {
       await api.post("/api/documents/upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / (progressEvent.total || file.size)
+          );
+          setUploadProgress(percentCompleted);
+        },
       });
       queryClient.invalidateQueries({ queryKey: ["documents"] });
     } catch (err: any) {
       setUploadError(err.response?.data?.error?.message || "Upload failed. Try again.");
     } finally {
       setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleViewDocument = async (id: string, mimeType: string) => {
+    try {
+      const response = await api.get(`/api/documents/${id}/download`, {
+        responseType: "blob",
+      });
+      const blob = new Blob([response.data], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      console.error("Failed to view document", err);
     }
   };
 
@@ -70,7 +94,7 @@ export default function DocumentsPage() {
         <input
           ref={fileRef}
           type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+          accept=".pdf,.jpg,.jpeg,.png"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -78,9 +102,17 @@ export default function DocumentsPage() {
           }}
         />
         {uploading ? (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
-            <span className="text-sm text-on-surface-variant">Uploading to secure storage...</span>
+          <div className="flex flex-col items-center gap-3 w-full max-w-xs mx-auto">
+            <div className="flex items-center gap-2 mb-1 text-primary-600 font-medium">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Uploading {uploadProgress}%</span>
+            </div>
+            <div className="w-full bg-surface-container rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-primary-500 h-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3">
@@ -90,7 +122,7 @@ export default function DocumentsPage() {
             <div>
               <p className="font-medium text-on-surface mb-1">Drop files here or click to upload</p>
               <p className="text-xs text-on-surface-variant">
-                PDF, JPG, PNG, DOC/DOCX up to 10MB
+                PDF, JPG, PNG up to 10MB
               </p>
             </div>
           </div>
@@ -152,16 +184,13 @@ export default function DocumentsPage() {
                         Pending
                       </span>
                     )}
-                    {doc.s3_url && (
-                      <a
-                        href={doc.s3_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary-500 transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </a>
-                    )}
+                    <button
+                      onClick={() => handleViewDocument(doc.id, doc.mime_type)}
+                      title="View Document"
+                      className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary-500 transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </Card>

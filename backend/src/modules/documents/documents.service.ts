@@ -1,11 +1,13 @@
 import { prisma } from '../../config/prisma';
 import { s3Client } from '../../config/s3';
 import { env } from '../../config/env';
-import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
 import { sendEmail } from '../../config/email';
 import { UserRole } from '@prisma/client';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
 
 export class DocumentsService {
   async listDocuments(userId: string, role: UserRole) {
@@ -56,13 +58,17 @@ export class DocumentsService {
     const uniqueKey = `documents/${userId}/${crypto.randomUUID()}.${fileExtension}`;
     const isPlaceholder = env.AWS_ACCESS_KEY_ID.includes('placeholder');
 
-    let file_url = `https://${env.S3_BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com/${uniqueKey}`;
+    let file_url = '';
 
     if (isPlaceholder) {
-      console.log('⚠️ [MOCK S3 UPLOAD] Using dummy storage URL due to placeholder credentials.');
-      file_url = `https://mock-s3-storage.local/${uniqueKey}`;
+      console.log('⚠️ [MOCK S3 UPLOAD] Saving file locally due to placeholder credentials.');
+      const uploadDir = path.join(process.cwd(), 'uploads', 'documents', userId);
+      fs.mkdirSync(uploadDir, { recursive: true });
+      const localPath = path.join(uploadDir, `${crypto.randomUUID()}.${fileExtension}`);
+      fs.writeFileSync(localPath, file.buffer);
+      file_url = localPath;
     } else {
-      // Execute actual upload to S3 bucket
+      file_url = `https://${env.S3_BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com/${uniqueKey}`;
       await s3Client.send(
         new PutObjectCommand({
           Bucket: env.S3_BUCKET_NAME,
@@ -89,6 +95,44 @@ export class DocumentsService {
     return document;
   }
 
+  async downloadDocument(id: string, userId: string, role: UserRole) {
+    const doc = await prisma.document.findUnique({ where: { id } });
+    if (!doc) throw new NotFoundError('Document not found');
+    if (role === 'user' && doc.user_id !== userId) throw new ForbiddenError('Access denied to view this document');
+
+    const isPlaceholder = env.AWS_ACCESS_KEY_ID.includes('placeholder');
+
+    if (isPlaceholder) {
+      if (!fs.existsSync(doc.file_url)) throw new NotFoundError('Local file not found');
+      return {
+        stream: fs.createReadStream(doc.file_url),
+        mimeType: doc.mime_type,
+        fileName: doc.file_name,
+        size: doc.file_size,
+      };
+    } else {
+      try {
+        const urlObj = new URL(doc.file_url);
+        const key = urlObj.pathname.substring(1);
+        const s3Obj = await s3Client.send(
+          new GetObjectCommand({
+            Bucket: env.S3_BUCKET_NAME,
+            Key: key,
+          })
+        );
+        return {
+          stream: s3Obj.Body,
+          mimeType: doc.mime_type,
+          fileName: doc.file_name,
+          size: doc.file_size,
+        };
+      } catch (err) {
+        console.error('Failed to stream S3 file:', err);
+        throw new NotFoundError('Document file not found in storage');
+      }
+    }
+  }
+
   async deleteDocument(id: string, userId: string, role: UserRole) {
     const doc = await prisma.document.findUnique({
       where: { id },
@@ -102,12 +146,20 @@ export class DocumentsService {
       throw new ForbiddenError('Access denied to delete this document');
     }
 
-    // Try removing from S3 if real credentials are used
-    if (!env.AWS_ACCESS_KEY_ID.includes('placeholder')) {
+    const isPlaceholder = env.AWS_ACCESS_KEY_ID.includes('placeholder');
+
+    if (isPlaceholder) {
       try {
-        // Extract S3 key from URL
+        if (fs.existsSync(doc.file_url)) {
+          fs.unlinkSync(doc.file_url);
+        }
+      } catch (err) {
+        console.error('Failed to delete local file:', err);
+      }
+    } else {
+      try {
         const urlObj = new URL(doc.file_url);
-        const key = urlObj.pathname.substring(1); // remove leading slash
+        const key = urlObj.pathname.substring(1);
         await s3Client.send(
           new DeleteObjectCommand({
             Bucket: env.S3_BUCKET_NAME,
@@ -148,7 +200,6 @@ export class DocumentsService {
       },
     });
 
-    // Create DB notification
     await prisma.notification.create({
       data: {
         user_id: doc.user_id,
@@ -159,7 +210,6 @@ export class DocumentsService {
       },
     });
 
-    // Trigger email: Document verification complete
     await sendEmail({
       to: doc.user.email,
       subject: 'MomPlan: Document Verification Complete',

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { DocumentsService } from './documents.service';
 import { UnauthorizedError, BadRequestError } from '../../utils/errors';
+import { pipeline } from 'stream/promises';
 
 const documentsService = new DocumentsService();
 
@@ -28,6 +29,22 @@ export class DocumentsController {
       if (!req.user) throw new UnauthorizedError();
       const document = await documentsService.getDocumentById(req.params.id, req.user.id, req.user.role);
       res.status(200).json({ success: true, data: document });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async downloadDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw new UnauthorizedError();
+      
+      const { stream, mimeType, fileName, size } = await documentsService.downloadDocument(req.params.id, req.user.id, req.user.role);
+      
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+      res.setHeader('Content-Length', size.toString());
+      
+      await pipeline(stream as any, res);
     } catch (error) {
       next(error);
     }

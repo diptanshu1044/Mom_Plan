@@ -96,6 +96,8 @@ export default function EligibilityPage() {
     immigration_status: "citizen",
     domestic_violence: false,
     savings_assets: "none",
+    legal_issues: false,
+    monthly_childcare_cost: "",
   });
 
   // Calculate dynamic steps description
@@ -199,6 +201,8 @@ export default function EligibilityPage() {
         work_situation: formData.employment_status,
         health_insurance: formData.health_insurance,
         savings_assets: formData.savings_assets,
+        monthly_childcare_cost: formData.needs_childcare ? (parseFloat(formData.monthly_childcare_cost) || 0) : null,
+        legal_issues: formData.legal_issues ? ["has_legal_dependencies"] : [],
       });
 
       // 3. Trigger benefit match scan
@@ -804,6 +808,41 @@ export default function EligibilityPage() {
                         <option value="visa_holder">Other Visa Holder / Non-Citizen</option>
                       </select>
                     </div>
+
+                    {/* Legal Dependencies Check */}
+                    <label className="flex items-start gap-3 p-3.5 rounded-xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors mt-3">
+                      <input
+                        type="checkbox"
+                        checked={formData.legal_issues}
+                        onChange={(e) => handleInputChange("legal_issues", e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded accent-primary-500 shrink-0"
+                      />
+                      <div>
+                        <div className="font-bold text-sm text-on-surface">Legal dependencies or custody issues?</div>
+                        <div className="text-xs text-on-surface-variant mt-0.5">
+                          Triggers specialized family legal aid and guardian assistance programs.
+                        </div>
+                      </div>
+                    </label>
+
+                    {/* Childcare Costs Check */}
+                    {formData.needs_childcare && (
+                      <div className="mt-3">
+                        <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Estimated Monthly Childcare Cost</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-on-surface-variant font-bold">$</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="e.g. 400"
+                            value={formData.monthly_childcare_cost}
+                            onChange={(e) => handleInputChange("monthly_childcare_cost", e.target.value.replace(/\D/g, ""))}
+                            className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

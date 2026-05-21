@@ -194,7 +194,7 @@ function PrimaryLink({
       href={href}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-lg px-8 py-3.5 text-base font-semibold text-white",
-        "bg-gradient-primary shadow-primary hover:shadow-primary-lg hover:-translate-y-0.5 active:translate-y-0",
+        "bg-gradient-primary shadow-primary hover:shadow-primary-lg",
         "transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400",
         className
       )}

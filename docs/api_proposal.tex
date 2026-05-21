@@ -1,0 +1,214 @@
+\documentclass[11pt,a4paper]{article}
+
+% --- Core Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{amsmath}
+
+% --- Premium Color Definitions ---
+\definecolor{DeepNavy}{RGB}{20, 35, 60}
+\definecolor{SteelBlue}{RGB}{70, 130, 180}
+\definecolor{Charcoal}{RGB}{50, 50, 50}
+\definecolor{LightGray}{RGB}{245, 245, 247}
+
+% --- Custom Hyperref Setup ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=DeepNavy,
+    filecolor=SteelBlue,      
+    urlcolor=SteelBlue,
+    pdftitle={MomPlan AI Benefits Platform - API Technical Proposal},
+    pdfpagemode=FullScreen,
+}
+
+% --- Custom Heading Formatting ---
+\titleformat{\section}
+  {\color{DeepNavy}\normalfont\Large\bfseries}
+  {\thesection}{1em}{}[{\titlerule[0.8pt]}]
+\titleformat{\subsection}
+  {\color{SteelBlue}\normalfont\large\bfseries}
+  {\thesubsection}{1em}{}
+
+% --- Code Listing Styles ---
+\lstset{
+    backgroundcolor=\color{LightGray},
+    basicstyle=\small\ttfamily,
+    breaklines=true,
+    captionpos=b,
+    commentstyle=\color{gray},
+    keywordstyle=\color{DeepNavy},
+    stringstyle=\color{SteelBlue},
+    frame=single,
+    rulecolor=\color{gray!30},
+    showstringspaces=false
+}
+
+% --- Title Info ---
+\title{
+    \vspace{2cm}
+    \textbf{\color{DeepNavy}MomPlan AI Benefits Platform} \\
+    \Large{API Integration Requirements \& Strategic Technical Proposal} \\
+    \vspace{1cm}
+}
+\author{
+    \textbf{Systems Architecture \& Development Team} \\
+    MomPlan AI Corporation
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\newpage
+\pagenumbering{arabic}
+
+% --- Table of Contents ---
+\tableofcontents
+\newpage
+
+% --- Section 1: Executive Summary ---
+\section{Executive Summary}
+The MomPlan AI Benefits Platform represents a state-of-the-art solution designed to help families discover public benefits, run eligibility scans, track active applications, and manage counseling renewal dates. To sustain separate consumer-facing portals and counselor administration dashboards, a unified server backend is required. 
+
+This document proposes the implementation of a centralized, secure **Application Programming Interface (API)**. The API acts as the core transactional engine, decoupling frontend user interfaces from data layers. Implementing an API-first pattern guarantees that business calculations (such as eligibility logic and rules evaluations) are consolidated, secure, and easily maintainable. This document outlines the strategic necessity of the API, details its architectural benefits, and specifies the technical and data requirements.
+
+---
+
+% --- Section 2: Architectural Challenges ---
+\section{Problem Statement: Current Architectural Vulnerabilities}
+Operating a modern SaaS application without a decoupled API layer leads to severe structural deficiencies:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+    \item \textbf{Duplicated Business Rules (Code Drift):}
+    When both the user portal and the administrator portal perform eligibility assessments, rules are duplicated. This double implementation leads to discrepancies, validation mismatches, and high maintenance costs when program guidelines change.
+    
+    \item \textbf{Direct Database Exposure Risks:}
+    Allowing user interfaces to query databases directly exposes underlying tables to SQL injection, privilege escalation, and unintended structural edits.
+    
+    \item \textbf{Integration Complexity:}
+    Managing connections to third-party providers (such as Stripe payments and AWS S3 document buckets) inside frontend clients exposes secret cryptographic keys and increases the payload size of client bundles.
+    
+    \item \textbf{Blocking Operations:}
+    Long-running actions, such as generating matching scores against dozens of benefit databases or sending email updates, block user interface loops and degrade responsiveness if not handled asynchronously.
+\end{enumerate}
+
+---
+
+% --- Section 3: Strategic API Benefits ---
+\section{Strategic Benefits of an API-Centric Architecture}
+Transitioning to an API-centric model addresses these vulnerabilities and provides significant advantages to the platform:
+
+\subsection{1. Unified Business Logic (The Rules Engine)}
+By housing the eligibility scanner inside a centralized API endpoint (\texttt{/api/eligibility/scan}), both the user's mobile/web app and the counselor's administration portal query the same mathematical calculations. Any changes to the rules criteria (such as income limits or household sizes) are deployed in a single server script, taking effect instantly without requiring client updates.
+
+\subsection{2. Ironclad Security & Granular Access Control}
+The API enforces strict middleware validation before database writes:
+\begin{itemize}
+    \item \textbf{Tokenized Authentication:} Employs stateless JSON Web Token (JWT) verification on protected paths.
+    \item \textbf{Role-Based Access Control (RBAC):} Standard users are confined to their private folders, while counselors and administrators are dynamically granted write-permissions on verification routes.
+    \item \textbf{Rate Limiting Protection:} Prevents brute-force credential scans by throttling general traffic to 100 requests per 15 minutes, and authentication targets to 5 requests per 15 minutes per IP.
+\end{itemize}
+
+\subsection{3. Elastic Scalability & Performance}
+Decoupling the database allows for optimized connection pooling via Prisma to a serverless Neon PostgreSQL cluster. Under heavy load (e.g. during policy updates or seasonal application surges), database connections are managed safely by the API layer, preventing service outages.
+
+\subsection{4. Safe Third-Party Integrations}
+The API acts as a secure proxy to external services:
+\begin{itemize}
+    \item \textbf{Stripe:} Signature verification takes place in a raw-buffer webhook, blocking fraudulent subscription adjustments.
+    \item \textbf{AWS S3:} The API handles validation checks and returns transient presigned upload URLs, keeping direct bucket write configurations hidden.
+\end{itemize}
+
+---
+
+% --- Section 4: Core Functional Requirements ---
+\section{Core API Functional Requirements}
+The API is divided into modular controllers, each exposing specific endpoints:
+
+\subsection{Authentication \& Access Control (\texttt{/api/auth})}
+Handles user registrations, secure token issuance, and password resets:
+\begin{itemize}
+    \item \texttt{POST /api/auth/register} -- Onboards users with hashed credentials.
+    \item \texttt{POST /api/auth/login} -- Generates short-lived Access Tokens and long-lived Refresh Tokens.
+    \item \texttt{POST /api/auth/forgot-password} \& \texttt{POST /api/auth/reset-password} -- Manages secure password recovery loops.
+\end{itemize}
+
+\subsection{User Demographics \& Wiser Moms Profiles (\texttt{/api/user})}
+Captures basic account settings and detailed family profiles. The API stores expanded indicators to compute precise eligibility matches:
+\begin{itemize}
+    \item \textbf{Base Metrics:} Household size, count of children, children's ages, monthly income, housing type, and disability status.
+    \item \textbf{Advanced Demographics (Wiser Moms Integration):} Captures date of birth, preferred language, eviction risk, domestic violence history, childcare costs, immigration status, and specific legal dependencies.
+\end{itemize}
+
+\subsection{Eligibility Engine (\texttt{/api/eligibility})}
+Processes eligibility requests and retrieves historic results:
+\begin{itemize}
+    \item \texttt{POST /api/eligibility/scan} -- Reads user inputs, compares them to JSON metadata, updates database results, and returns status grades (\textit{qualified}, \textit{likely\_qualified}, \textit{check\_required}, \textit{not\_qualified}) alongside reasoning descriptions.
+\end{itemize}
+
+\subsection{Document Vault (\texttt{/api/documents})}
+Handles secure attachments for applications:
+\begin{itemize}
+    \item Accepts binary uploads up to 10MB (PDF, JPEG, PNG).
+    \item Generates file links pointing to private S3 folders.
+    \item Exposes verification endpoints (\texttt{PUT /api/documents/:id/verify}) restricted to administrators and counselors.
+\end{itemize}
+
+\subsection{Billing \& Stripe Integration (\texttt{/api/billing})}
+Enables subscription monetization (Free, Family, Navigator tiers):
+\begin{itemize}
+    \item Generates checkout sessions and updates billing card arrangements.
+    \item Captures Stripe webhook payloads to automatically demote, upgrade, or flag user subscription statuses.
+\end{itemize}
+
+\subsection{Admin Telemetry (\texttt{/api/admin})}
+Provides administrative oversight:
+\begin{itemize}
+    \item Lists platform analytics (timeseries user signups, applications, and program popularity metrics).
+    \item Manages and reviews user account statuses (\textit{active}, \textit{inactive}, \textit{flagged}).
+    \item Records audit logs for compliance tracking.
+\end{itemize}
+
+---
+
+% --- Section 5: Implementation Roadmap ---
+\section{Implementation Roadmap \& Next Steps}
+To deploy this API-first architecture, the development team recommends a phased three-part implementation schedule:
+
+\begin{table}[h]
+    \centering
+    \caption{Proposed Implementation Phases}
+    \vspace{0.2cm}
+    \begin{tabular}{lll}
+        \toprule
+        \textbf{Phase} & \textbf{Focus Area} & \textbf{Key Deliverables} \\
+        \midrule
+        \textbf{Phase 1} & Core Infrastructure & Database Schema Sync, JWT Auth, CORS setup \\
+        \textbf{Phase 2} & Business Engines & Eligibility Engine, Program Directories, User Profiles \\
+        \textbf{Phase 3} & Integrations & S3 Vault uploads, Stripe Webhooks, Counselor Sessions \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Immediate Actions}
+Upon proposal approval, the following actions will be initialized:
+\begin{enumerate}
+    \item Synchronize developer environment configurations (\texttt{.env} keys for S3, Neon, and Stripe).
+    \item Seed program criteria database tables with actual state guidelines.
+    \item Secure backend CORS rules for local testing, preparing the API endpoints for production deployment.
+\end{enumerate}
+
+---
+
+% --- Section 6: Conclusion ---
+\section{Conclusion}
+Developing a dedicated, secure API is a critical step for the MomPlan AI Benefits Platform. It addresses key architectural concerns by separating concerns, protecting data, and centralizing business logic. Over the long term, this API-centric approach guarantees that the platform can expand to support new web portals, mobile apps, and direct government integrations without requiring structural rewrites.
+
+\end{document}

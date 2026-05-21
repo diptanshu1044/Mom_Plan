@@ -38,3 +38,20 @@ Located in `backend/src/jobs/`.
 - **StitchMCP**: For managing, updating, and generating UI screens dynamically.
 - **Stripe**: Manages subscriptions (free, family, navigator).
 - **AWS S3**: Secure document uploads with presigned URLs.
+
+## Document and PDF Architecture
+- **Upload Flow**: Uses `multer` in-memory buffering for secure validation of MIME types and size constraints (10MB limit) before forwarding to local storage (`/uploads/documents/`) or AWS S3.
+- **PDF Generation & Viewing**: Implements a secure streaming architecture (`/api/documents/:id/download`) utilizing Node.js streams to pipe document buffers directly to the browser. This ensures that users can securely preview PDFs and images directly in the browser or download them seamlessly without relying on exposed S3 URLs.
+
+## Real-Time Government Data Integration
+Located in `backend/src/modules/integration/`.
+- **Integration Layer**: A generic `GovApiIntegrationService` manages outbound API requests to external government sources (e.g., USDA, HUD, HHS, IRS).
+- **Extensible Providers**: Employs an interface-based architecture (`GovApiProvider`) allowing individual state and federal services to plug into the normalization layer.
+- **Resiliency & Caching**: Incorporates built-in retry mechanisms using Axios interceptors and an in-memory caching system to gracefully handle rate-limiting and minimize redundant requests to external APIs.
+
+## Automation and Processing Architecture
+Located in `backend/src/modules/automation/`.
+- **Asynchronous Processing**: Designed to integrate with message queues and background workers for handling potentially long-running processes independently of the main API event loop.
+- **Email Composition System**: A centralized `AutomationService` templates and securely attaches uploaded documents to outgoing government communications, specifically targeting relevant agency contacts based on the user's location and program.
+- **External Contact Ingestion**: Features a structured scraping and ingestion strategy that securely compiles government agency contacts (from state and federal websites) into a centralized, searchable database. Built-in validation and duplicate prevention ensure high data integrity.
+- **Workflow Hooks**: Provides modular hooks (e.g., `onApplicationStatusChange`) that decouple application state transitions from notification and automation triggers, ensuring robust future scalability.

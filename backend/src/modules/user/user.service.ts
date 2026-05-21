@@ -42,7 +42,8 @@ export class UserService {
       needs_childcare, monthly_rent, eviction_risk, domestic_violence,
       chronic_illness, immigration_status, date_of_birth, preferred_language,
       marital_status, other_adults, income_sources, work_situation,
-      health_insurance, savings_assets, child_support_status
+      health_insurance, savings_assets, child_support_status,
+      monthly_childcare_cost, legal_issues
     } = data;
 
     // Update User basic info
@@ -65,7 +66,8 @@ export class UserService {
       needs_childcare, monthly_rent, eviction_risk, domestic_violence,
       chronic_illness, immigration_status, date_of_birth, preferred_language,
       marital_status, other_adults, income_sources, work_situation,
-      health_insurance, savings_assets, child_support_status
+      health_insurance, savings_assets, child_support_status,
+      monthly_childcare_cost, legal_issues
     ].some(val => val !== undefined);
 
     if (hasFamilyData) {
@@ -99,6 +101,8 @@ export class UserService {
           health_insurance: health_insurance || '',
           savings_assets: savings_assets || '',
           child_support_status: child_support_status || 'none',
+          monthly_childcare_cost: monthly_childcare_cost || null,
+          legal_issues: legal_issues || [],
         },
         update: {
           ...(household_size !== undefined && { household_size }),
@@ -125,6 +129,8 @@ export class UserService {
           ...(health_insurance !== undefined && { health_insurance }),
           ...(savings_assets !== undefined && { savings_assets }),
           ...(child_support_status !== undefined && { child_support_status }),
+          ...(monthly_childcare_cost !== undefined && { monthly_childcare_cost }),
+          ...(legal_issues !== undefined && { legal_issues }),
         }
       });
     }

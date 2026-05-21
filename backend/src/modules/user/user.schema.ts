@@ -33,6 +33,8 @@ export const updateProfileSchema = z.object({
     health_insurance: z.string().optional(),
     savings_assets: z.string().optional(),
     child_support_status: z.string().optional(),
+    monthly_childcare_cost: z.number().nullable().optional(),
+    legal_issues: z.array(z.string()).optional(),
   }),
 });
 

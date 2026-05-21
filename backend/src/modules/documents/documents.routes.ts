@@ -20,6 +20,7 @@ router.use(authenticate);
 
 router.get('/', documentsController.listDocuments);
 router.post('/upload', upload.single('file'), documentsController.uploadDocument);
+router.get('/:id/download', validate(documentIdParamSchema), documentsController.downloadDocument);
 router.get('/:id', validate(documentIdParamSchema), documentsController.getDocumentById);
 router.delete('/:id', validate(documentIdParamSchema), documentsController.deleteDocument);
 
