@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Upload, FileText, CheckCircle, XCircle, Loader2, Trash2, Eye } from "lucide-react";
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Trash2, Eye, Clock } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
@@ -180,8 +180,8 @@ export default function DocumentsPage() {
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Pending
+                        <Clock className="w-3.5 h-3.5" />
+                        Pending Verification
                       </span>
                     )}
                     <button
