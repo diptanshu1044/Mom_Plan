@@ -6,6 +6,7 @@ import {
   applicationIdParamSchema,
   createApplicationSchema,
   updateApplicationSchema,
+  applyApplicationSchema,
 } from './applications.schema';
 
 const router = Router();
@@ -18,6 +19,11 @@ router.post('/', validate(createApplicationSchema), applicationsController.creat
 router.get('/:id', validate(applicationIdParamSchema), applicationsController.getApplicationById);
 router.put('/:id', validate(updateApplicationSchema), applicationsController.updateApplication);
 router.delete('/:id', validate(applicationIdParamSchema), applicationsController.deleteApplication);
-router.post('/:id/apply', validate(applicationIdParamSchema), applicationsController.applyApplication);
+
+// Generate Draft without submitting
+router.get('/:id/draft', validate(applicationIdParamSchema), applicationsController.generateDraft);
+
+// Submit application (can include edited draft)
+router.post('/:id/apply', validate(applyApplicationSchema), applicationsController.applyApplication);
 
 export default router;

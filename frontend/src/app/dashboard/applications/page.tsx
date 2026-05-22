@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ClipboardList, Plus, Filter, Search } from "lucide-react";
+import { ClipboardList, Plus, Filter, Search, Send, Loader2, Edit3, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +12,12 @@ import { formatDate, formatRelativeDate } from "@/lib/utils";
 
 export default function ApplicationsPage() {
   const [filter, setFilter] = useState("all");
+  const [draftModalOpen, setDraftModalOpen] = useState(false);
+  const [activeApp, setActiveApp] = useState<any>(null);
+  const [draftSubject, setDraftSubject] = useState("");
+  const [draftBody, setDraftBody] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data: applications, isLoading } = useQuery({
     queryKey: ["applications"],
@@ -31,6 +37,40 @@ export default function ApplicationsPage() {
     { key: "approved", label: "Approved" },
     { key: "rejected", label: "Rejected" },
   ];
+
+  const handlePrepareDraft = async (app: any) => {
+    setActiveApp(app);
+    setDraftModalOpen(true);
+    setIsGenerating(true);
+    setDraftSubject("");
+    setDraftBody("");
+    try {
+      const res = await api.get(`/api/applications/${app.id}/draft`);
+      setDraftSubject(res.data.data.subject);
+      setDraftBody(res.data.data.body);
+    } catch (err) {
+      console.error(err);
+      setDraftBody("Failed to generate draft. You can write your own email here.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleSubmitDraft = async () => {
+    setIsSubmitting(true);
+    try {
+      await api.post(`/api/applications/${activeApp.id}/apply`, {
+        subject: draftSubject,
+        body: draftBody,
+      });
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      setDraftModalOpen(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div>
@@ -134,9 +174,96 @@ export default function ApplicationsPage() {
                     <p className="text-xs text-orange-700 font-medium">Action needed: {app.notes}</p>
                   </div>
                 )}
+                {app.status === "draft" && (
+                  <div className="mt-3 pt-3 border-t border-surface-container-highest flex justify-end">
+                    <Button 
+                      size="sm" 
+                      onClick={() => handlePrepareDraft(app)}
+                      className="bg-primary-50 text-primary-700 hover:bg-primary-100"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 mr-1" />
+                      Review & Send Application
+                    </Button>
+                  </div>
+                )}
               </Card>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {/* Draft Modal */}
+      {draftModalOpen && activeApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-surface rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            <div className="px-6 py-4 border-b border-surface-container flex items-center justify-between bg-surface-container-lowest">
+              <div>
+                <h3 className="font-display font-semibold text-lg text-on-surface">Review Application Email</h3>
+                <p className="text-xs text-on-surface-variant">
+                  We've drafted an email for {activeApp.program?.name}. You can edit it before sending.
+                </p>
+              </div>
+              <button
+                onClick={() => setDraftModalOpen(false)}
+                className="p-2 rounded-full hover:bg-surface-container text-on-surface-variant"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              {isGenerating ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary-500 mb-4" />
+                  <p className="text-sm text-on-surface-variant font-medium">AI is drafting your application email...</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-on-surface-variant mb-1">Subject Line</label>
+                    <input
+                      type="text"
+                      value={draftSubject}
+                      onChange={(e) => setDraftSubject(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-outline-variant/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-on-surface-variant mb-1">Email Body</label>
+                    <textarea
+                      value={draftBody}
+                      onChange={(e) => setDraftBody(e.target.value)}
+                      rows={12}
+                      className="w-full px-3 py-2 text-sm border border-outline-variant/60 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                    />
+                  </div>
+                  <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                    <p className="text-xs text-blue-800">
+                      <strong>Note:</strong> Your uploaded documents will be automatically attached to this email when sent.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-surface-container bg-surface-container-lowest flex items-center justify-end gap-3">
+              <Button variant="outline" onClick={() => setDraftModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSubmitDraft} 
+                disabled={isGenerating || isSubmitting || !draftBody.trim()}
+                loading={isSubmitting}
+              >
+                <Send className="w-4 h-4 mr-1.5" />
+                Submit Application
+              </Button>
+            </div>
+          </motion.div>
         </div>
       )}
     </div>

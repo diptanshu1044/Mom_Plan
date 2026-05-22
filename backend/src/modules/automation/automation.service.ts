@@ -136,12 +136,15 @@ The email should be ready to send as-is. End with "MomPlan Automations System" a
   /**
    * TASK 8: Process Application (Sync replacement for BullMQ)
    */
-  async processApplication(applicationId: string, userId: string) {
+  async processApplication(applicationId: string, userId: string, customBody?: string, customSubject?: string) {
     console.log(`[Worker] Processing Apply Now for application: ${applicationId}`);
 
     try {
       // 1. Compose email (this will fetch contact, prepare payload, and use AI to generate email)
       const emailData = await this.composeApplicationEmail(applicationId, userId);
+
+      if (customBody) emailData.body = customBody;
+      if (customSubject) emailData.subject = customSubject;
 
       // 2. Attach documents and send email
       await sendEmail({

@@ -27,3 +27,13 @@ export const updateApplicationSchema = z.object({
     assigned_admin_id: z.string().nullable().optional(),
   }),
 });
+
+export const applyApplicationSchema = z.object({
+  params: z.object({
+    id: z.string().min(1),
+  }),
+  body: z.object({
+    subject: z.string().optional(),
+    body: z.string().optional(),
+  }),
+});
