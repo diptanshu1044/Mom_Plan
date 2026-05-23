@@ -638,6 +638,7 @@ export default function EligibilityPage() {
                     )}
                   </div>
                 </div>
+              )}
               {/* Step 5: Income & Employment */}
               {step === 5 && (
                 <div className="space-y-6">
