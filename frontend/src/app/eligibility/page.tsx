@@ -74,6 +74,7 @@ export default function EligibilityPage() {
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
+    date_of_birth: "",
     state: "GA",
     zip_code: "",
     preferred_language: "English",
@@ -101,7 +102,7 @@ export default function EligibilityPage() {
   });
 
   // Calculate dynamic steps description
-  const totalSteps = 8;
+  const totalSteps = 9;
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => {
@@ -151,7 +152,7 @@ export default function EligibilityPage() {
   const canContinue = () => {
     switch (step) {
       case 1:
-        return formData.first_name.trim().length > 0 && formData.last_name.trim().length > 0;
+        return formData.first_name.trim().length > 0 && formData.last_name.trim().length > 0 && formData.date_of_birth.trim().length > 0;
       case 2:
         return formData.zip_code.trim().length >= 5;
       case 5:
@@ -194,6 +195,7 @@ export default function EligibilityPage() {
         domestic_violence: formData.domestic_violence,
         chronic_illness: formData.chronic_illness,
         immigration_status: formData.immigration_status,
+        date_of_birth: formData.date_of_birth || null,
         preferred_language: formData.preferred_language,
         marital_status: formData.marital_status,
         other_adults: formData.other_adults,
@@ -372,35 +374,46 @@ export default function EligibilityPage() {
               transition={{ duration: 0.25 }}
               className="min-h-[300px] flex flex-col justify-between"
             >
-              {/* Step 1: Nice to meet you! */}
+              {/* Step 1: Personal Info */}
               {step === 1 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <h2 className="font-display font-black text-2xl md:text-3xl text-on-surface leading-tight">
-                      First, what is your name, mama?
+                      First, let's get to know you, mama! 🌟
                     </h2>
                     <p className="text-sm text-on-surface-variant">
-                      Let's personalize your program scanning.
+                      Tell us your name and when you were born.
                     </p>
                   </div>
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">First Name</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Maria"
-                        value={formData.first_name}
-                        onChange={(e) => handleInputChange("first_name", e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
-                      />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">First Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Maria"
+                          value={formData.first_name}
+                          onChange={(e) => handleInputChange("first_name", e.target.value)}
+                          className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Last Name</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Rodriguez"
+                          value={formData.last_name}
+                          onChange={(e) => handleInputChange("last_name", e.target.value)}
+                          className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
+                        />
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Last Name</label>
+                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Your Date of Birth</label>
                       <input
-                        type="text"
-                        placeholder="e.g. Rodriguez"
-                        value={formData.last_name}
-                        onChange={(e) => handleInputChange("last_name", e.target.value)}
+                        type="date"
+                        value={formData.date_of_birth}
+                        onChange={(e) => handleInputChange("date_of_birth", e.target.value)}
                         className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
                       />
                     </div>
@@ -408,12 +421,12 @@ export default function EligibilityPage() {
                 </div>
               )}
 
-              {/* Step 2: Language & Location */}
+              {/* Step 2: Location & Language */}
               {step === 2 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <h2 className="font-display font-black text-2xl md:text-3xl text-on-surface leading-tight">
-                      Nice to meet you, {formData.first_name}! 🌟 Where do you live?
+                      Nice to meet you, {formData.first_name || "mama"}! 🌟 Where do you live?
                     </h2>
                     <p className="text-sm text-on-surface-variant">
                       Benefits vary heavily by state and regional zip codes.
@@ -446,18 +459,34 @@ export default function EligibilityPage() {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Preferred Language</label>
-                      <select
-                        value={formData.preferred_language}
-                        onChange={(e) => handleInputChange("preferred_language", e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
-                      >
-                        <option value="English">English</option>
-                        <option value="Spanish">Español (Spanish)</option>
-                        <option value="Vietnamese">Tiếng Việt (Vietnamese)</option>
-                        <option value="Chinese">中文 (Chinese)</option>
-                      </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Preferred Language</label>
+                        <select
+                          value={formData.preferred_language}
+                          onChange={(e) => handleInputChange("preferred_language", e.target.value)}
+                          className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
+                        >
+                          <option value="English">English</option>
+                          <option value="Spanish">Español (Spanish)</option>
+                          <option value="Vietnamese">Tiếng Việt (Vietnamese)</option>
+                          <option value="Chinese">中文 (Chinese)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Immigration Status</label>
+                        <select
+                          value={formData.immigration_status}
+                          onChange={(e) => handleInputChange("immigration_status", e.target.value)}
+                          className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
+                        >
+                          <option value="citizen">US Citizen</option>
+                          <option value="eligible_non_citizen">Green Card / Eligible Non-Citizen</option>
+                          <option value="daca">DACA Recipient</option>
+                          <option value="visa_holder">Other Visa Holder / Non-Citizen</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -468,13 +497,13 @@ export default function EligibilityPage() {
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <h2 className="font-display font-black text-2xl md:text-3xl text-on-surface leading-tight">
-                      Tell us about your household size
+                      Tell us about your household setup
                     </h2>
                     <p className="text-sm text-on-surface-variant">
                       Household size includes yourself, children, and any other adults living with you.
                     </p>
                   </div>
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {/* Household Size Counter */}
                     <div className="flex items-center justify-between p-4 rounded-2xl bg-surface-container-low border border-outline-variant/30">
                       <div>
@@ -501,6 +530,51 @@ export default function EligibilityPage() {
                       </div>
                     </div>
 
+                    <div>
+                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Marital Status</label>
+                      <select
+                        value={formData.marital_status}
+                        onChange={(e) => handleInputChange("marital_status", e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
+                      >
+                        <option value="single">Single</option>
+                        <option value="married">Married</option>
+                        <option value="divorced">Divorced</option>
+                        <option value="separated">Separated</option>
+                        <option value="widowed">Widowed</option>
+                      </select>
+                    </div>
+
+                    <label className="flex items-start gap-4 p-4 rounded-2xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={formData.other_adults}
+                        onChange={(e) => handleInputChange("other_adults", e.target.checked)}
+                        className="w-5 h-5 mt-0.5 rounded accent-primary-500 shrink-0"
+                      />
+                      <div>
+                        <div className="font-bold text-sm text-on-surface">Are there other adults in the household?</div>
+                        <div className="text-xs text-on-surface-variant mt-0.5">
+                          Check this if you live with family members, friends, or a partner.
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Children & Pregnancy */}
+              {step === 4 && (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h2 className="font-display font-black text-2xl md:text-3xl text-on-surface leading-tight">
+                      Tell us about your children
+                    </h2>
+                    <p className="text-sm text-on-surface-variant">
+                      Many programs are designed specifically for pregnant mamas and families with kids.
+                    </p>
+                  </div>
+                  <div className="space-y-4">
                     {/* Children Counter */}
                     <div className="flex items-center justify-between p-4 rounded-2xl bg-surface-container-low border border-outline-variant/30">
                       <div>
@@ -542,48 +616,29 @@ export default function EligibilityPage() {
                         </div>
                       </div>
                     </label>
-                  </div>
-                </div>
-              )}
 
-              {/* Step 4: Kids birthdates */}
-              {step === 4 && (
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <h2 className="font-display font-black text-2xl md:text-3xl text-on-surface leading-tight">
-                      When were your children born?
-                    </h2>
-                    <p className="text-sm text-on-surface-variant">
-                      Child care programs like Georgia CAPS and PeachCare require child birthdates to verify eligibility.
-                    </p>
-                  </div>
-                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
-                    {formData.num_children === 0 ? (
-                      <div className="text-center py-6 text-on-surface-variant text-sm font-medium">
-                        No children under 18 in household. You can proceed directly.
-                      </div>
-                    ) : (
-                      Array.from({ length: formData.num_children }).map((_, i) => (
-                        <div key={i} className="p-4 rounded-xl border border-outline-variant/30 bg-surface-container-low">
-                          <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">
-                            Child {i + 1} Birthdate
-                          </label>
-                          <div className="relative">
+                    {/* Children birthdates if num_children > 0 */}
+                    {formData.num_children > 0 && (
+                      <div className="space-y-3 max-h-[200px] overflow-y-auto pr-1 border-t border-outline-variant/20 pt-3 mt-3">
+                        <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                          Children's Birthdates
+                        </label>
+                        {Array.from({ length: formData.num_children }).map((_, i) => (
+                          <div key={i} className="flex items-center gap-3 p-2 rounded-xl border border-outline-variant/30 bg-surface-container-low">
+                            <span className="text-xs font-bold text-on-surface-variant shrink-0 w-16">Child {i + 1}</span>
                             <input
                               type="date"
                               value={formData.children_birthdates[i] || ""}
                               onChange={(e) => handleChildDobChange(i, e.target.value)}
-                              className="w-full px-4 py-3 rounded-lg border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
+                              className="w-full px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest focus:border-primary-500 outline-none text-sm transition-all font-medium text-on-surface"
                             />
                           </div>
-                        </div>
-                      ))
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
-              )}
-
-              {/* Step 5: Income & Work */}
+              {/* Step 5: Income & Employment */}
               {step === 5 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
@@ -625,44 +680,83 @@ export default function EligibilityPage() {
                         <option value="disabled">Receiving Disability Assistance</option>
                       </select>
                     </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Income Sources</label>
+                      <p className="text-xs text-on-surface-variant mb-2">Tap all categories that apply to your household.</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[150px] overflow-y-auto pr-1">
+                        {INCOME_SOURCES_OPTIONS.map((option) => {
+                          const active = formData.income_sources.includes(option.id);
+                          return (
+                            <button
+                              key={option.id}
+                              type="button"
+                              onClick={() => toggleIncomeSource(option.id)}
+                              className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition-all ${
+                                active
+                                  ? "bg-rose-50 border-rose-400 text-rose-900 shadow-sm scale-[0.98]"
+                                  : "bg-surface-container-low border-outline-variant/30 text-on-surface hover:bg-surface-container"
+                              }`}
+                            >
+                              <span className="text-xs font-bold">{option.label}</span>
+                              {active && (
+                                <div className="w-4 h-4 rounded-full bg-rose-500 flex items-center justify-center text-white shrink-0">
+                                  <Check className="w-3 h-3" />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Step 6: Income Sources */}
+              {/* Step 6: Childcare */}
               {step === 6 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <h2 className="font-display font-black text-2xl md:text-3xl text-on-surface leading-tight">
-                      Where does your income come from?
+                      Childcare assistance
                     </h2>
                     <p className="text-sm text-on-surface-variant">
-                      Tap all categories that apply to your household.
+                      Let us know if you need or pay for childcare.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[250px] overflow-y-auto pr-1">
-                    {INCOME_SOURCES_OPTIONS.map((option) => {
-                      const active = formData.income_sources.includes(option.id);
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          onClick={() => toggleIncomeSource(option.id)}
-                          className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
-                            active
-                              ? "bg-rose-50 border-rose-400 text-rose-900 shadow-sm scale-[0.98]"
-                              : "bg-surface-container-low border-outline-variant/30 text-on-surface hover:bg-surface-container"
-                          }`}
-                        >
-                          <span className="text-sm font-bold">{option.label}</span>
-                          {active && (
-                            <div className="w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center text-white shrink-0">
-                              <Check className="w-3.5 h-3.5" />
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
+                  <div className="space-y-4">
+                    <label className="flex items-start gap-4 p-4 rounded-2xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={formData.needs_childcare}
+                        onChange={(e) => handleInputChange("needs_childcare", e.target.checked)}
+                        className="w-5 h-5 mt-0.5 rounded accent-primary-500 shrink-0"
+                      />
+                      <div>
+                        <div className="font-bold text-sm text-on-surface">Do you need childcare assistance?</div>
+                        <div className="text-xs text-on-surface-variant mt-0.5">
+                          For working or student moms needing help paying for daycare or afterschool programs.
+                        </div>
+                      </div>
+                    </label>
+
+                    {formData.needs_childcare && (
+                      <div className="space-y-2">
+                        <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">Estimated Monthly Childcare Cost</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-on-surface-variant font-bold">$</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            placeholder="e.g. 400"
+                            value={formData.monthly_childcare_cost}
+                            onChange={(e) => handleInputChange("monthly_childcare_cost", e.target.value.replace(/\D/g, ""))}
+                            className="w-full pl-8 pr-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -732,35 +826,33 @@ export default function EligibilityPage() {
                 </div>
               )}
 
-              {/* Step 8: Safety & Health Checks */}
+              {/* Step 8: Health & Safety */}
               {step === 8 && (
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <h2 className="font-display font-black text-2xl md:text-3xl text-on-surface leading-tight">
-                      Special situations & assistance
+                      Health & safety indicators
                     </h2>
                     <p className="text-sm text-on-surface-variant">
-                      Critical factors used to trigger specific child care subsidies, health assistance, and safety support.
+                      Critical factors used to match healthcare assistance and safety support services.
                     </p>
                   </div>
                   <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                    {/* Needs Childcare Check */}
-                    <label className="flex items-start gap-3 p-3.5 rounded-xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={formData.needs_childcare}
-                        onChange={(e) => handleInputChange("needs_childcare", e.target.checked)}
-                        className="w-4 h-4 mt-0.5 rounded accent-primary-500 shrink-0"
-                      />
-                      <div>
-                        <div className="font-bold text-sm text-on-surface">Do you need childcare assistance?</div>
-                        <div className="text-xs text-on-surface-variant mt-0.5">
-                          For working or student moms needing help paying for daycare or afterschool programs.
-                        </div>
-                      </div>
-                    </label>
+                    <div>
+                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Health Insurance Status</label>
+                      <select
+                        value={formData.health_insurance}
+                        onChange={(e) => handleInputChange("health_insurance", e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
+                      >
+                        <option value="none">Uninsured</option>
+                        <option value="private">Private (Employer/Individual)</option>
+                        <option value="medicaid">Medicaid / PeachCare</option>
+                        <option value="medicare">Medicare</option>
+                        <option value="other">Other Public Plan</option>
+                      </select>
+                    </div>
 
-                    {/* Chronic Illness Check */}
                     <label className="flex items-start gap-3 p-3.5 rounded-xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
                       <input
                         type="checkbox"
@@ -769,14 +861,28 @@ export default function EligibilityPage() {
                         className="w-4 h-4 mt-0.5 rounded accent-primary-500 shrink-0"
                       />
                       <div>
-                        <div className="font-bold text-sm text-on-surface">Chronic illness or disability?</div>
+                        <div className="font-bold text-sm text-on-surface">Chronic illness?</div>
                         <div className="text-xs text-on-surface-variant mt-0.5">
                           Checks medical expense deductions and matches specialized healthcare assistance.
                         </div>
                       </div>
                     </label>
 
-                    {/* Domestic Violence Safe Check */}
+                    <label className="flex items-start gap-3 p-3.5 rounded-xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={formData.has_disability}
+                        onChange={(e) => handleInputChange("has_disability", e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded accent-primary-500 shrink-0"
+                      />
+                      <div>
+                        <div className="font-bold text-sm text-on-surface">Diagnosed physical or mental disability?</div>
+                        <div className="text-xs text-on-surface-variant mt-0.5">
+                          Assists in qualifying for SSI or disability support.
+                        </div>
+                      </div>
+                    </label>
+
                     <label className="flex items-start gap-3 p-3.5 rounded-xl border border-outline-variant/30 bg-red-50/20 hover:bg-red-50/40 cursor-pointer transition-all">
                       <input
                         type="checkbox"
@@ -793,24 +899,37 @@ export default function EligibilityPage() {
                         </div>
                       </div>
                     </label>
+                  </div>
+                </div>
+              )}
 
-                    {/* Citizenship check */}
+              {/* Step 9: Additional Context */}
+              {step === 9 && (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h2 className="font-display font-black text-2xl md:text-3xl text-on-surface leading-tight">
+                      Additional context
+                    </h2>
+                    <p className="text-sm text-on-surface-variant">
+                      Almost done! These last details help refine specialized assistance eligibility.
+                    </p>
+                  </div>
+                  <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Citizenship / Immigration Status</label>
+                      <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Savings & Assets</label>
                       <select
-                        value={formData.immigration_status}
-                        onChange={(e) => handleInputChange("immigration_status", e.target.value)}
-                        className="w-full px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
+                        value={formData.savings_assets}
+                        onChange={(e) => handleInputChange("savings_assets", e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
                       >
-                        <option value="citizen">US Citizen</option>
-                        <option value="eligible_non_citizen">Permanent Resident (Green Card) / Eligible Non-Citizen</option>
-                        <option value="daca">DACA Recipient</option>
-                        <option value="visa_holder">Other Visa Holder / Non-Citizen</option>
+                        <option value="none">No assets / Under $2,000</option>
+                        <option value="low">Low ($2,000 - $5,000)</option>
+                        <option value="medium">Medium ($5,000 - $10,000)</option>
+                        <option value="high">Significant (Above $10,000)</option>
                       </select>
                     </div>
 
-                    {/* Legal Dependencies Check */}
-                    <label className="flex items-start gap-3 p-3.5 rounded-xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors mt-3">
+                    <label className="flex items-start gap-3 p-3.5 rounded-xl border border-outline-variant/30 bg-surface-container-low hover:bg-surface-container cursor-pointer transition-colors">
                       <input
                         type="checkbox"
                         checked={formData.legal_issues}
@@ -824,25 +943,6 @@ export default function EligibilityPage() {
                         </div>
                       </div>
                     </label>
-
-                    {/* Childcare Costs Check */}
-                    {formData.needs_childcare && (
-                      <div className="mt-3">
-                        <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Estimated Monthly Childcare Cost</label>
-                        <div className="relative">
-                          <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-on-surface-variant font-bold">$</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            placeholder="e.g. 400"
-                            value={formData.monthly_childcare_cost}
-                            onChange={(e) => handleInputChange("monthly_childcare_cost", e.target.value.replace(/\D/g, ""))}
-                            className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-base transition-all font-medium text-on-surface"
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}

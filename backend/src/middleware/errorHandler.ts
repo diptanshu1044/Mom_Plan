@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/errors';
 import { ZodError } from 'zod';
+import { safeLogger } from './sanitize';
 
 export const errorHandler = (
   err: Error,
@@ -9,7 +10,7 @@ export const errorHandler = (
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   next: NextFunction
 ) => {
-  console.error('🚨 Error caught by middleware:', err);
+  safeLogger.error('Error caught by middleware:', err);
 
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({

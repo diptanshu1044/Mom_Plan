@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { useAuthStore } from "@/store/auth.store";
-import { api } from "@/lib/api";
+import { api, setInMemoryToken } from "@/lib/api";
 
 const registerSchema = z
   .object({
@@ -71,8 +71,9 @@ function RegisterForm() {
         password: data.password,
         phone: data.phone,
       });
-      const { user, accessToken, refreshToken } = response.data.data;
-      setAuth(user, accessToken, refreshToken);
+      const { user, accessToken } = response.data.data;
+      setInMemoryToken(accessToken);
+      setAuth(user, accessToken);
       router.push("/dashboard");
     } catch (err: any) {
       setError(

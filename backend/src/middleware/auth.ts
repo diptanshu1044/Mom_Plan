@@ -12,13 +12,22 @@ interface JwtPayload {
 }
 
 export const authenticate = (req: Request, res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
+  let token: string | undefined;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next(new UnauthorizedError('Authentication token is missing or invalid'));
+  // 1. Check Authorization header
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
   }
 
-  const token = authHeader.split(' ')[1];
+  // 2. Fall back to cookie (mp_at)
+  if (!token && req.cookies) {
+    token = req.cookies.mp_at;
+  }
+
+  if (!token) {
+    return next(new UnauthorizedError('Authentication token is missing or invalid'));
+  }
 
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;

@@ -53,6 +53,13 @@ export class EligibilityService {
         eviction_risk: profile.eviction_risk ?? undefined,
         domestic_violence: profile.domestic_violence ?? undefined,
         chronic_illness: profile.chronic_illness ?? undefined,
+        preferred_language: profile.preferred_language || undefined,
+        marital_status: profile.marital_status || undefined,
+        income_sources: (profile.income_sources as string[]) || undefined,
+        health_insurance: profile.health_insurance || undefined,
+        savings_assets: profile.savings_assets || undefined,
+        monthly_childcare_cost: profile.monthly_childcare_cost ?? undefined,
+        legal_issues: profile.legal_issues && Array.isArray(profile.legal_issues) && profile.legal_issues.length > 0 ? true : false,
       });
       return { programId: p.id, ...evaluation };
     });

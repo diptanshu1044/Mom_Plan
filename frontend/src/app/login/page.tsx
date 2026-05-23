@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { useAuthStore } from "@/store/auth.store";
-import { api } from "@/lib/api";
+import { api, setInMemoryToken } from "@/lib/api";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -39,8 +39,11 @@ export default function LoginPage() {
     setError("");
     try {
       const response = await api.post("/api/auth/login", data);
-      const { user, accessToken, refreshToken } = response.data.data;
-      setAuth(user, accessToken, refreshToken);
+      // SECURITY: refreshToken is now an httpOnly cookie set by the server.
+      // We only receive the user object and accessToken in the JSON body.
+      const { user, accessToken } = response.data.data;
+      setInMemoryToken(accessToken);
+      setAuth(user, accessToken);
 
       if (user.role === "admin") {
         router.push("/admin");

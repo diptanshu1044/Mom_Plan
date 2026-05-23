@@ -23,10 +23,12 @@ export interface AuthUser {
 
 interface AuthState {
   user: AuthUser | null;
+  // accessToken is kept in memory only — NOT persisted to localStorage
+  // The refresh token lives in an httpOnly cookie managed by the server
   accessToken: string | null;
-  refreshToken: string | null;
   isAuthenticated: boolean;
-  setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
+  setAuth: (user: AuthUser, accessToken: string) => void;
+  setAccessToken: (accessToken: string) => void;
   logout: () => void;
   updateUser: (user: Partial<AuthUser>) => void;
 }
@@ -36,23 +38,30 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       accessToken: null,
-      refreshToken: null,
       isAuthenticated: false,
 
-      setAuth: (user, accessToken, refreshToken) => {
-        if (typeof window !== "undefined") {
-          localStorage.setItem("momplan_access_token", accessToken);
-          localStorage.setItem("momplan_refresh_token", refreshToken);
-        }
-        set({ user, accessToken, refreshToken, isAuthenticated: true });
+      /**
+       * Called after a successful login/register API response.
+       * Stores the access token in memory (Zustand state), NOT in localStorage.
+       * The refresh token is in an httpOnly cookie set by the server.
+       */
+      setAuth: (user, accessToken) => {
+        set({ user, accessToken, isAuthenticated: true });
+      },
+
+      /** Called by the API interceptor after a silent token refresh */
+      setAccessToken: (accessToken) => {
+        set({ accessToken });
       },
 
       logout: () => {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("momplan_access_token");
-          localStorage.removeItem("momplan_refresh_token");
-        }
-        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+        // No localStorage to clean up — tokens were never stored there.
+        // The server will clear the httpOnly refresh cookie via the logout endpoint.
+        set({
+          user: null,
+          accessToken: null,
+          isAuthenticated: false,
+        });
       },
 
       updateUser: (partial) =>
@@ -61,10 +70,14 @@ export const useAuthStore = create<AuthState>()(
         })),
     }),
     {
-      name: "momplan-auth",
+      name: "momplan-user",
+      // SECURITY: Only persist non-sensitive user metadata.
+      // accessToken is NEVER persisted — it lives in memory only.
+      // refreshToken lives in an httpOnly server cookie (not accessible here).
       partialize: (state: AuthState) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        // accessToken intentionally excluded
       }),
     } as any
   )

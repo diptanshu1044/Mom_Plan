@@ -1,9 +1,11 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
+import { responseSanitizer } from './middleware/sanitize';
 
 // Import Feature Routers
 import authRoutes from './modules/auth/auth.routes';
@@ -35,9 +37,12 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: allowedOrigins,
-    credentials: true,
+    credentials: true, // Required so browsers send/receive httpOnly cookies
   })
 );
+
+// Parse httpOnly cookies (used for secure auth token storage)
+app.use(cookieParser());
 
 // Apply billing router before global body parsers to permit raw Buffer capture on /api/billing/webhook
 app.use('/api/billing', billingRoutes);
@@ -48,6 +53,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Apply General Rate Limiting to all general API surface endpoints
 app.use('/api', apiLimiter);
+
+// Response sanitizer: strips sensitive PII fields (ssn_last_four, password_hash, etc.)
+// from ALL outbound JSON responses before they reach the client
+app.use(responseSanitizer);
 
 // Mount Routers
 app.use('/api/auth', authRoutes);
