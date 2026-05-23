@@ -351,10 +351,11 @@ export default function DashboardPage() {
                 ) : (
                   <div className="space-y-3">
                     {upcomingDeadlines.slice(0, 4).map((deadline: any) => {
-                      const daysLeft = Math.ceil(
-                        (new Date(deadline.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-                      );
-                      const isUrgent = daysLeft <= 7;
+                      const dueTime = new Date(deadline.due_date).getTime();
+                      const daysLeft = isNaN(dueTime)
+                        ? 0
+                        : Math.ceil((dueTime - Date.now()) / (1000 * 60 * 60 * 24));
+                      const isUrgent = !isNaN(dueTime) && daysLeft <= 7;
 
                       return (
                         <div

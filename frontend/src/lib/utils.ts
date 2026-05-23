@@ -13,16 +13,21 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
-export function formatDate(date: string | Date): string {
+export function formatDate(date: string | Date | null | undefined): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(date));
+  }).format(d);
 }
 
-export function formatRelativeDate(date: string | Date): string {
+export function formatRelativeDate(date: string | Date | null | undefined): string {
+  if (!date) return "—";
   const d = new Date(date);
+  if (isNaN(d.getTime())) return "—";
   const now = new Date();
   const diffMs = d.getTime() - now.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
@@ -32,7 +37,7 @@ export function formatRelativeDate(date: string | Date): string {
   if (diffDays === -1) return "Yesterday";
   if (diffDays > 0 && diffDays <= 30) return `In ${diffDays} days`;
   if (diffDays < 0 && diffDays >= -30) return `${Math.abs(diffDays)} days ago`;
-  return formatDate(date);
+  return formatDate(d);
 }
 
 export function capitalizeFirst(str: string): string {

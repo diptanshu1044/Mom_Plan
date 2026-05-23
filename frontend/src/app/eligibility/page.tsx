@@ -169,6 +169,7 @@ export default function EligibilityPage() {
       const ages = formData.children_birthdates.map((dob) => {
         if (!dob) return 2; // Default fallback age
         const birth = new Date(dob);
+        if (isNaN(birth.getTime())) return 2;
         const diff = Date.now() - birth.getTime();
         const ageDate = new Date(diff);
         return Math.max(0, Math.abs(ageDate.getUTCFullYear() - 1970));

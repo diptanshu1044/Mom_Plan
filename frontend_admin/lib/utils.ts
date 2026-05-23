@@ -13,15 +13,21 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
-export function formatDate(date: string | Date): string {
+export function formatDate(date: string | Date | null | undefined): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(date));
+  }).format(d);
 }
 
-export function formatDatetime(date: string | Date): string {
+export function formatDatetime(date: string | Date | null | undefined): string {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -29,11 +35,13 @@ export function formatDatetime(date: string | Date): string {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-  }).format(new Date(date));
+  }).format(d);
 }
 
-export function formatRelativeDate(date: string | Date): string {
+export function formatRelativeDate(date: string | Date | null | undefined): string {
+  if (!date) return "—";
   const d = new Date(date);
+  if (isNaN(d.getTime())) return "—";
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffSec = Math.round(diffMs / 1000);
@@ -46,7 +54,7 @@ export function formatRelativeDate(date: string | Date): string {
   if (diffHr < 24) return `${diffHr}h ago`;
   if (diffDays === 1) return "yesterday";
   if (diffDays < 30) return `${diffDays}d ago`;
-  return formatDate(date);
+  return formatDate(d);
 }
 
 export function capitalizeFirst(str: string): string {
