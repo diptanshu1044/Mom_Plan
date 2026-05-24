@@ -334,7 +334,7 @@ export default function DocumentsPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => viewPdf(pdf.id)}
-                        disabled={isViewing || isDownloading}
+                        disabled={!!isViewing || !!isDownloading}
                         title="View PDF"
                         className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary-500 transition-colors"
                       >
@@ -342,7 +342,7 @@ export default function DocumentsPage() {
                       </button>
                       <button
                         onClick={() => downloadPdf(pdf.id, pdf.program?.name)}
-                        disabled={isViewing || isDownloading}
+                        disabled={!!isViewing || !!isDownloading}
                         title="Download PDF"
                         className="p-1.5 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary-500 transition-colors"
                       >

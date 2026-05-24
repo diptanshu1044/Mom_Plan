@@ -232,8 +232,8 @@ export default function ApplicationsPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => viewPdf(app.generated_pdfs[0].id)}
-                        disabled={isViewing || isDownloading}
-                        loading={isViewing && pdfModal.pdfId === app.generated_pdfs[0].id}
+                        disabled={!!isViewing || !!isDownloading}
+                        loading={isViewing === app.generated_pdfs[0].id}
                       >
                         <Eye className="w-3.5 h-3.5 mr-1" />
                         View PDF
@@ -242,8 +242,8 @@ export default function ApplicationsPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => downloadPdf(app.generated_pdfs[0].id, app.program?.name)}
-                        disabled={isViewing || isDownloading}
-                        loading={isDownloading && pdfModal.pdfId === app.generated_pdfs[0].id}
+                        disabled={!!isViewing || !!isDownloading}
+                        loading={isDownloading === app.generated_pdfs[0].id}
                       >
                         <Download className="w-3.5 h-3.5 mr-1" />
                         Download
@@ -479,16 +479,16 @@ export default function ApplicationsPage() {
                   <Button
                     variant="outline"
                     onClick={() => viewPdf(pdfModal.pdfId!)}
-                    disabled={isViewing || isDownloading}
-                    loading={isViewing}
+                    disabled={!!isViewing || !!isDownloading}
+                    loading={isViewing === pdfModal.pdfId}
                   >
                     <Eye className="w-4 h-4 mr-1.5" />
                     View PDF
                   </Button>
                   <Button
                     onClick={() => downloadPdf(pdfModal.pdfId!, pdfModal.programName)}
-                    disabled={isViewing || isDownloading}
-                    loading={isDownloading}
+                    disabled={!!isViewing || !!isDownloading}
+                    loading={isDownloading === pdfModal.pdfId}
                   >
                     <Download className="w-4 h-4 mr-1.5" />
                     Download PDF

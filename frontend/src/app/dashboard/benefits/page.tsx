@@ -431,16 +431,16 @@ export default function BenefitsPage() {
                   <Button
                     variant="outline"
                     onClick={() => viewPdf(pdfModal.pdfId!)}
-                    disabled={isViewing || isDownloading}
-                    loading={isViewing}
+                    disabled={!!isViewing || !!isDownloading}
+                    loading={isViewing === pdfModal.pdfId}
                   >
                     <Eye className="w-4 h-4 mr-1.5" />
                     View PDF
                   </Button>
                   <Button
                     onClick={() => downloadPdf(pdfModal.pdfId!, pdfModal.programName)}
-                    disabled={isViewing || isDownloading}
-                    loading={isDownloading}
+                    disabled={!!isViewing || !!isDownloading}
+                    loading={isDownloading === pdfModal.pdfId}
                   >
                     <Download className="w-4 h-4 mr-1.5" />
                     Download PDF

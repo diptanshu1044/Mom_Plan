@@ -30,8 +30,8 @@ export function usePdfGeneration() {
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [pendingParams, setPendingParams] = useState<PendingGenerateParams | null>(null);
 
-  const [isViewing, setIsViewing] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isViewing, setIsViewing] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState<string | null>(null);
 
   const handleGeneratePdf = async (programId: string, applicationId?: string, programName?: string) => {
     // Determine loading indicator key (use application_id if tracker, otherwise program_id)
@@ -89,6 +89,9 @@ export function usePdfGeneration() {
         downloadUrl: urlRes.data.data.url,
         programName,
       });
+
+      // Auto-trigger download right after successful generation
+      downloadPdf(pdfId, programName);
     } catch (err) {
       console.error("Failed to generate PDF application packet:", err);
     } finally {
@@ -98,7 +101,7 @@ export function usePdfGeneration() {
   };
 
   const viewPdf = async (pdfId: string) => {
-    setIsViewing(true);
+    setIsViewing(pdfId);
     try {
       const response = await api.get(`/api/pdf/${pdfId}/download/stream`, {
         responseType: "blob",
@@ -110,12 +113,12 @@ export function usePdfGeneration() {
     } catch (err) {
       console.error("Failed to view PDF:", err);
     } finally {
-      setIsViewing(false);
+      setIsViewing(null);
     }
   };
 
   const downloadPdf = async (pdfId: string, programName?: string) => {
-    setIsDownloading(true);
+    setIsDownloading(pdfId);
     try {
       const response = await api.get(`/api/pdf/${pdfId}/download/stream`, {
         responseType: "blob",
@@ -132,7 +135,7 @@ export function usePdfGeneration() {
     } catch (err) {
       console.error("Failed to download PDF:", err);
     } finally {
-      setIsDownloading(false);
+      setIsDownloading(null);
     }
   };
 
