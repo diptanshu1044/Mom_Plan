@@ -193,7 +193,7 @@ Write the eligibility summary for this applicant's application packet.`;
 
     // Compile pdf using pdfkit
     const pdfBuffer = await new Promise<Buffer>((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50 });
+      const doc = new PDFDocument({ margin: 50, bufferPages: true });
       const chunks: Buffer[] = [];
 
       doc.on('data', (chunk) => chunks.push(chunk));
@@ -205,37 +205,60 @@ Write the eligibility summary for this applicant's application packet.`;
       const darkColor = '#1E2130';
       const slateColor = '#475569';
       const dividerColor = '#E2E8F0';
+      const lower = program.name.toLowerCase();
 
-      // Cover Page
-      doc.font('Helvetica-Bold').fontSize(24).fillColor(primaryColor).text(program.name, { align: 'center' });
-      doc.moveDown(0.2);
-      doc.font('Helvetica').fontSize(12).fillColor(slateColor).text(requirements?.agency || program.agency, { align: 'center' });
-      
-      doc.moveDown(4);
-      doc.font('Helvetica-Bold').fontSize(16).fillColor(darkColor).text('Application for Government Assistance', { align: 'center' });
-      doc.font('Helvetica').fontSize(11).fillColor(slateColor).text('Prepared by MomPlan Application System', { align: 'center' });
-      
-      doc.moveDown(4);
-      doc.font('Helvetica-Bold').fontSize(12).fillColor(darkColor).text(`Applicant: `, { continued: true }).font('Helvetica').text(user.full_name);
-      doc.moveDown(0.2);
-      doc.font('Helvetica-Bold').fontSize(12).text(`Date: `, { continued: true }).font('Helvetica').text(this.formatDate(new Date()));
-      doc.moveDown(0.2);
-      doc.font('Helvetica-Bold').fontSize(12).text(`Reference ID: `, { continued: true }).font('Helvetica').text(uuid);
+      // --- COVER PAGE DESIGN ---
+      // Colored banner block at the top
+      doc.rect(0, 0, 612, 190).fill('#F3F0FF'); // Elegant light purple background
+
+      // Brand Title Tag
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(primaryColor).text('MOMPLAN DIGITAL VAULT', 50, 45, { characterSpacing: 1 });
+
+      // Program Name in large bold letters
+      doc.font('Helvetica-Bold').fontSize(26).fillColor(darkColor).text(program.name, 50, 75, { width: 512 });
+      doc.moveDown(0.25);
+      // Agency Subtitle
+      doc.font('Helvetica-Bold').fontSize(10).fillColor(primaryColor).text((requirements?.agency || program.agency).toUpperCase(), { characterSpacing: 0.5 });
+
+      // Program Specific Title
+      const programSpecificTitle = this.getProgramSpecificTitle(program.name);
+      doc.font('Helvetica-Bold').fontSize(17).fillColor(darkColor).text(programSpecificTitle, 50, 230);
+
+      // Horizontal separator line
+      doc.moveTo(50, 255).lineTo(562, 255).lineWidth(1.5).stroke(primaryColor);
+
+      // Introduction
+      const programIntro = this.getProgramIntroduction(program.name);
+      doc.font('Helvetica').fontSize(10).fillColor(slateColor).text(programIntro, 50, 275, { width: 512, lineGap: 3 });
+
+      // Metadata Details Box (bordered)
+      const boxY = 380;
+      doc.roundedRect(50, boxY, 512, 110, 8).lineWidth(1).stroke('#E2E8F0');
+
+      // Metadata details inside the box
+      doc.font('Helvetica-Bold').fontSize(10).fillColor(darkColor).text('APPLICANT PORTFOLIO SUMMARY', 70, boxY + 15);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(slateColor).text('Applicant Name:', 70, boxY + 35).font('Helvetica').fillColor(darkColor).text(user.full_name, 190, boxY + 35);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(slateColor).text('Submission Date:', 70, boxY + 55).font('Helvetica').fillColor(darkColor).text(this.formatDate(new Date()), 190, boxY + 55);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(slateColor).text('Verification ID:', 70, boxY + 75).font('Helvetica').fillColor(darkColor).text(uuid, 190, boxY + 75);
+
+      // Bottom Secure Badge / Note
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#10B981').text('✓ DIGITALLY SECURED & VERIFIED BY MOMPLAN', 50, 680);
+      doc.font('Helvetica').fontSize(8).fillColor(slateColor).text('This is an official document portfolio generated on behalf of the applicant for direct agency intake processing.', 50, 695);
 
       doc.addPage();
 
       const drawSectionHeader = (title: string) => {
-        doc.moveDown(1);
-        doc.font('Helvetica-Bold').fontSize(13).fillColor(primaryColor).text(title);
+        doc.moveDown(0.8);
+        doc.font('Helvetica-Bold').fontSize(12).fillColor(primaryColor).text(title);
         // Draw line divider
-        doc.moveTo(50, doc.y + 4).lineTo(562, doc.y + 4).stroke(dividerColor);
-        doc.moveDown(0.6);
+        doc.moveTo(50, doc.y + 3).lineTo(562, doc.y + 3).stroke(dividerColor);
+        doc.moveDown(0.5);
       };
 
       const drawRow = (label: string, value: string) => {
-        doc.font('Helvetica-Bold').fontSize(10).fillColor(darkColor).text(label, { continued: true })
+        doc.font('Helvetica-Bold').fontSize(9).fillColor(darkColor).text(label, { continued: true })
            .font('Helvetica').fillColor(slateColor).text(` ${value}`);
-        doc.moveDown(0.35);
+        doc.moveDown(0.3);
       };
 
       // Section 1 — Applicant Summary
@@ -259,7 +282,11 @@ Write the eligibility summary for this applicant's application packet.`;
       drawRow('Children Ages:', childAgesStr);
       drawRow('Marital Status:', this.slugToTitle(profile.marital_status || 'N/A'));
       drawRow('Employment Status:', this.slugToTitle(profile.employment_status || 'N/A'));
-      drawRow('Employer:', profile.employer_name || 'N/A');
+      
+      if (profile.employer_name) {
+        drawRow('Employer:', profile.employer_name);
+      }
+
       drawRow('Monthly Income:', this.formatCurrency(profile.monthly_income));
       drawRow('Annual Income:', this.formatCurrency(profile.monthly_income * 12));
       drawRow('Federal Poverty Level %:', this.calculateFplPercentage(profile.household_size, profile.monthly_income));
@@ -270,12 +297,33 @@ Write the eligibility summary for this applicant's application packet.`;
       }
       drawRow('Income Sources:', incomeSourcesStr);
 
-      // Section 3 — Housing
+      // Child Care & Development subsidy specifics
+      if (lower.includes('ccdf') || lower.includes('child care') || lower.includes('head start')) {
+        doc.moveDown(0.2);
+        doc.font('Helvetica-Bold').fontSize(9).fillColor(darkColor).text('Childcare Subsidy Details:');
+        drawRow('Childcare Subsidies Needed:', this.formatBoolean(profile.needs_childcare));
+        if (profile.childcare_preference) {
+          drawRow('Preferred Childcare Mode:', this.slugToTitle(profile.childcare_preference));
+        }
+        if (profile.childcare_provider) {
+          drawRow('Chosen Provider Name:', profile.childcare_provider);
+        }
+        if (profile.monthly_childcare_cost !== null && profile.monthly_childcare_cost !== undefined) {
+          drawRow('Current Monthly Childcare Expenses:', this.formatCurrency(profile.monthly_childcare_cost));
+        }
+      }
+
+      // Section 3 — Housing & Utilities
       drawSectionHeader('Section 3 — Housing');
       drawRow('Housing Status:', this.slugToTitle(profile.housing_status || 'N/A'));
-      drawRow('Monthly Rent:', profile.monthly_rent !== null && profile.monthly_rent !== undefined ? this.formatCurrency(profile.monthly_rent) : 'N/A');
-      drawRow('Monthly Utilities:', profile.monthly_utilities !== null && profile.monthly_utilities !== undefined ? this.formatCurrency(profile.monthly_utilities) : 'N/A');
-      drawRow('Eviction Risk:', this.formatBoolean(profile.eviction_risk));
+      
+      if (profile.monthly_rent !== null && profile.monthly_rent !== undefined) {
+        drawRow('Monthly Rent:', this.formatCurrency(profile.monthly_rent));
+      }
+      if (profile.monthly_utilities !== null && profile.monthly_utilities !== undefined) {
+        drawRow('Monthly Utilities:', this.formatCurrency(profile.monthly_utilities));
+      }
+      drawRow('Eviction/Homelessness Risk:', this.formatBoolean(profile.eviction_risk));
 
       // Section 4 — Health & Demographics
       drawSectionHeader('Section 4 — Health & Demographics');
@@ -284,6 +332,18 @@ Write the eligibility summary for this applicant's application packet.`;
       drawRow('Current Health Coverage:', profile.health_insurance || 'None');
       drawRow('Chronic Illness:', this.formatBoolean(profile.chronic_illness));
 
+      // Legal Aid specifics
+      if (lower.includes('legal aid') || lower.includes('civil legal')) {
+        let legalIssuesStr = 'None';
+        if (profile.legal_issues && Array.isArray(profile.legal_issues)) {
+          legalIssuesStr = profile.legal_issues.map(t => this.slugToTitle(String(t))).join(', ');
+        }
+        drawRow('Civil Legal Aid Issues:', legalIssuesStr);
+        if (profile.urgency) {
+          drawRow('Assistance Urgency Level:', this.slugToTitle(profile.urgency));
+        }
+      }
+
       doc.addPage();
 
       // Section 5 — Eligibility Summary
@@ -291,78 +351,99 @@ Write the eligibility summary for this applicant's application packet.`;
       drawRow('Program Matched:', program.name);
       drawRow('Qualification Status:', this.slugToTitle(eligibilityResult.status));
       drawRow('AI Confidence Score:', `${eligibilityResult.confidence_score}%`);
-      drawRow('Estimated Monthly Benefit:', `${this.formatCurrency(program.estimated_monthly_value_min)} – ${this.formatCurrency(program.estimated_monthly_value_max)}`);
+      
+      if (program.estimated_monthly_value_min !== null) {
+        drawRow('Estimated Monthly Benefit:', `${this.formatCurrency(program.estimated_monthly_value_min)} – ${this.formatCurrency(program.estimated_monthly_value_max)}`);
+      }
       
       doc.moveDown(0.2);
-      doc.font('Helvetica-Bold').fontSize(10).fillColor(darkColor).text('AI Match Summary:');
-      doc.font('Helvetica').fontSize(10).fillColor(slateColor).text(eligibilitySummary, { lineGap: 3 });
-      doc.moveDown(0.8);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(darkColor).text('AI Match Summary:');
+      doc.font('Helvetica').fontSize(9).fillColor(slateColor).text(eligibilitySummary, { lineGap: 2.5 });
+      doc.moveDown(0.5);
 
       // Section 6 — Supporting Documents
       drawSectionHeader('Section 6 — Supporting Documents');
       
       // Draw Table Header
       const tableStartY = doc.y;
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(darkColor);
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(darkColor);
       doc.text('Document Type', 50, tableStartY);
       doc.text('File Name', 200, tableStartY);
       doc.text('Status', 450, tableStartY);
       
-      doc.moveTo(50, tableStartY + 12).lineTo(562, tableStartY + 12).stroke(dividerColor);
-      doc.moveDown(0.6);
+      doc.moveTo(50, tableStartY + 11).lineTo(562, tableStartY + 11).stroke(dividerColor);
+      doc.moveDown(0.5);
 
       const requirementsDocs = [
         ...(requirements?.required_documents.map(d => ({ type: d, required: true })) || []),
         ...(requirements?.optional_documents.map(d => ({ type: d, required: false })) || [])
       ];
 
-      doc.font('Helvetica').fontSize(9).fillColor(slateColor);
+      doc.font('Helvetica').fontSize(8.5).fillColor(slateColor);
       for (const reqDoc of requirementsDocs) {
         const matchingDoc = user.documents.find(d => d.document_type === reqDoc.type);
         const y = doc.y;
         
         doc.text(this.slugToTitle(reqDoc.type), 50, y);
-        doc.text(matchingDoc ? matchingDoc.display_name : 'Not Provided', 200, y, { width: 230, height: 12, ellipsis: true });
+        doc.text(matchingDoc ? matchingDoc.display_name : 'Not Provided', 200, y, { width: 230, height: 11, ellipsis: true });
         
         let statusText = 'Attached';
         if (!matchingDoc) {
           statusText = reqDoc.required ? 'Not Provided' : 'Optional — Not Provided';
         }
         doc.text(statusText, 450, y);
-        doc.moveDown(0.4);
+        doc.moveDown(0.35);
       }
 
       // Section 7 — Declaration & Signature
-      doc.moveDown(1.5);
-      doc.font('Helvetica-Bold').fontSize(11).fillColor(darkColor).text('APPLICANT DECLARATION', { align: 'center' });
-      doc.moveDown(0.4);
+      doc.moveDown(1);
+      doc.font('Helvetica-Bold').fontSize(10).fillColor(darkColor).text('APPLICANT DECLARATION', { align: 'center' });
+      doc.moveDown(0.3);
       const declarationText = `I certify that all information provided in this application is true, accurate, and complete to the best of my knowledge. I understand that knowingly providing false information is subject to penalties under law.`;
-      doc.font('Helvetica').fontSize(9).fillColor(slateColor).text(declarationText, { align: 'justify', lineGap: 2 });
+      doc.font('Helvetica').fontSize(8.5).fillColor(slateColor).text(declarationText, { align: 'justify', lineGap: 1.5 });
       
-      doc.moveDown(2);
+      doc.moveDown(1.5);
       const sigY = doc.y;
       doc.moveTo(50, sigY + 12).lineTo(300, sigY + 12).stroke(darkColor);
       doc.moveTo(400, sigY + 12).lineTo(562, sigY + 12).stroke(darkColor);
       
-      doc.font('Helvetica').fontSize(9).fillColor(darkColor);
+      doc.font('Helvetica').fontSize(8.5).fillColor(darkColor);
       doc.text('Applicant Signature', 50, sigY + 18);
       doc.text('Date', 400, sigY + 18);
 
-      doc.moveDown(1.5);
-      doc.font('Helvetica-Bold').fontSize(9).text('Printed Name: ', { continued: true }).font('Helvetica').text(user.full_name);
+      doc.moveDown(1.2);
+      doc.font('Helvetica-Bold').fontSize(8.5).text('Printed Name: ', { continued: true }).font('Helvetica').text(user.full_name);
       
-      doc.moveDown(1);
-      doc.fontSize(8).fillColor(slateColor).text(`Prepared on behalf of applicant by MomPlan Application System.`, { align: 'center' });
+      doc.moveDown(0.8);
+      doc.fontSize(7.5).fillColor(slateColor).text(`Prepared on behalf of applicant by MomPlan Application System.`, { align: 'center' });
       doc.text(`This document was generated on ${this.formatDate(new Date())} and is valid for submission.`, { align: 'center' });
 
       // Appendix — Attached Documents
-      // For MVP we just state they are attached to the email
       doc.addPage();
       drawSectionHeader('Appendix — Attached Documents');
-      doc.font('Helvetica').fontSize(10).fillColor(slateColor).text(
+      doc.font('Helvetica').fontSize(9).fillColor(slateColor).text(
         'Due to current system limits, full original copies of the uploaded documents listed in Section 6 are attached separately in your email package. They are also preserved in your secure digital vault on the MomPlan platform.',
-        { lineGap: 3 }
+        { lineGap: 2.5 }
       );
+
+      // --- GLOBAL PAGE NUMBERING & HEADERS/FOOTERS PASS ---
+      const range = doc.bufferedPageRange();
+      for (let i = 1; i < range.count; i++) {
+        doc.switchToPage(i);
+        doc.save();
+        
+        // Header line & text
+        doc.font('Helvetica-Bold').fontSize(7.5).fillColor(slateColor).text(program.name.toUpperCase(), 50, 25);
+        doc.font('Helvetica').fontSize(7.5).text(this.formatDate(new Date()), 500, 25, { align: 'right' });
+        doc.moveTo(50, 36).lineTo(562, 36).lineWidth(0.5).stroke(dividerColor);
+        
+        // Footer line & text
+        doc.moveTo(50, 745).lineTo(562, 745).lineWidth(0.5).stroke(dividerColor);
+        doc.font('Helvetica').fontSize(7.5).fillColor(slateColor).text('Digitally compiled by MomPlan Assistance Platform', 50, 752);
+        doc.text(`Page ${i + 1} of ${range.count}`, 500, 752, { align: 'right' });
+        
+        doc.restore();
+      }
 
       doc.end();
     });
@@ -499,5 +580,67 @@ Write the eligibility summary for this applicant's application packet.`;
       .split('_')
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');
+  }
+
+  private getProgramSpecificTitle(programName: string): string {
+    const lower = programName.toLowerCase();
+    if (lower.includes('snap')) return 'Supplemental Nutrition Assistance Program (SNAP) Benefits Application';
+    if (lower.includes('tanf')) return 'Temporary Assistance for Needy Families (TANF) Application';
+    if (lower.includes('wic')) return 'Women, Infants, and Children (WIC) Nutrition Program Application';
+    if (lower.includes('medicaid')) return 'Medicaid & CHIP Healthcare Coverage Application';
+    if (lower.includes('ccdf') || lower.includes('child care subsidy')) return 'Child Care Development Fund (CCDF) Subsidy Application';
+    if (lower.includes('section 8') || lower.includes('housing choice') || lower.includes('section8')) return 'Section 8 Housing Choice Voucher Application';
+    if (lower.includes('liheap')) return 'Low-Income Home Energy Assistance Program (LIHEAP) Application';
+    if (lower.includes('eitc')) return 'Earned Income Tax Credit (EITC) Benefits Portfolio';
+    if (lower.includes('child tax')) return 'Child Tax Credit (CTC) Verification Portfolio';
+    if (lower.includes('pell')) return 'Federal Pell Grant Student Assistance Application';
+    if (lower.includes('head start')) return 'Head Start & Early Head Start Enrollment Package';
+    if (lower.includes('lifeline')) return 'Lifeline Benefit Phone & Internet Assistance Application';
+    if (lower.includes('legal aid') || lower.includes('civil legal')) return 'Civil Legal Aid Intake & Eligibility Portfolio';
+    return `${programName} Application Portfolio`;
+  }
+
+  private getProgramIntroduction(programName: string): string {
+    const lower = programName.toLowerCase();
+    if (lower.includes('snap')) {
+      return 'This application package contains the necessary applicant details, household demographics, and verified income statements required to determine eligibility for the Supplemental Nutrition Assistance Program (SNAP). SNAP helps low-income individuals and families purchase healthy food.';
+    }
+    if (lower.includes('tanf')) {
+      return 'This document portfolio is prepared for the Temporary Assistance for Needy Families (TANF) program. It outlines the family composition, children details, employment search parameters, and monthly income verification necessary for cash assistance and support service eligibility.';
+    }
+    if (lower.includes('wic')) {
+      return 'This intake portfolio is for the Special Supplemental Nutrition Program for Women, Infants, and Children (WIC). It presents the pregnancy status, children age details, and household nutritional needs to facilitate access to WIC supplemental foods, health care referrals, and nutrition education.';
+    }
+    if (lower.includes('medicaid')) {
+      return 'This application packet compiles demographic and financial verification for Medicaid and Children\'s Health Insurance Program (CHIP). It details household income, health indicators, disability status, and coverage needs to process state health insurance eligibility.';
+    }
+    if (lower.includes('ccdf') || lower.includes('child care subsidy')) {
+      return 'This enrollment package is prepared for the Child Care and Development Fund (CCDF) subsidy. It specifies the applicant\'s employment status, childcare requirements, children age ranges, and verified income statements to secure childcare support benefits.';
+    }
+    if (lower.includes('section 8') || lower.includes('housing choice') || lower.includes('section8')) {
+      return 'This document packet is compiled for the Section 8 Housing Choice Voucher Program. It verifies household size, rental contribution constraints, eviction risks, and total gross income to determine qualification for housing assistance vouchers.';
+    }
+    if (lower.includes('liheap')) {
+      return 'This utility assistance packet is prepared for the Low-Income Home Energy Assistance Program (LIHEAP). It details household composition, energy utility billing status, and income verification to support home heating and cooling energy credit determinations.';
+    }
+    if (lower.includes('eitc')) {
+      return 'This tax credit intake packet compiles household earnings, child details, and tax filing parameters for the Earned Income Tax Credit (EITC). It assists counselors in validating credit amounts during tax preparation.';
+    }
+    if (lower.includes('child tax')) {
+      return 'This validation portfolio supports eligibility for the Child Tax Credit (CTC). It registers child counts, age documentation, dependency verification, and income ranges to support eligibility audits.';
+    }
+    if (lower.includes('pell')) {
+      return 'This student assistance package is compiled for the Federal Pell Grant. It outlines enrollment intent, dependent details, and household income ratios to qualify for post-secondary education tuition subsidies.';
+    }
+    if (lower.includes('head start')) {
+      return 'This enrollment package is for the Head Start and Early Head Start child development programs. It provides household demographics, child age documentation, and family status details to process enrollment placement.';
+    }
+    if (lower.includes('lifeline')) {
+      return 'This communication assistance application is for the Lifeline program. It documents household income and program participation criteria to establish entitlement to subsidized broadband and cellular voice services.';
+    }
+    if (lower.includes('legal aid') || lower.includes('civil legal')) {
+      return 'This intake document supports qualifications for Civil Legal Aid Services. It details the nature of civil legal challenges (housing, safety, employment) along with family income levels to verify qualification under local legal services limits.';
+    }
+    return `This document packet compiles all essential household profiles, income disclosures, and supporting documentation required to review eligibility and initiate enrollment for the ${programName}.`;
   }
 }

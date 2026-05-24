@@ -395,7 +395,7 @@ export default function BenefitsPage() {
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-surface rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col"
+            className="bg-surface rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col"
           >
             <div className="px-6 py-4 border-b border-surface-container flex items-center justify-between bg-surface-container-lowest">
               <div className="flex items-center gap-2">
@@ -422,8 +422,12 @@ export default function BenefitsPage() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-surface-container bg-surface-container-lowest flex items-center justify-end gap-3">
-              <Button variant="outline" onClick={closePdfModal}>
+            <div className="px-6 py-4 border-t border-surface-container bg-surface-container-lowest flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
+              <Button 
+                variant="outline" 
+                onClick={closePdfModal}
+                className="w-full sm:w-auto whitespace-nowrap"
+              >
                 Close
               </Button>
               {pdfModal.pdfId && (
@@ -433,6 +437,7 @@ export default function BenefitsPage() {
                     onClick={() => viewPdf(pdfModal.pdfId!)}
                     disabled={!!isViewing || !!isDownloading}
                     loading={isViewing === pdfModal.pdfId}
+                    className="w-full sm:w-auto whitespace-nowrap"
                   >
                     <Eye className="w-4 h-4 mr-1.5" />
                     View PDF
@@ -441,6 +446,7 @@ export default function BenefitsPage() {
                     onClick={() => downloadPdf(pdfModal.pdfId!, pdfModal.programName)}
                     disabled={!!isViewing || !!isDownloading}
                     loading={isDownloading === pdfModal.pdfId}
+                    className="w-full sm:w-auto whitespace-nowrap"
                   >
                     <Download className="w-4 h-4 mr-1.5" />
                     Download PDF
