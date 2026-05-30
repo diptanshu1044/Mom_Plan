@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
