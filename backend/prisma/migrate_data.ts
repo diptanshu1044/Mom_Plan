@@ -18,7 +18,7 @@ async function main() {
   });
 
   try {
-    console.log('Ensuring all required columns exist on Supabase database...');
+    console.log('Ensuring essential database columns exist on Supabase...');
     await supabase.$executeRawUnsafe(`
       ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_hash text;
     `);
@@ -37,27 +37,28 @@ async function main() {
     const users = await neon.user.findMany();
     console.log(`Found ${users.length} users in Neon. Migrating to Supabase...`);
     for (const user of users) {
-      const { language, ...userData } = user as any;
+      const cleanUser = {
+        id: user.id,
+        email: user.email,
+        password_hash: user.password_hash ?? '',
+        full_name: user.full_name ?? '',
+        phone: user.phone,
+        role: user.role,
+        plan: user.plan,
+        stripe_customer_id: user.stripe_customer_id,
+        stripe_subscription_id: user.stripe_subscription_id,
+        state: user.state,
+        zip_code: user.zip_code,
+        status: user.status,
+        profile_picture: user.profile_picture,
+        last_active_at: user.last_active_at,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+      };
       await supabase.user.upsert({
         where: { id: user.id },
-        update: {
-          email: user.email,
-          password_hash: user.password_hash,
-          full_name: user.full_name,
-          phone: user.phone,
-          role: user.role,
-          plan: user.plan,
-          stripe_customer_id: user.stripe_customer_id,
-          stripe_subscription_id: user.stripe_subscription_id,
-          state: user.state,
-          zip_code: user.zip_code,
-          status: user.status,
-          profile_picture: user.profile_picture,
-          last_active_at: user.last_active_at,
-          created_at: user.created_at,
-          updated_at: user.updated_at,
-        },
-        create: userData,
+        update: cleanUser,
+        create: cleanUser,
       });
     }
     console.log('Users migrated successfully.');

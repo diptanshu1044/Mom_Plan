@@ -53,8 +53,8 @@ enum ApplicationPriority {
 model User {
   id                     String    @id @default(uuid()) @db.Uuid
   email                  String    @unique
-  password_hash          String
-  full_name              String
+  password_hash          String    @default("")
+  full_name              String    @default("")
   phone                  String?
   role                   UserRole  @default(user)
   plan                   UserPlan  @default(free)
@@ -158,7 +158,7 @@ model FamilyProfile {
 }
 
 model BenefitProgram {
-  id                          String   @id @default(uuid()) @db.Uuid
+  id                          String   @id @default(uuid())
   name                        String   @map("program_name")
   agency                      String   @map("administering_agency")
   program_type                String
@@ -214,11 +214,11 @@ model EligibilityResult {
   id               String            @id @default(uuid()) @db.Uuid
   user_id          String            @db.Uuid
   user             User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  program_id       String            @db.Uuid
+  program_id       String
   program          BenefitProgram    @relation(fields: [program_id], references: [id], onDelete: Cascade)
-  status           EligibilityStatus
-  confidence_score Float             // 0-100
-  reasoning        String            @db.Text
+  status           EligibilityStatus @default(check_required)
+  confidence_score Float             @default(0) // 0-100
+  reasoning        String            @default("") @db.Text
   checked_at       DateTime          @default(now())
 
   org_id           String?           @db.Uuid
@@ -240,7 +240,7 @@ model Application {
   id                String              @id @default(uuid()) @db.Uuid
   user_id           String              @db.Uuid
   user              User                @relation("UserApplications", fields: [user_id], references: [id], onDelete: Cascade)
-  program_id        String?             @db.Uuid
+  program_id        String?
   program           BenefitProgram?     @relation(fields: [program_id], references: [id], onDelete: Cascade)
   status            String              @default("draft")
   submitted_at      DateTime?
@@ -343,7 +343,7 @@ model GeneratedPdf {
   user            User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
   application_id  String?     @db.Uuid
   application     Application? @relation(fields: [application_id], references: [id], onDelete: SetNull)
-  program_id      String      @db.Uuid
+  program_id      String
   program         BenefitProgram @relation(fields: [program_id], references: [id], onDelete: Cascade)
   file_url        String      // S3 key or local path
   file_size       Int
@@ -368,7 +368,7 @@ model AccountDeletionRequest {
 
 model ApplicationGuide {
   id            String      @id @default(uuid()) @db.Uuid
-  program_id    String?     @db.Uuid
+  program_id    String?
   program       BenefitProgram? @relation(fields: [program_id], references: [id], onDelete: Cascade)
   guide_name    String
   overview      String?
@@ -416,7 +416,7 @@ model Appointment {
 
 model DocumentRequired {
   id            String         @id @default(uuid()) @db.Uuid
-  program_id    String         @db.Uuid
+  program_id    String
   program       BenefitProgram @relation(fields: [program_id], references: [id], onDelete: Cascade)
   document_name String
   description   String?
@@ -429,7 +429,7 @@ model DocumentRequired {
 
 model IncomeThreshold {
   id             String         @id @default(uuid()) @db.Uuid
-  program_id     String         @db.Uuid
+  program_id     String
   program        BenefitProgram @relation(fields: [program_id], references: [id], onDelete: Cascade)
   household_size Int
   income_limit   Decimal?       @db.Decimal
@@ -515,7 +515,7 @@ model Reminder {
   id            String         @id @default(uuid()) @db.Uuid
   user_id       String         @db.Uuid
   user          User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  program_id    String?        @db.Uuid
+  program_id    String?
   program       BenefitProgram? @relation(fields: [program_id], references: [id], onDelete: Cascade)
   program_name  String?
   renewal_date  DateTime       @db.Date
