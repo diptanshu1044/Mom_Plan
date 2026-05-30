@@ -40,7 +40,8 @@ export const runDeadlineReminderTask = async () => {
 
       for (const deadline of deadlines) {
         // Create DB Notification
-        const msg = `Reminder: Your application deadline for ${deadline.application.program.name} (${deadline.deadline_type.replace('_', ' ')}) is due in ${interval.days} day(s) on ${deadline.due_date.toLocaleDateString()}.`;
+        const programName = deadline.application?.program?.name || 'Assistance Program';
+        const msg = `Reminder: Your application deadline for ${programName} (${deadline.deadline_type.replace('_', ' ')}) is due in ${interval.days} day(s) on ${deadline.due_date.toLocaleDateString()}.`;
 
         await prisma.notification.create({
           data: {

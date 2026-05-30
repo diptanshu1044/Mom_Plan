@@ -29,7 +29,7 @@ const DOCUMENT_TYPES = [
   { value: "other", label: "Other Supporting Document", icon: "📄" }
 ];
 
-export function classifyDocumentType(fileName: string, currentType: string = "other"): string {
+function classifyDocumentType(fileName: string, currentType: string = "other"): string {
   const lowerName = fileName.toLowerCase();
   
   if (

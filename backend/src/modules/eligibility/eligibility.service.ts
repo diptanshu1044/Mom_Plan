@@ -31,15 +31,15 @@ export class EligibilityService {
     const rulesEngine = new RulesEngine();
     const ruleResults = programs.map((p) => {
       const evaluation = rulesEngine.evaluate(p, {
-        household_size: profile.household_size,
-        number_of_children: profile.num_children,
-        children_ages: profile.children_ages as number[],
-        monthly_income: profile.monthly_income,
-        employment_status: profile.employment_status,
-        state: user.state || profile.state || '',
-        pregnancy_status: profile.is_pregnant,
-        disability_status: profile.has_disability,
-        housing_status: profile.housing_status,
+        household_size: profile.household_size ?? 1,
+        number_of_children: profile.num_children ?? 0,
+        children_ages: Array.isArray(profile.children_ages) ? (profile.children_ages as number[]) : [],
+        monthly_income: profile.monthly_income ?? 0,
+        employment_status: profile.employment_status ?? 'unemployed',
+        state: user.state || profile.state || 'GA',
+        pregnancy_status: profile.is_pregnant ?? false,
+        disability_status: profile.has_disability ?? false,
+        housing_status: profile.housing_status ?? 'stable',
         student_status: profile.employment_status === 'student',
         
         // Map citizenship_status correctly (citizen or eligible_non_citizen)
@@ -49,7 +49,7 @@ export class EligibilityService {
         
         // Apply Wiser Moms eligibility fields
         needs_childcare: profile.needs_childcare ?? undefined,
-        monthly_rent: profile.monthly_rent ?? undefined,
+        monthly_rent: profile.monthly_rent ? Number(profile.monthly_rent) : undefined,
         eviction_risk: profile.eviction_risk ?? undefined,
         domestic_violence: profile.domestic_violence ?? undefined,
         chronic_illness: profile.chronic_illness ?? undefined,
@@ -58,7 +58,7 @@ export class EligibilityService {
         income_sources: (profile.income_sources as string[]) || undefined,
         health_insurance: profile.health_insurance || undefined,
         savings_assets: profile.savings_assets || undefined,
-        monthly_childcare_cost: profile.monthly_childcare_cost ?? undefined,
+        monthly_childcare_cost: profile.monthly_childcare_cost ? Number(profile.monthly_childcare_cost) : undefined,
         legal_issues: profile.legal_issues && Array.isArray(profile.legal_issues) ? (profile.legal_issues as string[]) : [],
         urgency: profile.urgency || undefined,
       });

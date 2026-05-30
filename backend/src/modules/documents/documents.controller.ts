@@ -40,9 +40,11 @@ export class DocumentsController {
       
       const { stream, mimeType, fileName, size } = await documentsService.downloadDocument(req.params.id, req.user.id, req.user.role);
       
-      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Type', mimeType || 'application/octet-stream');
       res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
-      res.setHeader('Content-Length', size.toString());
+      if (size !== null && size !== undefined) {
+        res.setHeader('Content-Length', size.toString());
+      }
       
       await pipeline(stream as any, res);
     } catch (error) {

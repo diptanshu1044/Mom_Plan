@@ -34,7 +34,8 @@ export const runRenewalCheckTask = async () => {
       });
 
       // Create internal notification
-      const msg = `Your approved application for ${app.program.name} is approaching its annual renewal recertification deadline.`;
+      const programName = app.program?.name || 'Assistance Program';
+      const msg = `Your approved application for ${programName} is approaching its annual renewal recertification deadline.`;
       await prisma.notification.create({
         data: {
           user_id: app.user_id,
@@ -48,7 +49,7 @@ export const runRenewalCheckTask = async () => {
       // Trigger Email
       await sendEmail({
         to: app.user.email,
-        subject: `MomPlan Recertification Notice: ${app.program.name}`,
+        subject: `MomPlan Recertification Notice: ${programName}`,
         html: `<h1>Annual Benefit Renewal Required</h1>
         <p>Hello ${app.user.full_name},</p>
         <p>${msg}</p>

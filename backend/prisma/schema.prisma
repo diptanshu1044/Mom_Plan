@@ -131,6 +131,18 @@ model FamilyProfile {
   urgency                String?   @map("urgency_level")
   has_savings            Boolean?  @default(false)
   domestic_violence      Boolean?  @default(false)
+
+  // Additional fields added back for code compatibility
+  chronic_illness        Boolean?  @default(false)
+  health_insurance       String?
+  savings_assets         String?
+  monthly_childcare_cost Decimal?  @db.Decimal
+  employer_name          String?
+  child_support_status   String?
+  childcare_preference   String?
+  childcare_provider     String?
+  ssn_last_four          String?
+  work_situation         String?
   
   county                        String?
   postpartum_months_since_birth Int?

@@ -57,14 +57,14 @@ export class PdfService {
       if (!profile) return false;
       if (field === 'date_of_birth') return !!profile.date_of_birth;
       if (field === 'address') return !!(profile.street_address && profile.city && profile.state && profile.zip_code);
-      if (field === 'household_size') return profile.household_size > 0;
-      if (field === 'num_children') return profile.num_children >= 0;
+      if (field === 'household_size') return profile.household_size !== null && profile.household_size > 0;
+      if (field === 'num_children') return profile.num_children !== null && profile.num_children >= 0;
       if (field === 'children_ages') {
         if (profile.num_children === 0) return true;
         const ages = profile.children_ages as any;
         return Array.isArray(ages) && ages.length > 0;
       }
-      if (field === 'monthly_income') return profile.monthly_income >= 0;
+      if (field === 'monthly_income') return profile.monthly_income !== null && profile.monthly_income >= 0;
       if (field === 'employment_status') return !!profile.employment_status;
       if (field === 'immigration_status') return !!profile.immigration_status;
       if (field === 'employer_name') return !!profile.employer_name;
@@ -133,21 +133,28 @@ export class PdfService {
     const program = await prisma.benefitProgram.findUnique({ where: { id: programId } });
     if (!program) throw new Error('Benefit program not found.');
 
-    let eligibilityResult = await prisma.eligibilityResult.findUnique({
+    const eligibilityResult = await prisma.eligibilityResult.findUnique({
       where: { user_id_program_id: { user_id: userId, program_id: programId } },
     });
 
-    if (!eligibilityResult) {
-      eligibilityResult = {
-        id: crypto.randomUUID(),
-        user_id: userId,
-        program_id: programId,
-        status: 'pending',
-        confidence_score: 80,
-        reasoning: 'Eligibility pending formal agency review. Application drafted by user.',
-        created_at: new Date(),
-      };
-    }
+    const eligibility = eligibilityResult || {
+      id: crypto.randomUUID(),
+      user_id: userId,
+      program_id: programId,
+      status: 'check_required' as const,
+      confidence_score: 80,
+      reasoning: 'Eligibility pending formal agency review. Application drafted by user.',
+      created_at: new Date(),
+      checked_at: new Date(),
+      org_id: null as string | null,
+      match_type: null as string | null,
+      eligibility: null as string | null,
+      estimated_benefit: null as any,
+      match_reason: null as string | null,
+      ai_rank: null as number | null,
+      reasons: [] as string[],
+      program_code: null as string | null,
+    };
 
     if (!applicationId) {
       const app = await prisma.application.findFirst({ where: { user_id: userId, program_id: programId } });
@@ -181,7 +188,7 @@ export class PdfService {
     const isPlaceholder = env.ANTHROPIC_API_KEY.includes('placeholder') || !env.ANTHROPIC_API_KEY;
 
     if (isPlaceholder) {
-      eligibilitySummary = `Based on the information provided, this applicant meets the income and household requirements for ${program.name}. The eligibility determination was completed on ${this.formatDate(new Date())} with a confidence score of ${eligibilityResult.confidence_score}%. Supporting documentation has been reviewed and is included in this application package.`;
+      eligibilitySummary = `Based on the information provided, this applicant meets the income and household requirements for ${program.name}. The eligibility determination was completed on ${this.formatDate(new Date())} with a confidence score of ${eligibility.confidence_score}%. Supporting documentation has been reviewed and is included in this application package.`;
     } else {
       const systemPrompt = `You are a professional government benefits application writer for MomPlan.
 Write a formal eligibility summary for a government assistance application PDF.
@@ -192,9 +199,9 @@ Do not include the applicant's SSN, full date of birth, or any security-sensitiv
 
       const userPrompt = `Program: ${program.name}
 Agency: ${requirements?.agency || program.agency}
-Eligibility Status: ${eligibilityResult.status}
-Confidence Score: ${eligibilityResult.confidence_score}%
-Qualification Reasons: ${eligibilityResult.reasoning}
+Eligibility Status: ${eligibility.status}
+Confidence Score: ${eligibility.confidence_score}%
+Qualification Reasons: ${eligibility.reasoning}
 Household Size: ${profile.household_size}
 Employment Status: ${profile.employment_status}
 Missing Required Documents: ${missingRequiredDocs.map(d => getDocumentLabel(d.type)).join(', ') || 'None'}
@@ -206,7 +213,7 @@ Write the eligibility summary for this applicant's application packet.`;
         eligibilitySummary = eligibilitySummary.replace(/```[a-z]*|```/g, '').trim();
       } catch (err) {
         console.error('Claude API call failed in PdfService:', err);
-        eligibilitySummary = `Based on the information provided, this applicant meets the income and household requirements for ${program.name}. The eligibility determination was completed on ${this.formatDate(new Date())} with a confidence score of ${eligibilityResult.confidence_score}%. Supporting documentation has been reviewed and is included in this application package.`;
+        eligibilitySummary = `Based on the information provided, this applicant meets the income and household requirements for ${program.name}. The eligibility determination was completed on ${this.formatDate(new Date())} with a confidence score of ${eligibility.confidence_score}%. Supporting documentation has been reviewed and is included in this application package.`;
       }
     }
 
@@ -310,9 +317,9 @@ Write the eligibility summary for this applicant's application packet.`;
       drawRow('Marital Status:', this.slugToTitle(profile.marital_status || 'N/A'));
       drawRow('Employment Status:', this.slugToTitle(profile.employment_status || 'N/A'));
       if (profile.employer_name) drawRow('Employer:', profile.employer_name);
-      drawRow('Monthly Income:', this.formatCurrency(profile.monthly_income));
-      drawRow('Annual Income:', this.formatCurrency(profile.monthly_income * 12));
-      drawRow('Federal Poverty Level %:', this.calculateFplPercentage(profile.household_size, profile.monthly_income));
+      drawRow('Monthly Income:', this.formatCurrency(profile.monthly_income || 0));
+      drawRow('Annual Income:', this.formatCurrency((profile.monthly_income || 0) * 12));
+      drawRow('Federal Poverty Level %:', this.calculateFplPercentage(profile.household_size || 1, profile.monthly_income || 0));
 
       let incomeSourcesStr = 'N/A';
       if (profile.income_sources && Array.isArray(profile.income_sources)) {
@@ -330,7 +337,7 @@ Write the eligibility summary for this applicant's application packet.`;
         if (profile.childcare_preference) drawRow('Preferred Childcare Mode:', this.slugToTitle(profile.childcare_preference));
         if (profile.childcare_provider) drawRow('Chosen Provider Name:', profile.childcare_provider);
         if (profile.monthly_childcare_cost !== null && profile.monthly_childcare_cost !== undefined) {
-          drawRow('Current Monthly Childcare Expenses:', this.formatCurrency(profile.monthly_childcare_cost));
+          drawRow('Current Monthly Childcare Expenses:', this.formatCurrency(Number(profile.monthly_childcare_cost)));
         }
       }
 
@@ -338,10 +345,10 @@ Write the eligibility summary for this applicant's application packet.`;
       drawSectionHeader('Section 3 — Housing');
       drawRow('Housing Status:', this.slugToTitle(profile.housing_status || 'N/A'));
       if (profile.monthly_rent !== null && profile.monthly_rent !== undefined) {
-        drawRow('Monthly Rent:', this.formatCurrency(profile.monthly_rent));
+        drawRow('Monthly Rent:', this.formatCurrency(Number(profile.monthly_rent)));
       }
       if (profile.monthly_utilities !== null && profile.monthly_utilities !== undefined) {
-        drawRow('Monthly Utilities:', this.formatCurrency(profile.monthly_utilities));
+        drawRow('Monthly Utilities:', this.formatCurrency(Number(profile.monthly_utilities)));
       }
       drawRow('Eviction/Homelessness Risk:', this.formatBoolean(profile.eviction_risk));
 
@@ -367,10 +374,10 @@ Write the eligibility summary for this applicant's application packet.`;
       // ── Section 5 — Eligibility Summary ──────────────────────────────────
       drawSectionHeader('Section 5 — Eligibility Summary');
       drawRow('Program Matched:', program.name);
-      drawRow('Qualification Status:', this.slugToTitle(eligibilityResult.status));
-      drawRow('AI Confidence Score:', `${eligibilityResult.confidence_score}%`);
+      drawRow('Qualification Status:', this.slugToTitle(eligibility.status));
+      drawRow('AI Confidence Score:', `${eligibility.confidence_score}%`);
       if (program.estimated_monthly_value_min !== null) {
-        drawRow('Estimated Monthly Benefit:', `${this.formatCurrency(program.estimated_monthly_value_min)} – ${this.formatCurrency(program.estimated_monthly_value_max)}`);
+        drawRow('Estimated Monthly Benefit:', `${this.formatCurrency(program.estimated_monthly_value_min)} – ${this.formatCurrency(program.estimated_monthly_value_max || 0)}`);
       }
       doc.moveDown(0.2);
       doc.font('Helvetica-Bold').fontSize(9).fillColor(darkColor).text('AI Match Summary:');

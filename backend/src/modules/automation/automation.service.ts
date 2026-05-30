@@ -59,10 +59,17 @@ export class AutomationService {
       throw new Error('Application or complete user profile not found');
     }
 
+    if (!application.program_id || !application.program) {
+      throw new Error('Application does not have a valid benefit program');
+    }
+
+    const programId = application.program_id;
+    const program = application.program;
+
     // 1. Verify Eligibility
     const eligibilityResult = await prisma.eligibilityResult.findUnique({
       where: {
-        user_id_program_id: { user_id: userId, program_id: application.program_id }
+        user_id_program_id: { user_id: userId, program_id: programId }
       }
     });
 
@@ -72,8 +79,8 @@ export class AutomationService {
 
     // 2. Determine target contact
     const state = application.user.state || 'National';
-    const contacts = this.contactCache.get(`${state}-${application.program.agency}`) || [];
-    const primaryContact = application.program.contact_email || (contacts.length > 0 ? contacts[0].email : 'support@agency.gov');
+    const contacts = this.contactCache.get(`${state}-${program.agency}`) || [];
+    const primaryContact = program.contact_email || (contacts.length > 0 ? contacts[0].email : 'support@agency.gov');
 
     // 3. Determine which documents to attach
     let docsToAttach = [];
@@ -95,8 +102,8 @@ Your task is to draft a formal, professional email to a government agency repres
 Do not include any placeholder brackets like [Name] in your final output, use the provided data.
 Keep the email structured, clear, and focused on application submission.`;
 
-    const userPrompt = `Draft an application submission email for ${application.user.full_name} applying to ${application.program.name}.
-Agency: ${application.program.agency}
+    const userPrompt = `Draft an application submission email for ${application.user.full_name} applying to ${program.name}.
+Agency: ${program.agency}
 Applicant Profile:
 - Household Size: ${application.user.family_profile.household_size}
 - Income: $${application.user.family_profile.monthly_income}/month
@@ -111,23 +118,23 @@ The email should be ready to send as-is. End with "MomPlan Automations System" a
     } catch (err) {
       console.error('Failed to generate AI email, falling back to template', err);
       // Fallback
-      generatedBody = `Dear ${application.program.agency} Representative,\n\n`;
+      generatedBody = `Dear ${program.agency} Representative,\n\n`;
       generatedBody += `Please find the application submission for ${application.user.full_name}.\n`;
-      generatedBody += `Program: ${application.program.name}\n\n`;
+      generatedBody += `Program: ${program.name}\n\n`;
       if (docsToAttach.length > 0) {
         generatedBody += `Attached are ${docsToAttach.length} supporting documents.\n`;
       }
       generatedBody += `\nThank you,\nMomPlan Automations System`;
     }
 
-    const subject = `Application Submission: ${application.program.name} - ${application.user.full_name}`;
+    const subject = `Application Submission: ${program.name} - ${application.user.full_name}`;
 
     // Check for most recently generated PDF for this application or program+user combo
     const generatedPdf = attachPdf
       ? await prisma.generatedPdf.findFirst({
           where: {
             user_id: userId,
-            program_id: application.program_id,
+            program_id: programId,
           },
           orderBy: { generated_at: 'desc' },
         })
@@ -139,7 +146,7 @@ The email should be ready to send as-is. End with "MomPlan Automations System" a
       body: generatedBody,
       attachments: [
         ...(generatedPdf ? [{
-          filename: `${application.program.name.replace(/\s+/g, '_')}_Application.pdf`,
+          filename: `${program.name.replace(/\s+/g, '_')}_Application.pdf`,
           url: generatedPdf.file_url,
           mimeType: 'application/pdf',
         }] : []),

@@ -192,8 +192,9 @@ export class AdminService {
 
     // If status changed, notify user
     if (isStatusChanged) {
+      const programName = updated.program?.name || 'Assistance Program';
       const statusTitle = `Application Status Updated: ${updated.status.replace('_', ' ').toUpperCase()}`;
-      const statusMsg = `Your application for ${updated.program.name} has been updated to status: ${updated.status.replace('_', ' ')}.`;
+      const statusMsg = `Your application for ${programName} has been updated to status: ${updated.status.replace('_', ' ')}.`;
 
       await prisma.notification.create({
         data: {
@@ -207,7 +208,7 @@ export class AdminService {
 
       await sendEmail({
         to: updated.user.email,
-        subject: `MomPlan Application Update: ${updated.program.name}`,
+        subject: `MomPlan Application Update: ${programName}`,
         html: `<h1>Application Status Update</h1>
         <p>Hello ${updated.user.full_name},</p>
         <p>${statusMsg}</p>
