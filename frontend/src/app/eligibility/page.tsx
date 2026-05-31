@@ -500,7 +500,10 @@ export default function EligibilityPage() {
       })();
 
       const numChildren = user.family_profile?.num_children || 0;
-      const initialDobs = [...(user.family_profile?.children_dobs || [])];
+      const initialDobs = (user.family_profile?.children_ages || []).map((age) => {
+        const birthYear = new Date().getFullYear() - age;
+        return `${birthYear}-01-01`;
+      });
       while (initialDobs.length < numChildren) {
         initialDobs.push("");
       }
