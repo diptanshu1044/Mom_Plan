@@ -1,6 +1,35 @@
 import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../utils/errors';
 
+/**
+ * Converts a Prisma Decimal object (or string/number) to a plain JS number.
+ * Returns null if the value is null/undefined or cannot be parsed.
+ */
+function parseDecimal(val: any): number | null {
+  if (val === null || val === undefined) return null;
+  const num = Number(val);
+  return isNaN(num) ? null : num;
+}
+
+/**
+ * Serializes Decimal fields in a family_profile object to plain numbers
+ * so they are never sent to the client as Prisma Decimal objects ([object Object]).
+ */
+function serializeProfile(user: any): any {
+  if (!user?.family_profile) return user;
+  const fp = user.family_profile;
+  return {
+    ...user,
+    family_profile: {
+      ...fp,
+      monthly_rent: parseDecimal(fp.monthly_rent),
+      monthly_utilities: parseDecimal(fp.monthly_utilities),
+      monthly_childcare_cost: parseDecimal(fp.monthly_childcare_cost),
+      monthly_income: parseDecimal(fp.monthly_income),
+    },
+  };
+}
+
 export class UserService {
   async getProfile(userId: string) {
     const user = await prisma.user.findUnique({
@@ -27,7 +56,7 @@ export class UserService {
       throw new NotFoundError('User profile not found');
     }
 
-    return user;
+    return serializeProfile(user);
   }
 
   async updateProfile(

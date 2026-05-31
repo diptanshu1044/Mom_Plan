@@ -29,6 +29,23 @@ import { PlanBadge } from "@/components/ui/Badge";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 
+/**
+ * Safely converts a Prisma Decimal, number, or string to a string for form inputs.
+ * Handles stale Zustand state with raw Decimal objects ({ s, e, d }) before the
+ * backend serialization fix was deployed.
+ */
+function parseDecimalToString(val: any): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "number") return String(val);
+  if (typeof val === "string") return val;
+  if (typeof val?.toJSON === "function") return String(val.toJSON());
+  if (typeof val?.toString === "function") {
+    const str = val.toString();
+    if (!isNaN(Number(str))) return str;
+  }
+  return "";
+}
+
 const PREFERRED_LANGUAGE_OPTIONS = [
   { value: "English", label: "English" },
   { value: "Spanish", label: "Español (Spanish)" },
@@ -194,10 +211,10 @@ export default function ProfilePage() {
         }
       })(),
       preferred_language: currentUser?.family_profile?.preferred_language || "English",
-      monthly_rent: String(currentUser?.family_profile?.monthly_rent || ""),
+      monthly_rent: parseDecimalToString(currentUser?.family_profile?.monthly_rent),
       eviction_risk: currentUser?.family_profile?.eviction_risk || false,
       needs_childcare: currentUser?.family_profile?.needs_childcare || false,
-      monthly_childcare_cost: String(currentUser?.family_profile?.monthly_childcare_cost || ""),
+      monthly_childcare_cost: parseDecimalToString(currentUser?.family_profile?.monthly_childcare_cost),
       health_insurance: currentUser?.family_profile?.health_insurance || "none",
       chronic_illness: currentUser?.family_profile?.chronic_illness || false,
       immigration_status: currentUser?.family_profile?.immigration_status || "citizen",

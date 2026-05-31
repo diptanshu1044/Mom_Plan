@@ -1,13 +1,13 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../config/prisma';
-// Simple in-memory caches replacing Redis
-const refreshTokensCache = new Map<string, string>();
-const resetTokensCache = new Map<string, string>();
 import { env } from '../../config/env';
 import { BadRequestError, UnauthorizedError, NotFoundError } from '../../utils/errors';
 import { sendEmail } from '../../config/email';
 import { UserRole, UserPlan } from '@prisma/client';
+
+// Simple in-memory cache for password reset tokens only (these are short-lived: 1h)
+const resetTokensCache = new Map<string, string>();
 
 interface TokenPayload {
   id: string;
@@ -60,8 +60,11 @@ export class AuthService {
 
     const tokens = this.generateTokens(user);
 
-    // Store refresh token in memory session cache for validation/revocation
-    refreshTokensCache.set(user.id, tokens.refreshToken);
+    // Persist refresh token to database so it survives server restarts
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refresh_token: tokens.refreshToken },
+    });
 
     return {
       user: {
@@ -89,14 +92,16 @@ export class AuthService {
       throw new UnauthorizedError('Invalid credentials');
     }
 
-    // Update last active
+    const tokens = this.generateTokens(user);
+
+    // Persist refresh token to database + update last_active_at
     await prisma.user.update({
       where: { id: user.id },
-      data: { last_active_at: new Date() },
+      data: {
+        last_active_at: new Date(),
+        refresh_token: tokens.refreshToken,
+      },
     });
-
-    const tokens = this.generateTokens(user);
-    refreshTokensCache.set(user.id, tokens.refreshToken);
 
     return {
       user: {
@@ -111,18 +116,18 @@ export class AuthService {
   }
 
   async logout(userId: string) {
-    refreshTokensCache.delete(userId);
+    // Clear persisted refresh token from database
+    await prisma.user.update({
+      where: { id: userId },
+      data: { refresh_token: null },
+    });
   }
 
   async refresh(refreshToken: string) {
     try {
       const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as TokenPayload;
-      const storedToken = refreshTokensCache.get(decoded.id);
 
-      if (!storedToken || storedToken !== refreshToken) {
-        throw new UnauthorizedError('Refresh token revoked or invalid');
-      }
-
+      // Validate token against the database (survives server restarts unlike in-memory Map)
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
       });
@@ -131,11 +136,22 @@ export class AuthService {
         throw new UnauthorizedError('User account not found or inactive');
       }
 
+      if (!user.refresh_token || user.refresh_token !== refreshToken) {
+        throw new UnauthorizedError('Refresh token revoked or invalid');
+      }
+
       const tokens = this.generateTokens(user);
-      refreshTokensCache.set(user.id, tokens.refreshToken);
+
+      // Rotate refresh token in database
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { refresh_token: tokens.refreshToken },
+      });
 
       return tokens;
-    } catch {
+    } catch (err: any) {
+      // Re-throw custom errors as-is; wrap JWT errors
+      if (err instanceof UnauthorizedError) throw err;
       throw new UnauthorizedError('Invalid refresh token');
     }
   }

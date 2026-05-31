@@ -67,6 +67,8 @@ model User {
   last_active_at         DateTime  @default(now()) @db.Timestamptz
   status                 UserStatus @default(active)
   profile_picture        String?
+  // Persisted refresh token so sessions survive server restarts (Render spin-down fix)
+  refresh_token          String?
 
   // Relations
   family_profile         FamilyProfile?

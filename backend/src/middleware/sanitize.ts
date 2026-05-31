@@ -26,6 +26,12 @@ export function sanitizeObject(obj: unknown): unknown {
   }
 
   if (obj !== null && typeof obj === 'object') {
+    // If the object has a custom toJSON method (like Decimal or Date), call it
+    // and recursively sanitize the serialized output.
+    if (typeof (obj as any).toJSON === 'function') {
+      return sanitizeObject((obj as any).toJSON());
+    }
+
     const sanitized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       if (SENSITIVE_FIELDS.includes(key.toLowerCase())) {

@@ -33,6 +33,26 @@ import { Card } from "@/components/ui/Card";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 
+/**
+ * Safely converts a value that might be a Prisma Decimal object, number, or
+ * string to a plain string for use in form inputs.
+ * Handles the case where old Zustand-persisted state still has the raw
+ * Decimal object shape { s, e, d } from before the backend serialization fix.
+ */
+function parseDecimalToString(val: any): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "number") return String(val);
+  if (typeof val === "string") return val;
+  // Handle Prisma Decimal objects which have a toJSON or toString method
+  if (typeof val.toJSON === "function") return String(val.toJSON());
+  if (typeof val.toString === "function") {
+    const str = val.toString();
+    // Only return if it looks like a number, not "[object Object]"
+    if (!isNaN(Number(str))) return str;
+  }
+  return "";
+}
+
 const US_STATES = [
   { value: "AL", label: "Alabama" }, { value: "AK", label: "Alaska" }, { value: "AZ", label: "Arizona" },
   { value: "AR", label: "Arkansas" }, { value: "CA", label: "California" }, { value: "CO", label: "Colorado" },
@@ -414,6 +434,7 @@ export default function EligibilityPage() {
   const [scanComplete, setScanComplete] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isFetchingProfile, setIsFetchingProfile] = useState(false);
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -463,76 +484,117 @@ export default function EligibilityPage() {
     domestic_violence: null as boolean | null,
   });
 
+  // Fetch fresh profile data from the API on mount to bypass stale Zustand
+  // localStorage cache which may contain raw Prisma Decimal objects.
   useEffect(() => {
-    if (typeof window !== "undefined" && localStorage.getItem("pending_eligibility_scan")) {
-      return;
-    }
-    if (user) {
-      const [first, ...rest] = (user.full_name || "").split(" ");
-      const last = rest.join(" ");
-      
-      const dobStr = (() => {
-        if (!user.family_profile?.date_of_birth) return "";
-        try {
-          const d = new Date(user.family_profile.date_of_birth);
-          return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
-        } catch {
-          return "";
+    if (!isAuthenticated || typeof window === "undefined") return;
+    if (localStorage.getItem("pending_eligibility_scan")) return;
+
+    setIsFetchingProfile(true);
+    api.get("/api/user/profile")
+      .then((res) => {
+        const freshUser = res.data.data;
+        // Update Zustand store with fresh, properly serialized data
+        updateUser(freshUser);
+
+        const fp = freshUser?.family_profile;
+        const [first, ...rest] = (freshUser?.full_name || "").split(" ");
+        const last = rest.join(" ");
+
+        const dobStr = (() => {
+          if (!fp?.date_of_birth) return "";
+          try {
+            const d = new Date(fp.date_of_birth);
+            return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+          } catch { return ""; }
+        })();
+
+        const numChildren = fp?.num_children || 0;
+        const initialDobs = [...(fp?.children_dobs || [])];
+        while (initialDobs.length < numChildren) initialDobs.push("");
+
+        setFormData({
+          first_name: fp?.first_name || first || "",
+          last_name: fp?.last_name || last || "",
+          date_of_birth: dobStr,
+          ssn_last_four: fp?.ssn_last_four || "",
+          phone: freshUser?.phone || fp?.phone || "",
+          email: freshUser?.email || fp?.email || "",
+          preferred_language: fp?.preferred_language || "English",
+          street_address: fp?.street_address || "",
+          city: fp?.city || "",
+          state: freshUser?.state || fp?.state || "GA",
+          zip_code: freshUser?.zip_code || fp?.zip_code || "",
+          monthly_income: parseDecimalToString(fp?.monthly_income),
+          income_sources: (fp?.income_sources as string[]) || [],
+          employment_status: fp?.employment_status || "full_time",
+          employer_name: fp?.employer_name || "",
+          other_earners: fp?.other_household_income ? "family" : "none",
+          savings_assets: fp?.savings_assets || "none",
+          child_support_status: fp?.child_support_status || "no_arrangement",
+          household_size: fp?.household_size || 1,
+          num_children: numChildren,
+          children_birthdates: initialDobs,
+          has_disability: fp?.has_disability ?? null,
+          is_pregnant: fp?.is_pregnant ?? null,
+          marital_status: fp?.marital_status || "single",
+          other_adults: fp?.other_adults ?? null,
+          housing_status: fp?.housing_status || "renting",
+          monthly_rent: parseDecimalToString(fp?.monthly_rent),
+          monthly_utilities: parseDecimalToString(fp?.monthly_utilities),
+          landlord_name: fp?.landlord_name || "",
+          eviction_risk: fp?.eviction_risk ?? null,
+          needs_childcare: fp?.needs_childcare ?? null,
+          childcare_preference: fp?.childcare_preference || "",
+          childcare_provider: fp?.childcare_provider || "",
+          monthly_childcare_cost: parseDecimalToString(fp?.monthly_childcare_cost),
+          work_hours: fp?.work_situation || "",
+          health_insurance: fp?.health_insurance || "none",
+          chronic_illness: fp?.chronic_illness ?? null,
+          er_visit: null,
+          immigration_status: fp?.immigration_status || "citizen",
+          legal_issues: (fp?.legal_issues as string[]) || [],
+          urgency: fp?.urgency || "not_urgent",
+          domestic_violence: fp?.domestic_violence ?? null,
+        });
+      })
+      .catch(() => {
+        // Fallback to Zustand state if API fetch fails
+        if (user) {
+          const fp = user.family_profile;
+          const [first, ...rest] = (user.full_name || "").split(" ");
+          const last = rest.join(" ");
+          const dobStr = (() => {
+            if (!fp?.date_of_birth) return "";
+            try {
+              const d = new Date(fp.date_of_birth);
+              return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+            } catch { return ""; }
+          })();
+          const numChildren = fp?.num_children || 0;
+          const initialDobs = [...(fp?.children_dobs || [])];
+          while (initialDobs.length < numChildren) initialDobs.push("");
+          setFormData(prev => ({
+            ...prev,
+            first_name: fp?.first_name || first || "",
+            last_name: fp?.last_name || last || "",
+            date_of_birth: dobStr,
+            phone: user.phone || fp?.phone || "",
+            email: user.email || fp?.email || "",
+            state: user.state || fp?.state || "GA",
+            zip_code: user.zip_code || fp?.zip_code || "",
+            monthly_income: parseDecimalToString(fp?.monthly_income),
+            monthly_rent: parseDecimalToString(fp?.monthly_rent),
+            monthly_utilities: parseDecimalToString(fp?.monthly_utilities),
+            monthly_childcare_cost: parseDecimalToString(fp?.monthly_childcare_cost),
+            household_size: fp?.household_size || 1,
+            num_children: numChildren,
+            children_birthdates: initialDobs,
+          }));
         }
-      })();
-
-      const numChildren = user.family_profile?.num_children || 0;
-      const initialDobs = [...(user.family_profile?.children_dobs || [])];
-      while (initialDobs.length < numChildren) {
-        initialDobs.push("");
-      }
-
-      setFormData({
-        first_name: user.family_profile?.first_name || first || "",
-        last_name: user.family_profile?.last_name || last || "",
-        date_of_birth: dobStr,
-        ssn_last_four: user.family_profile?.ssn_last_four || "",
-        phone: user.phone || user.family_profile?.phone || "",
-        email: user.email || user.family_profile?.email || "",
-        preferred_language: user.family_profile?.preferred_language || "English",
-        street_address: user.family_profile?.street_address || "",
-        city: user.family_profile?.city || "",
-        state: user.state || user.family_profile?.state || "GA",
-        zip_code: user.zip_code || user.family_profile?.zip_code || "",
-        monthly_income: user.family_profile?.monthly_income !== null && user.family_profile?.monthly_income !== undefined ? String(user.family_profile.monthly_income) : "",
-        income_sources: (user.family_profile?.income_sources as string[]) || [],
-        employment_status: user.family_profile?.employment_status || "full_time",
-        employer_name: user.family_profile?.employer_name || "",
-        other_earners: user.family_profile?.other_household_income ? "family" : "none",
-        savings_assets: user.family_profile?.savings_assets || "none",
-        child_support_status: user.family_profile?.child_support_status || "no_arrangement",
-        household_size: user.family_profile?.household_size || 1,
-        num_children: numChildren,
-        children_birthdates: initialDobs,
-        has_disability: user.family_profile?.has_disability ?? null,
-        is_pregnant: user.family_profile?.is_pregnant ?? null,
-        marital_status: user.family_profile?.marital_status || "single",
-        other_adults: user.family_profile?.other_adults ?? null,
-        housing_status: user.family_profile?.housing_status || "renting",
-        monthly_rent: user.family_profile?.monthly_rent !== null && user.family_profile?.monthly_rent !== undefined ? String(user.family_profile.monthly_rent) : "",
-        monthly_utilities: user.family_profile?.monthly_utilities !== null && user.family_profile?.monthly_utilities !== undefined ? String(user.family_profile.monthly_utilities) : "",
-        landlord_name: user.family_profile?.landlord_name || "",
-        eviction_risk: user.family_profile?.eviction_risk ?? null,
-        needs_childcare: user.family_profile?.needs_childcare ?? null,
-        childcare_preference: user.family_profile?.childcare_preference || "",
-        childcare_provider: user.family_profile?.childcare_provider || "",
-        monthly_childcare_cost: user.family_profile?.monthly_childcare_cost !== null && user.family_profile?.monthly_childcare_cost !== undefined ? String(user.family_profile.monthly_childcare_cost) : "",
-        work_hours: user.family_profile?.work_situation || "",
-        health_insurance: user.family_profile?.health_insurance || "none",
-        chronic_illness: user.family_profile?.chronic_illness ?? null,
-        er_visit: null,
-        immigration_status: user.family_profile?.immigration_status || "citizen",
-        legal_issues: (user.family_profile?.legal_issues as string[]) || [],
-        urgency: user.family_profile?.urgency || "not_urgent",
-        domestic_violence: user.family_profile?.domestic_violence ?? null,
-      });
-    }
-  }, [user]);
+      })
+      .finally(() => setIsFetchingProfile(false));
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -652,16 +714,36 @@ export default function EligibilityPage() {
       setScanComplete(true);
     } catch (err: any) {
       console.error("Benefit Scan Error:", err);
-      setError(
-        err.response?.data?.error?.message ||
-        "An unexpected error occurred during the benefits scan. Please try again."
-      );
+      const errData = err.response?.data?.error;
+      let msg = errData?.message || "An unexpected error occurred during the benefits scan. Please try again.";
+      // If Zod returned field-level details, surface them for easier debugging
+      if (errData?.details && typeof errData.details === "object") {
+        const fieldErrors = Object.entries(errData.details)
+          .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(", ")}`)
+          .join(" | ");
+        if (fieldErrors) msg = `Validation error — ${fieldErrors}`;
+      }
+      setError(msg);
     } finally {
       setIsScanning(false);
     }
   };
 
   const currentSection = SECTIONS.find(s => s.id === step)!;
+
+  if (isFetchingProfile) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center p-4">
+        <div className="text-center max-w-sm">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-primary-lg mx-auto mb-5">
+            <Loader2 className="w-8 h-8 text-white animate-spin" />
+          </div>
+          <h2 className="font-display font-bold text-xl text-on-surface mb-2">Loading your profile…</h2>
+          <p className="text-on-surface-variant text-sm">Pre-filling your information from previous answers.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isScanning) {
     return (

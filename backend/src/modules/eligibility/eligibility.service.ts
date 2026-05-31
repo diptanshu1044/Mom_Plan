@@ -84,7 +84,7 @@ export class EligibilityService {
         const aiResponse = await Promise.race([
           this.callClaudeApi(aiPrompt),
           new Promise<string>((_, reject) =>
-            setTimeout(() => reject(new Error('AI Refinement Timeout')), 6000)
+            setTimeout(() => reject(new Error('AI Refinement Timeout')), 25000)
           ),
         ]);
         const cleaned = aiResponse.replace(/```json|```/g, '').trim();
@@ -101,32 +101,33 @@ export class EligibilityService {
       }
     }
 
-    // 5. Save results to database (upsert)
-    for (const res of parsedResults) {
-      const program = programs.find((p) => p.id === res.programId);
-      if (!program) continue;
-
-      await prisma.eligibilityResult.upsert({
-        where: {
-          user_id_program_id: {
+    // 5. Save results to database (parallel upserts for speed)
+    await Promise.all(
+      parsedResults.map((res) => {
+        const program = programs.find((p) => p.id === res.programId);
+        if (!program) return Promise.resolve();
+        return prisma.eligibilityResult.upsert({
+          where: {
+            user_id_program_id: {
+              user_id: userId,
+              program_id: program.id,
+            },
+          },
+          update: {
+            status: res.status,
+            confidence_score: res.confidence_score || 0,
+            reasoning: res.reasoning,
+          },
+          create: {
             user_id: userId,
             program_id: program.id,
+            status: res.status,
+            confidence_score: res.confidence_score || 0,
+            reasoning: res.reasoning,
           },
-        },
-        update: {
-          status: res.status,
-          confidence_score: res.confidence_score || 0,
-          reasoning: res.reasoning,
-        },
-        create: {
-          user_id: userId,
-          program_id: program.id,
-          status: res.status,
-          confidence_score: res.confidence_score || 0,
-          reasoning: res.reasoning,
-        },
-      });
-    }
+        });
+      })
+    );
 
     return this.getResults(userId);
   }
