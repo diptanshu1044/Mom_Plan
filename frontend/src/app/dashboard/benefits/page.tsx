@@ -380,7 +380,7 @@ export default function BenefitsPage() {
                     onClick={() => downloadPdf(pdfModal.pdfId!, pdfModal.programName)}
                     disabled={!!isViewing || !!isDownloading}
                     loading={isDownloading === pdfModal.pdfId}
-                    className="w-full sm:w-auto whitespace-nowrap"
+                    className="w-full sm:w-auto whitespace-nowrap px-2.5"
                   >
                     <Download className="w-4 h-4 mr-1.5" />
                     Download PDF
