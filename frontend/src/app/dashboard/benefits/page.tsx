@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
-import { formatCurrency, getConfidenceColor } from "@/lib/utils";
+import { formatCurrency, formatDate, getConfidenceColor } from "@/lib/utils";
 
 export default function BenefitsPage() {
   const [filter, setFilter] = useState("all");
@@ -254,19 +254,31 @@ export default function BenefitsPage() {
                 </div>
 
                 {/* Reasoning + renewal */}
-                {(result.reasoning || !!result.program?.renewal_period_months) && (
+                {(result.reasoning ||
+                  !!result.program?.renewal_period_months ||
+                  !!result.program?.next_due_date) && (
                   <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-surface-container-low">
                     <Info className="w-3.5 h-3.5 text-on-surface-variant shrink-0 mt-0.5" />
                     <p className="text-xs text-on-surface-variant leading-relaxed">
                       {result.reasoning}
-                      {result.reasoning && !!result.program?.renewal_period_months && (
-                        <span className="mx-1.5 text-on-surface-variant/50">·</span>
-                      )}
+                      {result.reasoning &&
+                        (!!result.program?.renewal_period_months || !!result.program?.next_due_date) && (
+                          <span className="mx-1.5 text-on-surface-variant/50">·</span>
+                        )}
                       {!!result.program?.renewal_period_months && (
                         <span className="inline-flex items-center gap-1 whitespace-nowrap align-middle">
                           <Calendar className="w-3 h-3 shrink-0" />
                           Renews every {result.program.renewal_period_months}{" "}
                           {result.program.renewal_period_months === 1 ? "month" : "months"}
+                        </span>
+                      )}
+                      {!!result.program?.renewal_period_months && !!result.program?.next_due_date && (
+                        <span className="mx-1.5 text-on-surface-variant/50">·</span>
+                      )}
+                      {!!result.program?.next_due_date && (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap align-middle">
+                          <Calendar className="w-3 h-3 shrink-0" />
+                          Next due {formatDate(result.program.next_due_date)}
                         </span>
                       )}
                     </p>

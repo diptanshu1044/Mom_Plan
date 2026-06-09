@@ -49,6 +49,7 @@ export default function ProgramsPage() {
   const [email, setEmail] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [dueDate, setDueDate] = useState("");
+  const [renewalPeriodMonths, setRenewalPeriodMonths] = useState<number | "">("");
   const [criteria, setCriteria] = useState("{}");
 
   const [formError, setFormError] = useState("");
@@ -56,6 +57,15 @@ export default function ProgramsPage() {
   const { data: programs, isLoading } = useQuery({
     queryKey: ["admin-programs"],
     queryFn: () => api.get("/api/programs").then((r) => r.data.data || r.data),
+  });
+
+  const { data: quarterDueDates } = useQuery({
+    queryKey: ["program-quarter-due-dates", editingProgram?.id],
+    queryFn: () =>
+      api
+        .get(`/api/programs/${editingProgram.id}/quarter-due-dates`)
+        .then((r) => r.data.data || []),
+    enabled: !!editingProgram?.id,
   });
 
   const openAdd = () => {
@@ -72,6 +82,7 @@ export default function ProgramsPage() {
     setEmail("");
     setIsActive(true);
     setDueDate("");
+    setRenewalPeriodMonths("");
     setCriteria(JSON.stringify({ age: "any", citizenship: "required", income: "fpl_pct" }, null, 2));
     setFormError("");
     setShowDrawer(true);
@@ -103,6 +114,8 @@ export default function ProgramsPage() {
       setDueDate("");
     }
 
+    setRenewalPeriodMonths(program.renewal_period_months ?? "");
+
     setCriteria(
       program.eligibility_criteria
         ? JSON.stringify(program.eligibility_criteria, null, 2)
@@ -116,6 +129,7 @@ export default function ProgramsPage() {
     mutationFn: (newProgram: any) => api.post("/api/programs", newProgram),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-programs"] });
+      queryClient.invalidateQueries({ queryKey: ["program-quarter-due-dates"] });
       setShowDrawer(false);
     },
     onError: (err: any) => {
@@ -128,6 +142,7 @@ export default function ProgramsPage() {
       api.put(`/api/programs/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-programs"] });
+      queryClient.invalidateQueries({ queryKey: ["program-quarter-due-dates"] });
       setShowDrawer(false);
     },
     onError: (err: any) => {
@@ -173,6 +188,8 @@ export default function ProgramsPage() {
       contact_email: email.trim() || null,
       is_active: isActive,
       program_due_date: dueDate || null,
+      renewal_period_months:
+        renewalPeriodMonths === "" ? null : Number(renewalPeriodMonths),
       eligibility_criteria: parsedCriteria,
     };
 
@@ -495,6 +512,81 @@ export default function ProgramsPage() {
                       Optionally specify a global calendar deadline date for this benefit program.
                     </p>
                   </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                      Renewal Period (months)
+                    </label>
+                    <select
+                      value={renewalPeriodMonths}
+                      onChange={(e) =>
+                        setRenewalPeriodMonths(
+                          e.target.value === "" ? "" : Number(e.target.value)
+                        )
+                      }
+                      className="select"
+                    >
+                      <option value="" className="bg-slate-900">
+                        Not set
+                      </option>
+                      <option value={1} className="bg-slate-900">
+                        Monthly (1)
+                      </option>
+                      <option value={3} className="bg-slate-900">
+                        Quarterly (3)
+                      </option>
+                      <option value={6} className="bg-slate-900">
+                        Semi-annual (6)
+                      </option>
+                      <option value={12} className="bg-slate-900">
+                        Annual (12)
+                      </option>
+                    </select>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Used to generate quarterly due date rows. Leave empty for scraper backfill later.
+                    </p>
+                  </div>
+
+                  {editingProgram && (
+                    <div className="space-y-2 p-4 rounded-xl bg-slate-900 border border-slate-800/80">
+                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Quarterly Due Dates ({new Date().getFullYear()})
+                      </label>
+                      {quarterDueDates && quarterDueDates.length > 0 ? (
+                        <div className="space-y-2">
+                          {quarterDueDates.map((row: any) => (
+                            <div
+                              key={row.id}
+                              className="flex items-start justify-between gap-3 text-[11px] border border-slate-800 rounded-lg p-2.5"
+                            >
+                              <div>
+                                <div className="font-semibold text-white">{row.quarter}</div>
+                                <div className="text-slate-500 mt-0.5">
+                                  {(row.due_dates_json || []).length > 0
+                                    ? (row.due_dates_json || [])
+                                        .map((d: string) =>
+                                          new Date(`${d}T00:00:00`).toLocaleDateString("en-US", {
+                                            month: "short",
+                                            day: "numeric",
+                                          })
+                                        )
+                                        .join(", ")
+                                    : "No dates"}
+                                </div>
+                              </div>
+                              <span className="badge badge-gray text-[10px] shrink-0">
+                                {row.source || "unset"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[10px] text-slate-500">
+                          No quarter rows yet. Save renewal period or run backfill.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Eligibility Criteria (JSON Editor) */}
                   <div className="space-y-1.5">

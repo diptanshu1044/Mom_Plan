@@ -13,6 +13,24 @@ export const programIdParamSchema = z.object({
   }),
 });
 
+export const quarterDueDatesQuerySchema = z.object({
+  params: z.object({
+    id: z.string().min(1),
+  }),
+  query: z.object({
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
+  }),
+});
+
+export const backfillQuarterDueDatesSchema = z.object({
+  body: z
+    .object({
+      year: z.number().int().min(2000).max(2100).optional(),
+    })
+    .optional()
+    .default({}),
+});
+
 export const createProgramSchema = z.object({
   body: z.object({
     name: z.string().min(1),
@@ -28,6 +46,7 @@ export const createProgramSchema = z.object({
     contact_email: z.string().email().or(z.literal("")).nullable().optional(),
     is_active: z.boolean().default(true),
     program_due_date: z.string().datetime().or(z.string()).nullable().optional(),
+    renewal_period_months: z.number().int().min(1).max(12).nullable().optional(),
   }),
 });
 
@@ -49,5 +68,6 @@ export const updateProgramSchema = z.object({
     contact_email: z.string().email().or(z.literal("")).nullable().optional(),
     is_active: z.boolean().optional(),
     program_due_date: z.string().datetime().or(z.string()).nullable().optional(),
+    renewal_period_months: z.number().int().min(1).max(12).nullable().optional(),
   }),
 });

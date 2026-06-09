@@ -7,6 +7,8 @@ import {
   programIdParamSchema,
   createProgramSchema,
   updateProgramSchema,
+  quarterDueDatesQuerySchema,
+  backfillQuarterDueDatesSchema,
 } from './programs.schema';
 
 const router = Router();
@@ -21,6 +23,16 @@ router.use(authenticate);
 router.use(authorizeRoles('admin'));
 
 router.post('/', validate(createProgramSchema), programsController.createProgram);
+router.post(
+  '/quarter-due-dates/backfill',
+  validate(backfillQuarterDueDatesSchema),
+  programsController.backfillQuarterDueDates
+);
+router.get(
+  '/:id/quarter-due-dates',
+  validate(quarterDueDatesQuerySchema),
+  programsController.getProgramQuarterDueDates
+);
 router.put('/:id', validate(updateProgramSchema), programsController.updateProgram);
 router.delete('/:id', validate(programIdParamSchema), programsController.deleteProgram);
 

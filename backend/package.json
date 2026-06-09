@@ -4,12 +4,14 @@
   "description": "Backend for MomPlan - AI-powered government benefits eligibility and application management SaaS platform",
   "main": "dist/server.js",
   "scripts": {
-    "build": "prisma generate && prisma db push --accept-data-loss && tsc",
+    "build": "prisma generate && prisma migrate deploy && tsc",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:backfill-quarters": "tsx prisma/backfill_quarter_due_dates.ts",
     "lint": "eslint . --ext .ts"
   },
   "prisma": {

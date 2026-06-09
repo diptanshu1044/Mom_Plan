@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../utils/errors';
+import { quarterDueDatesService } from './quarterDueDates.service';
 
 let cachedPrograms: any[] | null = null;
 let cacheTimestamp = 0;
@@ -84,6 +85,8 @@ export class ProgramsService {
       data: insertData,
     });
 
+    await quarterDueDatesService.backfillProgramQuarters(program.id, new Date().getUTCFullYear());
+
     // Invalidate cache
     clearProgramsCache();
 
@@ -115,10 +118,18 @@ export class ProgramsService {
       updateData.program_due_date = updateData.program_due_date ? new Date(updateData.program_due_date) : null;
     }
 
+    const renewalPeriodChanged =
+      updateData.renewal_period_months !== undefined &&
+      updateData.renewal_period_months !== existing.renewal_period_months;
+
     const updated = await prisma.benefitProgram.update({
       where: { id },
       data: updateData,
     });
+
+    if (renewalPeriodChanged) {
+      await quarterDueDatesService.regenerateCalculatedQuarters(id);
+    }
 
     // Invalidate cache
     clearProgramsCache();
@@ -161,5 +172,23 @@ export class ProgramsService {
         metadata: { name: existing.name },
       },
     });
+  }
+
+  async getProgramQuarterDueDates(programId: string, year?: number) {
+    const program = await prisma.benefitProgram.findUnique({
+      where: { id: programId },
+      select: { id: true },
+    });
+
+    if (!program) {
+      throw new NotFoundError('Benefit program not found');
+    }
+
+    const targetYear = year ?? new Date().getUTCFullYear();
+    return quarterDueDatesService.getQuarterDueDatesForProgram(programId, targetYear);
+  }
+
+  async backfillQuarterDueDates(year?: number) {
+    return quarterDueDatesService.backfillAllPrograms(year);
   }
 }

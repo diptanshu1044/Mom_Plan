@@ -50,6 +50,11 @@ enum ApplicationPriority {
   urgent
 }
 
+enum QuarterDueDateSource {
+  GOVT
+  CALCULATED
+}
+
 model User {
   id                     String    @id @default(uuid()) @db.Uuid
   email                  String    @unique
@@ -234,8 +239,26 @@ model BenefitProgram {
   documents_required          DocumentRequired[]
   income_thresholds           IncomeThreshold[]
   reminders                   Reminder[]
+  quarter_due_dates           ProgramQuarterDueDate[]
 
   @@map("programs")
+}
+
+model ProgramQuarterDueDate {
+  id             String                @id @default(uuid()) @db.Uuid
+  program_id     String
+  program        BenefitProgram        @relation(fields: [program_id], references: [id], onDelete: Cascade)
+  year           Int
+  quarter        String                // Q1, Q2, Q3, Q4
+  due_dates_json Json                  @default("[]")
+  source         QuarterDueDateSource?
+  created_at     DateTime              @default(now()) @db.Timestamptz
+  updated_at     DateTime              @updatedAt @db.Timestamptz
+
+  @@unique([program_id, year, quarter])
+  @@index([program_id])
+  @@index([year])
+  @@map("program_quarter_due_dates")
 }
 
 model EligibilityResult {

@@ -56,4 +56,25 @@ export class ProgramsController {
       next(error);
     }
   }
+
+  async getProgramQuarterDueDates(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const year = req.query.year ? Number(req.query.year) : undefined;
+      const quarters = await programsService.getProgramQuarterDueDates(req.params.id, year);
+      res.status(200).json({ success: true, data: quarters });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async backfillQuarterDueDates(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw new UnauthorizedError();
+      const year = req.body?.year as number | undefined;
+      const summary = await programsService.backfillQuarterDueDates(year);
+      res.status(200).json({ success: true, data: summary });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

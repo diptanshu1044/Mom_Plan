@@ -2,6 +2,7 @@ import { prisma } from '../../config/prisma';
 import { RulesEngine } from './rules.engine';
 import Anthropic from '@anthropic-ai/sdk';
 import { PdfService } from '../pdf/pdf.service';
+import { quarterDueDatesService } from '../programs/quarterDueDates.service';
 
 export class EligibilityService {
   private anthropic: Anthropic;
@@ -199,15 +200,17 @@ export class EligibilityService {
   }
 
   async getResults(userId: string) {
-    return prisma.eligibilityResult.findMany({
+    const results = await prisma.eligibilityResult.findMany({
       where: { user_id: userId },
       include: { program: true },
       orderBy: { confidence_score: 'desc' },
     });
+
+    return this.enrichResultsWithNextDueDate(results);
   }
 
   async getResultByProgramId(userId: string, programId: string) {
-    return prisma.eligibilityResult.findUnique({
+    const result = await prisma.eligibilityResult.findUnique({
       where: {
         user_id_program_id: {
           user_id: userId,
@@ -215,6 +218,40 @@ export class EligibilityService {
         },
       },
       include: { program: true },
+    });
+
+    if (!result) return null;
+
+    const [enriched] = await this.enrichResultsWithNextDueDate([result]);
+    return enriched;
+  }
+
+  private async enrichResultsWithNextDueDate<
+    T extends { program: { id: string } | null }
+  >(results: T[]) {
+    const programIds = [
+      ...new Set(results.map((result) => result.program?.id).filter(Boolean) as string[]),
+    ];
+
+    const nextDueDates = new Map<string, string | null>();
+    await Promise.all(
+      programIds.map(async (programId) => {
+        const nextDueDate = await quarterDueDatesService.getNextDueDateForProgram(programId);
+        nextDueDates.set(programId, nextDueDate);
+      })
+    );
+
+    return results.map((result) => {
+      if (!result.program) return result;
+
+      const nextDueDate = nextDueDates.get(result.program.id) ?? null;
+      return {
+        ...result,
+        program: {
+          ...result.program,
+          next_due_date: nextDueDate,
+        },
+      };
     });
   }
 }
