@@ -7,7 +7,6 @@ import { motion } from "framer-motion";
 import {
   Sparkles,
   RefreshCw,
-  Filter,
   Search,
   ArrowRight,
   CheckCircle2,
@@ -15,11 +14,11 @@ import {
   TrendingUp,
   FileText,
   X,
-  AlertTriangle,
   CheckCircle,
   Download,
   Eye,
   Calendar,
+  ChevronDown,
 } from "lucide-react";
 import { usePdfGeneration } from "@/hooks/usePdfGeneration";
 import DocumentReadinessModal from "@/components/pdf/DocumentReadinessModal";
@@ -31,10 +30,22 @@ import { CardSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate, getConfidenceColor } from "@/lib/utils";
 
+const QUARTER_FILTER_OPTIONS = [
+  { value: "all", label: "All Quarters" },
+  { value: "Q1", label: "Q1 (Jan–Mar)" },
+  { value: "Q2", label: "Q2 (Apr–Jun)" },
+  { value: "Q3", label: "Q3 (Jul–Sep)" },
+  { value: "Q4", label: "Q4 (Oct–Dec)" },
+];
+
+const selectClassName =
+  "w-full appearance-none rounded-lg border border-outline-variant/60 bg-white py-2.5 pl-3 pr-9 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-300 cursor-pointer";
+
 export default function BenefitsPage() {
-  const [filter, setFilter] = useState("all");
-  const [search, setSearch] = useState("");
-  const [showEmails, setShowEmails] = useState(false);
+  const [federalFilterActive, setFederalFilterActive] = useState(false);
+  const [stateFilterActive, setStateFilterActive] = useState(false);
+  const [stateSearch, setStateSearch] = useState("");
+  const [quarterFilter, setQuarterFilter] = useState("all");
   const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState<any>(null);
   const queryClient = useQueryClient();
@@ -69,21 +80,25 @@ export default function BenefitsPage() {
   });
 
   const filtered = (results || []).filter((r: any) => {
-    const matchesFilter = filter === "all" || r.status === filter;
-    const matchesSearch =
-      !search ||
-      r.program?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      r.program?.agency?.toLowerCase().includes(search.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+    const programState = r.program?.state_code ?? r.program?.state;
 
-  const filters = [
-    { key: "all", label: "All Programs" },
-    { key: "qualified", label: "Qualified" },
-    { key: "likely_qualified", label: "Likely Qualified" },
-    { key: "check_required", label: "Additional Review" },
-    { key: "not_qualified", label: "Not Qualified" },
-  ];
+    if (federalFilterActive) {
+      const fedOrState = r.program?.federal_or_state;
+      if (fedOrState == null || fedOrState === "") return false;
+    }
+
+    if (stateFilterActive) {
+      if (programState == null || programState === "") return false;
+    }
+
+    if (stateSearch.trim()) {
+      const query = stateSearch.trim().toLowerCase();
+      const stateValue = (programState || "").toLowerCase();
+      if (!stateValue.includes(query)) return false;
+    }
+
+    return true;
+  });
 
   return (
     <div>
@@ -140,42 +155,60 @@ export default function BenefitsPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-6">
+        <button
+          type="button"
+          onClick={() => setFederalFilterActive((active) => !active)}
+          className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+            federalFilterActive
+              ? "bg-primary-100 text-primary-700 border border-primary-200"
+              : "bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container"
+          }`}
+        >
+          Federal
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStateFilterActive((active) => !active)}
+          className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+            stateFilterActive
+              ? "bg-primary-100 text-primary-700 border border-primary-200"
+              : "bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container"
+          }`}
+        >
+          State
+        </button>
+
+        <div className="relative flex-1 min-w-[12rem]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
           <input
             type="text"
-            placeholder="Search programs..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by state (e.g. GA)..."
+            value={stateSearch}
+            onChange={(e) => setStateSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-outline-variant/60 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
           />
         </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          {filters.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                filter === f.key
-                  ? "bg-primary-100 text-primary-700 border border-primary-200"
-                  : "bg-white border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container"
-              }`}
+
+        <div className="flex-1 min-w-[10rem]">
+          <label htmlFor="quarter-filter" className="block text-xs font-semibold text-on-surface-variant mb-1.5">
+            Quarter
+          </label>
+          <div className="relative">
+            <select
+              id="quarter-filter"
+              value={quarterFilter}
+              onChange={(e) => setQuarterFilter(e.target.value)}
+              className={selectClassName}
             >
-              {f.label}
-            </button>
-          ))}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-outline-variant/30 bg-white text-sm">
-            <input
-              type="checkbox"
-              id="show-emails-checkbox"
-              checked={showEmails}
-              onChange={(e) => setShowEmails(e.target.checked)}
-              className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 border-outline-variant/60 cursor-pointer"
-            />
-            <label htmlFor="show-emails-checkbox" className="text-xs text-on-surface-variant font-semibold cursor-pointer select-none whitespace-nowrap">
-              Show Emails
-            </label>
+              {QUARTER_FILTER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
           </div>
         </div>
       </div>
@@ -271,15 +304,6 @@ export default function BenefitsPage() {
                         </span>
                       )}
                     </p>
-                  </div>
-                )}
-
-                {showEmails && result.program?.contact_email && (
-                  <div className="mb-4 p-3 rounded-lg bg-primary-50/50 border border-primary-100/50 flex items-center justify-between text-xs">
-                    <span className="text-on-surface-variant font-medium">Contact Email:</span>
-                    <a href={`mailto:${result.program.contact_email}`} className="text-primary-700 hover:underline font-mono font-semibold">
-                      {result.program.contact_email}
-                    </a>
                   </div>
                 )}
 
