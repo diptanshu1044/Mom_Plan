@@ -2,7 +2,19 @@ import { prisma } from '../../config/prisma';
 import { RulesEngine } from './rules.engine';
 import Anthropic from '@anthropic-ai/sdk';
 import { PdfService } from '../pdf/pdf.service';
-import { quarterDueDatesService } from '../programs/quarterDueDates.service';
+import {
+  applyEligibilityFilters,
+  computeAvailableStates,
+  computeSummary,
+  EligibilityResultsFilters,
+  EligibilityResultsResponse,
+} from './eligibility.filters';
+import {
+  getQuarterForMonth,
+  getRelevantDueDateInQuarter,
+  quarterDueDatesService,
+} from '../programs/quarterDueDates.service';
+import { Quarter } from '../programs/quarterDueDates.types';
 
 export class EligibilityService {
   private anthropic: Anthropic;
@@ -181,7 +193,8 @@ export class EligibilityService {
       console.error('[Background PDF Generation] Uncaught error in background worker:', err);
     });
 
-    return this.getResults(userId);
+    const response = await this.getResults(userId);
+    return response.results;
   }
 
   private async callClaudeApi(prompt: string): Promise<string> {
@@ -199,14 +212,43 @@ export class EligibilityService {
     return '';
   }
 
-  async getResults(userId: string) {
+  async getResults(
+    userId: string,
+    filters?: EligibilityResultsFilters
+  ): Promise<EligibilityResultsResponse> {
     const results = await prisma.eligibilityResult.findMany({
       where: { user_id: userId },
       include: { program: true },
       orderBy: { confidence_score: 'desc' },
     });
 
-    return this.enrichResultsWithQuarterDueDates(results);
+    const summary = computeSummary(results);
+    const availableStates = computeAvailableStates(results);
+
+    const referenceDate = new Date();
+    const year = referenceDate.getUTCFullYear();
+    const needsQuarterData = filters?.quarter && filters.quarter !== 'all';
+
+    let quarterDueDatesByProgram: Map<string, Partial<Record<Quarter, string[]>>> | undefined;
+    if (needsQuarterData) {
+      const programIds = results.map((result) => result.program_id);
+      quarterDueDatesByProgram = await quarterDueDatesService.getQuarterDueDatesByProgramForYear(
+        programIds,
+        year
+      );
+    }
+
+    const filtered = applyEligibilityFilters(results, filters, quarterDueDatesByProgram);
+    const enrichedResults = await this.enrichResultsWithQuarterDueDates(
+      filtered,
+      quarterDueDatesByProgram
+    );
+
+    return {
+      results: enrichedResults,
+      summary,
+      availableStates,
+    };
   }
 
   async getResultByProgramId(userId: string, programId: string) {
@@ -228,29 +270,38 @@ export class EligibilityService {
 
   private async enrichResultsWithQuarterDueDates<
     T extends { program: { id: string } | null }
-  >(results: T[]) {
+  >(
+    results: T[],
+    existingQuarterDueDatesByProgram?: Map<string, Partial<Record<Quarter, string[]>>>
+  ) {
     const programIds = [
       ...new Set(results.map((result) => result.program?.id).filter(Boolean) as string[]),
     ];
 
-    const quarterDueInfo = new Map<string, { quarter: string; due_date: string | null }>();
-    await Promise.all(
-      programIds.map(async (programId) => {
-        const info = await quarterDueDatesService.getCurrentQuarterDueInfoForProgram(programId);
-        quarterDueInfo.set(programId, info);
-      })
-    );
+    const referenceDate = new Date();
+    const year = referenceDate.getUTCFullYear();
+    const currentQuarter = getQuarterForMonth(referenceDate.getUTCMonth() + 1);
+
+    const quarterDueDatesByProgram =
+      existingQuarterDueDatesByProgram ??
+      (await quarterDueDatesService.getQuarterDueDatesByProgramForYear(programIds, year));
 
     return results.map((result) => {
       if (!result.program) return result;
 
-      const info = quarterDueInfo.get(result.program.id) ?? { quarter: null, due_date: null };
+      const quarterDueDates = quarterDueDatesByProgram.get(result.program.id) ?? {};
+      const currentQuarterDates = quarterDueDates[currentQuarter] ?? [];
+
       return {
         ...result,
         program: {
           ...result.program,
-          current_quarter: info.quarter,
-          current_quarter_due_date: info.due_date,
+          current_quarter: currentQuarter,
+          current_quarter_due_date: getRelevantDueDateInQuarter(
+            currentQuarterDates,
+            referenceDate
+          ),
+          quarter_due_dates: quarterDueDates,
         },
       };
     });

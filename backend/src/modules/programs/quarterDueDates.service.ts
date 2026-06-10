@@ -156,6 +156,35 @@ export class QuarterDueDatesService {
     );
   }
 
+  async getQuarterDueDatesByProgramForYear(programIds: string[], year: number) {
+    const byProgram = new Map<string, Partial<Record<Quarter, string[]>>>();
+
+    if (programIds.length === 0) return byProgram;
+
+    for (const programId of programIds) {
+      byProgram.set(programId, {});
+    }
+
+    const records = await prisma.programQuarterDueDate.findMany({
+      where: {
+        program_id: { in: programIds },
+        year,
+      },
+    });
+
+    for (const record of records) {
+      const dueDates = parseDueDatesJson(record.due_dates_json);
+      if (dueDates.length === 0) continue;
+
+      const quarters = byProgram.get(record.program_id);
+      if (quarters) {
+        quarters[record.quarter as Quarter] = dueDates;
+      }
+    }
+
+    return byProgram;
+  }
+
   async getCurrentQuarterDueInfoForProgram(
     programId: string,
     referenceDate?: Date

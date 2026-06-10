@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -41,11 +41,54 @@ const QUARTER_FILTER_OPTIONS = [
 const selectClassName =
   "w-full appearance-none rounded-lg border border-outline-variant/60 bg-white py-2.5 pl-3 pr-9 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-300 cursor-pointer";
 
+function getRelevantDueDateInQuarter(dates: string[] | undefined): string | null {
+  if (!dates?.length) return null;
+
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const sorted = [...dates].sort();
+
+  for (const dateStr of sorted) {
+    const parsed = new Date(`${dateStr}T00:00:00.000Z`);
+    if (!Number.isNaN(parsed.getTime()) && parsed.getTime() >= todayUtc) {
+      return dateStr;
+    }
+  }
+
+  return sorted[sorted.length - 1] ?? null;
+}
+
+function getProgramQuarterDueDisplay(
+  program: {
+    current_quarter?: string;
+    current_quarter_due_date?: string | null;
+    quarter_due_dates?: Record<string, string[]>;
+  } | null | undefined,
+  quarterFilter: string
+): { quarter: string | null; dueDate: string | null } {
+  if (quarterFilter !== "all") {
+    const dates = program?.quarter_due_dates?.[quarterFilter];
+    return {
+      quarter: quarterFilter,
+      dueDate: getRelevantDueDateInQuarter(dates),
+    };
+  }
+
+  return {
+    quarter: program?.current_quarter ?? null,
+    dueDate: program?.current_quarter_due_date ?? null,
+  };
+}
+
 export default function BenefitsPage() {
   const [federalFilterActive, setFederalFilterActive] = useState(false);
   const [stateFilterActive, setStateFilterActive] = useState(false);
-  const [stateSearch, setStateSearch] = useState("");
+  const [stateInput, setStateInput] = useState("");
+  const [selectedStateCode, setSelectedStateCode] = useState<string | null>(null);
+  const [stateDropdownOpen, setStateDropdownOpen] = useState(false);
+  const stateComboboxRef = useRef<HTMLDivElement>(null);
   const [quarterFilter, setQuarterFilter] = useState("all");
+  const [debouncedStateSearch, setDebouncedStateSearch] = useState("");
   const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState<any>(null);
   const queryClient = useQueryClient();
@@ -67,10 +110,35 @@ export default function BenefitsPage() {
     closePdfModal,
   } = usePdfGeneration();
 
-  const { data: results, isLoading } = useQuery({
-    queryKey: ["eligibility-results"],
-    queryFn: () => api.get("/api/eligibility/results").then((r) => r.data.data),
+  const filterParams = useMemo(
+    () => ({
+      ...(federalFilterActive ? { federal: "true" } : {}),
+      ...(stateFilterActive ? { state_only: "true" } : {}),
+      ...(selectedStateCode ? { state: selectedStateCode } : {}),
+      ...(!selectedStateCode && debouncedStateSearch.trim()
+        ? { state_search: debouncedStateSearch.trim() }
+        : {}),
+      ...(quarterFilter !== "all" ? { quarter: quarterFilter } : {}),
+    }),
+    [
+      federalFilterActive,
+      stateFilterActive,
+      selectedStateCode,
+      debouncedStateSearch,
+      quarterFilter,
+    ]
+  );
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["eligibility-results", filterParams],
+    queryFn: () =>
+      api.get("/api/eligibility/results", { params: filterParams }).then((r) => r.data.data),
+    placeholderData: (previousData) => previousData,
   });
+
+  const results = data?.results ?? [];
+  const summary = data?.summary;
+  const availableStateOptions = data?.availableStates ?? [];
 
   const scanMutation = useMutation({
     mutationFn: () => api.post("/api/eligibility/scan"),
@@ -79,26 +147,30 @@ export default function BenefitsPage() {
     },
   });
 
-  const filtered = (results || []).filter((r: any) => {
-    const programState = r.program?.state_code ?? r.program?.state;
+  const filteredStateOptions = useMemo(() => {
+    if (!stateInput.trim()) return availableStateOptions;
+    const query = stateInput.trim().toLowerCase();
+    return availableStateOptions.filter(
+      (opt: { code: string; label: string }) =>
+        opt.code.toLowerCase().includes(query) ||
+        opt.label.toLowerCase().includes(query)
+    );
+  }, [availableStateOptions, stateInput]);
 
-    if (federalFilterActive) {
-      const fedOrState = r.program?.federal_or_state;
-      if (fedOrState == null || fedOrState === "") return false;
-    }
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedStateSearch(stateInput), 300);
+    return () => clearTimeout(timer);
+  }, [stateInput]);
 
-    if (stateFilterActive) {
-      if (programState == null || programState === "") return false;
-    }
-
-    if (stateSearch.trim()) {
-      const query = stateSearch.trim().toLowerCase();
-      const stateValue = (programState || "").toLowerCase();
-      if (!stateValue.includes(query)) return false;
-    }
-
-    return true;
-  });
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (stateComboboxRef.current && !stateComboboxRef.current.contains(event.target as Node)) {
+        setStateDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <div>
@@ -122,7 +194,7 @@ export default function BenefitsPage() {
       </div>
 
       {/* Total value banner */}
-      {results && results.length > 0 && (
+      {summary && summary.totalCount > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -136,17 +208,13 @@ export default function BenefitsPage() {
               <div className="flex-1">
                 <div className="text-white/70 text-sm">Estimated Total Monthly Benefits</div>
                 <div className="font-display font-bold text-3xl text-white">
-                  {formatCurrency(
-                    results
-                      .filter((r: any) => ["qualified", "likely_qualified"].includes(r.status))
-                      .reduce((acc: number, r: any) => acc + (r.program?.estimated_monthly_value_max || 0), 0)
-                  )}
+                  {formatCurrency(summary.totalMonthlyValueMax)}
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-white/70 text-xs">Qualified programs</div>
                 <div className="font-bold text-2xl text-white">
-                  {results.filter((r: any) => ["qualified", "likely_qualified"].includes(r.status)).length}
+                  {summary.qualifiedCount}
                 </div>
               </div>
             </div>
@@ -155,7 +223,13 @@ export default function BenefitsPage() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-6 relative">
+        {isFetching && !isLoading && (
+          <div className="absolute -top-6 right-0 text-xs text-on-surface-variant flex items-center gap-1.5">
+            <RefreshCw className="w-3 h-3 animate-spin" />
+            Updating results...
+          </div>
+        )}
         <button
           type="button"
           onClick={() => setFederalFilterActive((active) => !active)}
@@ -180,15 +254,81 @@ export default function BenefitsPage() {
           State
         </button>
 
-        <div className="relative flex-1 min-w-[12rem]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant" />
+        <div ref={stateComboboxRef} className="relative flex-1 min-w-[12rem]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant z-10" />
           <input
             type="text"
-            placeholder="Search by state (e.g. GA)..."
-            value={stateSearch}
-            onChange={(e) => setStateSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-outline-variant/60 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+            role="combobox"
+            aria-expanded={stateDropdownOpen}
+            aria-autocomplete="list"
+            placeholder="Search state (e.g. Georgia or GA)..."
+            value={stateInput}
+            onChange={(e) => {
+              setStateInput(e.target.value);
+              setSelectedStateCode(null);
+              setStateDropdownOpen(true);
+            }}
+            onFocus={() => setStateDropdownOpen(true)}
+            className="w-full pl-10 pr-16 py-2.5 rounded-lg border border-outline-variant/60 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
           />
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {(stateInput || selectedStateCode) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setStateInput("");
+                  setSelectedStateCode(null);
+                  setStateDropdownOpen(false);
+                }}
+                className="p-1 rounded-md text-on-surface-variant hover:bg-surface-container"
+                aria-label="Clear state search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setStateDropdownOpen((open) => !open)}
+              className="p-1 rounded-md text-on-surface-variant hover:bg-surface-container"
+              aria-label="Toggle state options"
+            >
+              <ChevronDown className={`w-4 h-4 transition-transform ${stateDropdownOpen ? "rotate-180" : ""}`} />
+            </button>
+          </div>
+
+          {stateDropdownOpen && (
+            <ul
+              role="listbox"
+              className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-outline-variant/60 bg-white shadow-lg py-1"
+            >
+              {filteredStateOptions.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-on-surface-variant">No matching states in your results</li>
+              ) : (
+                filteredStateOptions.map((option: { code: string; label: string }) => (
+                  <li key={option.code}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={selectedStateCode === option.code}
+                      onClick={() => {
+                        setSelectedStateCode(option.code);
+                        setStateInput(`${option.label} (${option.code})`);
+                        setStateDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-surface-container ${
+                        selectedStateCode === option.code
+                          ? "bg-primary-50 text-primary-700 font-medium"
+                          : "text-on-surface"
+                      }`}
+                    >
+                      <span>{option.label}</span>
+                      <span className="ml-2 text-on-surface-variant">{option.code}</span>
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+          )}
         </div>
 
         <div className="flex-1 min-w-[10rem]">
@@ -218,18 +358,18 @@ export default function BenefitsPage() {
         <div className="grid md:grid-cols-2 gap-4">
           {[0, 1, 2, 3].map((i) => <CardSkeleton key={i} />)}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : results.length === 0 ? (
         <div className="text-center py-16">
           <Sparkles className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
           <h3 className="font-display font-semibold text-xl text-on-surface mb-2">
-            {results?.length === 0 ? "No scan results yet" : "No programs match your filter"}
+            {!summary?.totalCount ? "No scan results yet" : "No programs match your filter"}
           </h3>
           <p className="text-on-surface-variant mb-6 max-w-sm mx-auto">
-            {results?.length === 0
+            {!summary?.totalCount
               ? "We need a bit more information about your family to find the best matches. Complete your profile to see eligible benefits."
               : "Try adjusting your filter criteria"}
           </p>
-          {results?.length === 0 && (
+          {!summary?.totalCount && (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button onClick={() => router.push("/eligibility")} variant="primary">
                 <ArrowRight className="w-4 h-4" />
@@ -244,7 +384,10 @@ export default function BenefitsPage() {
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-4">
-          {filtered.map((result: any, i: number) => (
+          {results.map((result: any, i: number) => {
+            const quarterDueDisplay = getProgramQuarterDueDisplay(result.program, quarterFilter);
+
+            return (
             <motion.div
               key={result.id}
               initial={{ opacity: 0, y: 16 }}
@@ -286,21 +429,20 @@ export default function BenefitsPage() {
                   </div>
                 </div>
 
-                {/* Reasoning + current quarter due date */}
-                {(result.reasoning ||
-                  !!result.program?.current_quarter_due_date) && (
+                {/* Reasoning + quarter due date */}
+                {(result.reasoning || !!quarterDueDisplay.dueDate) && (
                   <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-surface-container-low">
                     <Info className="w-3.5 h-3.5 text-on-surface-variant shrink-0 mt-0.5" />
                     <p className="text-xs text-on-surface-variant leading-relaxed">
                       {result.reasoning}
-                      {result.reasoning && !!result.program?.current_quarter_due_date && (
+                      {result.reasoning && !!quarterDueDisplay.dueDate && (
                         <span className="mx-1.5 text-on-surface-variant/50">·</span>
                       )}
-                      {!!result.program?.current_quarter_due_date && (
+                      {!!quarterDueDisplay.dueDate && (
                         <span className="inline-flex items-center gap-1 whitespace-nowrap align-middle">
                           <Calendar className="w-3 h-3 shrink-0" />
-                          {result.program.current_quarter} due{" "}
-                          {formatDate(result.program.current_quarter_due_date)}
+                          {quarterDueDisplay.quarter} due{" "}
+                          {formatDate(quarterDueDisplay.dueDate)}
                         </span>
                       )}
                     </p>
@@ -343,7 +485,8 @@ export default function BenefitsPage() {
                 </div>
               </Card>
             </motion.div>
-          ))}
+            );
+          })}
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { EligibilityService } from './eligibility.service';
+import { parseEligibilityResultsFilters } from './eligibility.filters';
 import { UnauthorizedError } from '../../utils/errors';
 
 const eligibilityService = new EligibilityService();
@@ -18,7 +19,8 @@ export class EligibilityController {
   async getResults(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) throw new UnauthorizedError();
-      const results = await eligibilityService.getResults(req.user.id);
+      const filters = parseEligibilityResultsFilters(req.query as Record<string, unknown>);
+      const results = await eligibilityService.getResults(req.user.id, filters);
       res.status(200).json({ success: true, data: results });
     } catch (error) {
       next(error);

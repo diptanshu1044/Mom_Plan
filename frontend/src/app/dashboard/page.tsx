@@ -41,12 +41,14 @@ const greeting = () => {
 export default function DashboardPage() {
   const { user } = useAuthStore();
 
-  const { data: eligibilityResults, isLoading: loadingEligibility } = useQuery({
-    queryKey: ["eligibility-results"],
+  const { data: eligibilityData, isLoading: loadingEligibility } = useQuery({
+    queryKey: ["eligibility-results", {}],
     queryFn: () => api.get("/api/eligibility/results").then((r) => r.data.data),
     staleTime: 30000,
     refetchOnWindowFocus: false,
   });
+
+  const eligibilityResults = eligibilityData?.results ?? [];
 
   const { data: applications, isLoading: loadingApps } = useQuery({
     queryKey: ["applications"],
@@ -69,14 +71,16 @@ export default function DashboardPage() {
     refetchOnWindowFocus: false,
   });
 
-  const qualifiedPrograms = eligibilityResults?.filter(
+  const qualifiedPrograms = eligibilityResults.filter(
     (r: any) => r.status === "qualified" || r.status === "likely_qualified"
-  ) || [];
-
-  const totalBenefitValue = qualifiedPrograms.reduce(
-    (acc: number, r: any) => acc + (r.program?.estimated_monthly_value_max || 0),
-    0
   );
+
+  const totalBenefitValue =
+    eligibilityData?.summary?.totalMonthlyValueMax ??
+    qualifiedPrograms.reduce(
+      (acc: number, r: any) => acc + (r.program?.estimated_monthly_value_max || 0),
+      0
+    );
 
   const activeApps = applications?.filter(
     (a: any) => !["approved", "rejected", "withdrawn"].includes(a.status)
@@ -97,7 +101,7 @@ export default function DashboardPage() {
       value: formatCurrency(totalBenefitValue),
       icon: TrendingUp,
       color: "bg-emerald-50 text-emerald-600",
-      subtext: `${qualifiedPrograms.length} programs matched`,
+      subtext: `${eligibilityData?.summary?.qualifiedCount ?? qualifiedPrograms.length} programs matched`,
       loading: loadingEligibility,
     },
     {
@@ -149,7 +153,7 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* No eligibility scan banner */}
-      {!loadingEligibility && eligibilityResults?.length === 0 && (
+      {!loadingEligibility && (eligibilityData?.summary?.totalCount ?? eligibilityResults.length) === 0 && (
         <motion.div
           variants={fadeUp}
           initial="hidden"
