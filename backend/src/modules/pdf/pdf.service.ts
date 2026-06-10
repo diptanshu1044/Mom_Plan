@@ -575,16 +575,33 @@ Write the eligibility summary for this applicant's application packet.`;
       }
 
       // ── Global page numbering pass ────────────────────────────────────────
+      // Close any open text flow before switching pages — otherwise PDFKit may
+      // auto-add blank pages when drawing headers/footers near the page edge.
+      doc.text('', { continued: false });
+
       const range = doc.bufferedPageRange();
-      for (let i = 1; i < range.count; i++) {
+      const pageCount = range.count;
+      const generatedDate = this.formatDate(new Date());
+      const programHeader = program.name.toUpperCase();
+
+      for (let i = range.start + 1; i < range.start + pageCount; i++) {
         doc.switchToPage(i);
         doc.save();
-        doc.font('Helvetica-Bold').fontSize(7.5).fillColor(slateColor).text(program.name.toUpperCase(), 50, 25);
-        doc.font('Helvetica').fontSize(7.5).text(this.formatDate(new Date()), 500, 25, { align: 'right' });
+
+        doc.font('Helvetica-Bold').fontSize(7.5).fillColor(slateColor)
+          .text(programHeader, 50, 25, { width: 400, lineBreak: false });
+        doc.font('Helvetica').fontSize(7.5).fillColor(slateColor)
+          .text(generatedDate, 50, 25, { width: 512, align: 'right', lineBreak: false });
+
         doc.moveTo(50, 36).lineTo(562, 36).lineWidth(0.5).stroke(dividerColor);
         doc.moveTo(50, 745).lineTo(562, 745).lineWidth(0.5).stroke(dividerColor);
-        doc.font('Helvetica').fontSize(7.5).fillColor(slateColor).text('Digitally compiled by MomPlan Assistance Platform', 50, 752);
-        doc.text(`Page ${i + 1} of ${range.count}`, 500, 752, { align: 'right' });
+
+        // Footer text must use a fixed height — writing near the page bottom without
+        // one triggers PDFKit to auto-create blank pages during switchToPage passes.
+        doc.font('Helvetica').fontSize(7.5).fillColor(slateColor)
+          .text('Digitally compiled by MomPlan Assistance Platform', 50, 752, { width: 400, height: 12, lineBreak: false });
+        doc.text(`Page ${i - range.start + 1} of ${pageCount}`, 50, 752, { width: 512, height: 12, align: 'right', lineBreak: false });
+
         doc.restore();
       }
 

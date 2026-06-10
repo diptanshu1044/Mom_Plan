@@ -1,5 +1,7 @@
 import { env } from './env';
 
+export const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
+
 interface ClaudeMessageResponse {
   content: Array<{ text: string }>;
 }
@@ -56,7 +58,7 @@ MomPlan Automations System`;
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-3-5-sonnet-20241022',
+      model: ANTHROPIC_MODEL,
       max_tokens: 4000,
       system: systemPrompt,
       messages: [

@@ -1,3 +1,4 @@
+import { ANTHROPIC_MODEL } from '../../config/anthropic';
 import { prisma } from '../../config/prisma';
 import { RulesEngine } from './rules.engine';
 import Anthropic from '@anthropic-ai/sdk';
@@ -199,7 +200,7 @@ export class EligibilityService {
 
   private async callClaudeApi(prompt: string): Promise<string> {
     const response = await this.anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: ANTHROPIC_MODEL,
       max_tokens: 4000,
       system: 'You are an AI eligibility matching assistant for MomPlan. Return ONLY a JSON array of objects with keys: programId, status, confidence_score, reasoning, estimated_benefit.',
       messages: [{ role: 'user', content: prompt }],
