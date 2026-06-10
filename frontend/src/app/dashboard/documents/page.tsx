@@ -4,11 +4,11 @@ import { useState, useRef, Suspense, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileText, CheckCircle, XCircle, Loader2, Trash2, Eye, Clock, Edit2, Download, AlertTriangle } from "lucide-react";
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Trash2, Eye, Clock, Edit2, Download, AlertTriangle, ChevronDown } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
-import { formatDate } from "@/lib/utils";
+import { formatDate, QUARTER_FILTER_OPTIONS, getCurrentQuarterYear, formatPdfQuarterYear } from "@/lib/utils";
 import { usePdfGeneration } from "@/hooks/usePdfGeneration";
 
 const DOCUMENT_TYPES = [
@@ -199,6 +199,8 @@ function DocumentsContent() {
   const queryClient = useQueryClient();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
+  const { quarter: defaultQuarter, year: defaultYear } = getCurrentQuarterYear();
+  const [pdfQuarterFilter, setPdfQuarterFilter] = useState<string>(defaultQuarter);
   const [activeTab, setActiveTab] = useState<"uploaded" | "generated">("uploaded");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { viewPdf, downloadPdf, isViewing, isDownloading } = usePdfGeneration();
@@ -217,8 +219,17 @@ function DocumentsContent() {
   });
 
   const { data: generatedPdfs, isLoading: loadingPdfs } = useQuery({
-    queryKey: ["generated-pdfs"],
-    queryFn: () => api.get("/api/pdf").then((r) => r.data.data),
+    queryKey: ["generated-pdfs", pdfQuarterFilter, defaultYear],
+    queryFn: () =>
+      api
+        .get("/api/pdf", {
+          params:
+            pdfQuarterFilter !== "all"
+              ? { quarter: pdfQuarterFilter, year: defaultYear }
+              : undefined,
+        })
+        .then((r) => r.data.data),
+    enabled: activeTab === "generated",
   });
 
   const deleteMutation = useMutation({
@@ -555,6 +566,31 @@ function DocumentsContent() {
       )}
 
       {activeTab === "generated" && (
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-end gap-4">
+          <div className="flex-1 min-w-[10rem] max-w-xs">
+            <label htmlFor="pdf-quarter-filter" className="block text-xs font-semibold text-on-surface-variant mb-1.5">
+              Quarter
+            </label>
+            <div className="relative">
+              <select
+                id="pdf-quarter-filter"
+                value={pdfQuarterFilter}
+                onChange={(e) => setPdfQuarterFilter(e.target.value)}
+                className="w-full appearance-none rounded-lg border border-outline-variant/60 bg-white py-2.5 pl-3 pr-9 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-300 cursor-pointer"
+              >
+                {QUARTER_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "generated" && (
         loadingPdfs ? (
           <div className="space-y-3">
             {[0, 1, 2].map((i) => (
@@ -586,6 +622,12 @@ function DocumentsContent() {
                       </div>
                       <div className="flex items-center gap-2 text-xs text-on-surface-variant mt-0.5">
                         <span>v{pdf.version}</span>
+                        {formatPdfQuarterYear(pdf) && (
+                          <>
+                            <span>•</span>
+                            <span>{formatPdfQuarterYear(pdf)}</span>
+                          </>
+                        )}
                         <span>•</span>
                         <span>{pdf.program?.agency || "Government Assistance"}</span>
                         <span>•</span>

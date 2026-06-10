@@ -23,6 +23,8 @@ export interface PendingGenerateParams {
   programId: string;
   applicationId?: string;
   programName?: string;
+  quarter?: string;
+  year?: number;
 }
 
 export function usePdfGeneration() {
@@ -36,13 +38,17 @@ export function usePdfGeneration() {
   const [isViewing, setIsViewing] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
 
-  const handleGeneratePdf = async (programId: string, applicationId?: string, programName?: string) => {
-    // Determine loading indicator key (use application_id if tracker, otherwise program_id)
+  const handleGeneratePdf = async (
+    programId: string,
+    applicationId?: string,
+    programName?: string,
+    quarter?: string,
+    year?: number
+  ) => {
     const loadId = applicationId || programId;
     setGeneratingPdfId(loadId);
 
     try {
-      // Validate first
       const valRes = await api.post("/api/pdf/validate", { program_id: programId });
       const report: ValidationReport = valRes.data.data;
 
@@ -56,12 +62,11 @@ export function usePdfGeneration() {
 
       if (hasMissingRequired || hasMissingOptional) {
         setValidationReport(report);
-        setPendingParams({ programId, applicationId, programName });
+        setPendingParams({ programId, applicationId, programName, quarter, year });
         setShowWarningModal(true);
         setGeneratingPdfId(null);
       } else {
-        // Safe to generate directly
-        await confirmAndGeneratePdf(programId, applicationId, programName);
+        await confirmAndGeneratePdf(programId, applicationId, programName, quarter, year);
       }
     } catch (err) {
       console.error("Failed to validate program requirements:", err);
@@ -72,7 +77,9 @@ export function usePdfGeneration() {
   const confirmAndGeneratePdf = async (
     programId: string,
     applicationId?: string,
-    programName?: string
+    programName?: string,
+    quarter?: string,
+    year?: number
   ) => {
     const loadId = applicationId || programId;
     setGeneratingPdfId(loadId);
@@ -82,6 +89,8 @@ export function usePdfGeneration() {
       const res = await api.post("/api/pdf/generate", {
         program_id: programId,
         application_id: applicationId,
+        quarter,
+        year,
       });
       const pdfId = res.data.data.id;
       const urlRes = await api.get(`/api/pdf/${pdfId}/download`);

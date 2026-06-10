@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { formatDate, formatRelativeDate } from "@/lib/utils";
+import { formatDate, formatRelativeDate, getCurrentQuarterYear, formatPdfQuarterYear } from "@/lib/utils";
 import ApplyModal from "@/components/dashboard/ApplyModal";
 
 export default function ApplicationsPage() {
@@ -34,9 +34,20 @@ export default function ApplicationsPage() {
     closePdfModal,
   } = usePdfGeneration();
 
+  const { quarter: currentQuarter, year: currentYear } = getCurrentQuarterYear();
+
   const { data: applications, isLoading } = useQuery({
-    queryKey: ["applications"],
-    queryFn: () => api.get("/api/applications").then((r) => r.data.data),
+    queryKey: ["applications", currentQuarter, currentYear],
+    queryFn: () =>
+      api
+        .get("/api/applications", {
+          params: {
+            quarter: currentQuarter,
+            year: currentYear,
+            filter_pdfs_by_quarter: true,
+          },
+        })
+        .then((r) => r.data.data),
   });
 
   const filtered = (applications || []).filter((a: any) =>
@@ -165,7 +176,15 @@ export default function ApplicationsPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleGeneratePdf(app.program?.id, app.id, app.program?.name)}
+                      onClick={() =>
+                        handleGeneratePdf(
+                          app.program?.id,
+                          app.id,
+                          app.program?.name,
+                          currentQuarter,
+                          currentYear
+                        )
+                      }
                       disabled={generatingPdfId === app.id}
                       loading={generatingPdfId === app.id}
                     >
@@ -186,7 +205,13 @@ export default function ApplicationsPage() {
                   <div className="mt-3 pt-3 border-t border-surface-container-highest flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5 text-xs text-on-surface-variant font-medium">
                       <FileText className="w-3.5 h-3.5 text-primary-500" />
-                      <span>Application Package (v{app.generated_pdfs[0].version})</span>
+                      <span>
+                        Application Package (v{app.generated_pdfs[0].version}
+                        {formatPdfQuarterYear(app.generated_pdfs[0])
+                          ? ` · ${formatPdfQuarterYear(app.generated_pdfs[0])}`
+                          : ""}
+                        )
+                      </span>
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -295,7 +320,15 @@ export default function ApplicationsPage() {
                 Cancel
               </Button>
               <Button 
-                onClick={() => confirmAndGeneratePdf(pendingParams.programId, pendingParams.applicationId, pendingParams.programName)}
+                onClick={() =>
+                  confirmAndGeneratePdf(
+                    pendingParams.programId,
+                    pendingParams.applicationId,
+                    pendingParams.programName,
+                    pendingParams.quarter,
+                    pendingParams.year
+                  )
+                }
                 disabled={generatingPdfId !== null}
               >
                 Generate Anyway

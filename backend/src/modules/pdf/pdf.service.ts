@@ -4,6 +4,8 @@ import { s3Client } from '../../config/s3';
 import { callClaudeApi } from '../../config/anthropic';
 import { env } from '../../config/env';
 import { getProgramRequirements, getDocumentLabel, DOCUMENT_META, ProgramRequirements } from './program-requirements.data';
+import { getQuarterForMonth } from '../programs/quarterDueDates.service';
+import { Quarter } from '../programs/quarterDueDates.types';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getPresignedDownloadUrl } from '../../config/s3';
 import crypto from 'crypto';
@@ -21,6 +23,16 @@ export interface ValidationReport {
 }
 
 export class PdfService {
+  private resolveQuarterYear(quarter?: string, year?: number): { quarter: Quarter; year: number } {
+    const now = new Date();
+    const resolvedQuarter =
+      quarter && ['Q1', 'Q2', 'Q3', 'Q4'].includes(quarter)
+        ? (quarter as Quarter)
+        : getQuarterForMonth(now.getUTCMonth() + 1);
+    const resolvedYear = year ?? now.getUTCFullYear();
+    return { quarter: resolvedQuarter, year: resolvedYear };
+  }
+
   // ─── Validate what data is present/missing before generation ───────────────
   async validateForProgram(userId: string, programId: string): Promise<ValidationReport> {
     const user = await prisma.user.findUnique({
@@ -123,7 +135,8 @@ export class PdfService {
     userId: string,
     programId: string,
     applicationId?: string,
-    existingUuid?: string
+    existingUuid?: string,
+    pdfMeta?: { version?: number; quarter?: Quarter; year?: number }
   ): Promise<{ pdfBuffer: Buffer; validationReport: ValidationReport; uuid: string }> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -583,6 +596,12 @@ Write the eligibility summary for this applicant's application packet.`;
       const pageCount = range.count;
       const generatedDate = this.formatDate(new Date());
       const programHeader = program.name.toUpperCase();
+      const { quarter: pdfQuarter, year: pdfYear } = this.resolveQuarterYear(
+        pdfMeta?.quarter,
+        pdfMeta?.year
+      );
+      const versionLabel = pdfMeta?.version ?? 1;
+      const quarterYearLabel = `${pdfQuarter} ${pdfYear}`;
 
       for (let i = range.start + 1; i < range.start + pageCount; i++) {
         doc.switchToPage(i);
@@ -599,8 +618,11 @@ Write the eligibility summary for this applicant's application packet.`;
         // Footer text must use a fixed height — writing near the page bottom without
         // one triggers PDFKit to auto-create blank pages during switchToPage passes.
         doc.font('Helvetica').fontSize(7.5).fillColor(slateColor)
-          .text('Digitally compiled by MomPlan Assistance Platform', 50, 752, { width: 400, height: 12, lineBreak: false });
-        doc.text(`Page ${i - range.start + 1} of ${pageCount}`, 50, 752, { width: 512, height: 12, align: 'right', lineBreak: false });
+          .text('Digitally compiled by MomPlan Assistance Platform', 50, 752, { width: 170, height: 12, lineBreak: false });
+        doc.font('Helvetica-Bold').fontSize(7.5).fillColor(slateColor)
+          .text(`Version ${versionLabel} · ${quarterYearLabel}`, 50, 752, { width: 512, height: 12, align: 'center', lineBreak: false });
+        doc.font('Helvetica').fontSize(7.5).fillColor(slateColor)
+          .text(`Page ${i - range.start + 1} of ${pageCount}`, 50, 752, { width: 512, height: 12, align: 'right', lineBreak: false });
 
         doc.restore();
       }
@@ -612,8 +634,33 @@ Write the eligibility summary for this applicant's application packet.`;
   }
 
   // ─── Main generation function ──────────────────────────────────────────────
-  async generateApplicationPdf(userId: string, programId: string, applicationId?: string): Promise<any> {
-    const { pdfBuffer, validationReport, uuid } = await this.generatePdfBuffer(userId, programId, applicationId);
+  async generateApplicationPdf(
+    userId: string,
+    programId: string,
+    applicationId?: string,
+    quarter?: string,
+    year?: number
+  ): Promise<any> {
+    const { quarter: resolvedQuarter, year: resolvedYear } = this.resolveQuarterYear(quarter, year);
+
+    const existing = await prisma.generatedPdf.findFirst({
+      where: {
+        user_id: userId,
+        program_id: programId,
+        quarter: resolvedQuarter,
+        year: resolvedYear,
+      },
+      orderBy: { version: 'desc' },
+    });
+    const version = existing ? existing.version + 1 : 1;
+
+    const { pdfBuffer, validationReport, uuid } = await this.generatePdfBuffer(
+      userId,
+      programId,
+      applicationId,
+      undefined,
+      { version, quarter: resolvedQuarter, year: resolvedYear }
+    );
 
     // ── File persistence ────────────────────────────────────────────────────
     const isS3Placeholder = env.AWS_ACCESS_KEY_ID.includes('placeholder');
@@ -636,12 +683,6 @@ Write the eligibility summary for this applicant's application packet.`;
       file_url = `https://${env.S3_BUCKET_NAME}.s3.${env.AWS_REGION}.amazonaws.com/${key}`;
     }
 
-    const existing = await prisma.generatedPdf.findFirst({
-      where: { user_id: userId, program_id: programId },
-      orderBy: { version: 'desc' },
-    });
-    const version = existing ? existing.version + 1 : 1;
-
     const generated = await prisma.generatedPdf.create({
       data: {
         id: uuid,
@@ -651,6 +692,8 @@ Write the eligibility summary for this applicant's application packet.`;
         file_url,
         file_size: pdfBuffer.length,
         version,
+        quarter: resolvedQuarter,
+        year: resolvedYear,
         status: 'generated',
         validation_report: validationReport as any,
       },
@@ -668,7 +711,17 @@ Write the eligibility summary for this applicant's application packet.`;
     });
     if (!pdf) throw new Error('PDF not found in database');
 
-    const { pdfBuffer } = await this.generatePdfBuffer(pdf.user_id, pdf.program_id, pdf.application_id || undefined, pdf.id);
+    const { pdfBuffer } = await this.generatePdfBuffer(
+      pdf.user_id,
+      pdf.program_id,
+      pdf.application_id || undefined,
+      pdf.id,
+      {
+        version: pdf.version,
+        quarter: (pdf.quarter as Quarter | null) ?? undefined,
+        year: pdf.year ?? undefined,
+      }
+    );
 
     const isS3Placeholder = env.AWS_ACCESS_KEY_ID.includes('placeholder');
     if (isS3Placeholder || !pdf.file_url.startsWith('http')) {
@@ -721,9 +774,30 @@ Write the eligibility summary for this applicant's application packet.`;
   }
 
   // ── List PDFs ──────────────────────────────────────────────────────────────
-  async listPdfs(userId: string, role: string): Promise<any[]> {
+  async listPdfs(
+    userId: string,
+    role: string,
+    filters?: { quarter?: string; year?: number }
+  ): Promise<any[]> {
+    const quarterFilter =
+      filters?.quarter && ['Q1', 'Q2', 'Q3', 'Q4'].includes(filters.quarter)
+        ? filters.quarter
+        : undefined;
+
+    const where: Record<string, unknown> = {};
+    if (role !== 'admin' && role !== 'counselor') {
+      where.user_id = userId;
+    }
+    if (quarterFilter) {
+      where.quarter = quarterFilter;
+    }
+    if (filters?.year != null) {
+      where.year = filters.year;
+    }
+
     if (role === 'admin' || role === 'counselor') {
       return prisma.generatedPdf.findMany({
+        where,
         include: {
           user: { select: { full_name: true, email: true } },
           program: { select: { name: true, agency: true } },
@@ -732,7 +806,7 @@ Write the eligibility summary for this applicant's application packet.`;
       });
     }
     return prisma.generatedPdf.findMany({
-      where: { user_id: userId },
+      where,
       include: { program: { select: { name: true, agency: true } } },
       orderBy: { generated_at: 'desc' },
     });

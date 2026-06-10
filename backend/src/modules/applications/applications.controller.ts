@@ -8,7 +8,11 @@ export class ApplicationsController {
   async listApplications(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) throw new UnauthorizedError();
-      const applications = await applicationsService.listApplications(req.user.id, req.user.role);
+      const applications = await applicationsService.listApplications(req.user.id, req.user.role, {
+        quarter: req.query.quarter as string | undefined,
+        year: req.query.year != null ? Number(req.query.year) : undefined,
+        filter_pdfs_by_quarter: req.query.filter_pdfs_by_quarter === 'true',
+      });
       res.status(200).json({ success: true, data: applications });
     } catch (error) {
       next(error);

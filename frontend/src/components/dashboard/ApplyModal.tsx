@@ -26,6 +26,8 @@ interface ApplyModalProps {
   onClose: () => void;
   program: any;
   applicationId?: string;
+  pdfQuarter?: string;
+  pdfYear?: number;
 }
 
 export default function ApplyModal({
@@ -33,6 +35,8 @@ export default function ApplyModal({
   onClose,
   program,
   applicationId: initialApplicationId,
+  pdfQuarter,
+  pdfYear,
 }: ApplyModalProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -52,8 +56,16 @@ export default function ApplyModal({
 
   // Fetch applications list to see if there is an existing one if not provided
   const { data: applications } = useQuery({
-    queryKey: ["applications"],
-    queryFn: () => api.get("/api/applications").then((r) => r.data.data),
+    queryKey: ["applications", pdfQuarter, pdfYear],
+    queryFn: () =>
+      api
+        .get("/api/applications", {
+          params: {
+            ...(pdfQuarter ? { quarter: pdfQuarter, filter_pdfs_by_quarter: true } : { filter_pdfs_by_quarter: true }),
+            ...(pdfYear ? { year: pdfYear } : {}),
+          },
+        })
+        .then((r) => r.data.data),
     enabled: isOpen,
   });
 
@@ -383,7 +395,12 @@ export default function ApplyModal({
                                     📄 Generated Application PDF
                                   </label>
                                   <p className="text-[10px] text-on-surface-variant mt-0.5 truncate">
-                                    Version {pdfPackage.version} • Created {new Date(pdfPackage.generated_at).toLocaleDateString()}
+                                    Version {pdfPackage.version}
+                                    {pdfPackage.quarter && pdfPackage.year
+                                      ? ` • ${pdfPackage.quarter} ${pdfPackage.year}`
+                                      : ""}
+                                    {" • "}
+                                    Created {new Date(pdfPackage.generated_at).toLocaleDateString()}
                                   </p>
                                 </div>
                               </div>

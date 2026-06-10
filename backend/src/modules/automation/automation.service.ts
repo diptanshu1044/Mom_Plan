@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { sendEmail } from '../../config/email';
+import { getQuarterForMonth } from '../programs/quarterDueDates.service';
 
 /**
  * Government Contact Ingestion & Caching Strategy
@@ -130,11 +131,17 @@ The email should be ready to send as-is. End with "MomPlan Automations System" a
     const subject = `Application Submission: ${program.name} - ${application.user.full_name}`;
 
     // Check for most recently generated PDF for this application or program+user combo
+    const now = new Date();
+    const currentQuarter = getQuarterForMonth(now.getUTCMonth() + 1);
+    const currentYear = now.getUTCFullYear();
+
     const generatedPdf = attachPdf
       ? await prisma.generatedPdf.findFirst({
           where: {
             user_id: userId,
             program_id: programId,
+            quarter: currentQuarter,
+            year: currentYear,
           },
           orderBy: { generated_at: 'desc' },
         })

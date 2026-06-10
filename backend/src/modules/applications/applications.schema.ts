@@ -1,5 +1,16 @@
 import { z } from 'zod';
 
+export const listApplicationsQuerySchema = z.object({
+  query: z.object({
+    quarter: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
+    filter_pdfs_by_quarter: z
+      .enum(['true', 'false'])
+      .optional()
+      .transform((v) => v === 'true'),
+  }),
+});
+
 export const applicationIdParamSchema = z.object({
   params: z.object({
     id: z.string().min(1),

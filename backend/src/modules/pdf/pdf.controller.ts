@@ -24,7 +24,9 @@ export class PdfController {
       const pdf = await pdfService.generateApplicationPdf(
         req.user.id,
         req.body.program_id,
-        req.body.application_id
+        req.body.application_id,
+        req.body.quarter,
+        req.body.year
       );
       res.status(201).json({ success: true, data: pdf });
     } catch (error) {
@@ -35,7 +37,10 @@ export class PdfController {
   async listPdfs(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) throw new UnauthorizedError();
-      const pdfs = await pdfService.listPdfs(req.user.id, req.user.role);
+      const pdfs = await pdfService.listPdfs(req.user.id, req.user.role, {
+        quarter: req.query.quarter as string | undefined,
+        year: req.query.year != null ? Number(req.query.year) : undefined,
+      });
       res.status(200).json({ success: true, data: pdfs });
     } catch (error) {
       next(error);

@@ -28,7 +28,7 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
-import { formatCurrency, formatDate, getConfidenceColor } from "@/lib/utils";
+import { formatCurrency, formatDate, getConfidenceColor, resolveQuarterYearForPdf } from "@/lib/utils";
 
 const QUARTER_FILTER_OPTIONS = [
   { value: "all", label: "All Quarters" },
@@ -386,6 +386,7 @@ export default function BenefitsPage() {
         <div className="grid md:grid-cols-2 gap-4">
           {results.map((result: any, i: number) => {
             const quarterDueDisplay = getProgramQuarterDueDisplay(result.program, quarterFilter);
+            const pdfQuarterContext = resolveQuarterYearForPdf(quarterFilter);
 
             return (
             <motion.div
@@ -461,7 +462,15 @@ export default function BenefitsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleGeneratePdf(result.program.id, undefined, result.program.name)}
+                        onClick={() =>
+                          handleGeneratePdf(
+                            result.program.id,
+                            undefined,
+                            result.program.name,
+                            pdfQuarterContext.quarter,
+                            pdfQuarterContext.year
+                          )
+                        }
                         disabled={generatingPdfId === result.program.id}
                         loading={generatingPdfId === result.program.id}
                       >
@@ -578,6 +587,8 @@ export default function BenefitsPage() {
           setSelectedProgram(null);
         }}
         program={selectedProgram}
+        pdfQuarter={resolveQuarterYearForPdf(quarterFilter).quarter}
+        pdfYear={resolveQuarterYearForPdf(quarterFilter).year}
       />
     </div>
   );

@@ -403,12 +403,15 @@ model GeneratedPdf {
   file_url        String      // S3 key or local path
   file_size       Int
   version         Int         @default(1)
+  quarter         String?     // Q1, Q2, Q3, Q4
+  year            Int?
   status          String      @default("generated") // generated | attached | sent
   validation_report Json?     // missing fields/docs at generation time
   generated_at    DateTime    @default(now()) @db.Timestamptz
 
   @@index([user_id])
   @@index([program_id])
+  @@index([user_id, program_id, quarter, year])
   @@map("generated_pdfs")
 }
 

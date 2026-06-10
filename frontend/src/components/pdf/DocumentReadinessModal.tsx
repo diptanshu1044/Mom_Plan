@@ -127,6 +127,8 @@ export interface PendingGenerateParams {
   programId: string;
   applicationId?: string;
   programName?: string;
+  quarter?: string;
+  year?: number;
 }
 
 interface DocumentReadinessModalProps {
@@ -135,7 +137,13 @@ interface DocumentReadinessModalProps {
   pendingParams: PendingGenerateParams | null;
   generatingPdfId: string | null;
   onClose: () => void;
-  onGenerateAnyway: (programId: string, applicationId?: string, programName?: string) => void;
+  onGenerateAnyway: (
+    programId: string,
+    applicationId?: string,
+    programName?: string,
+    quarter?: string,
+    year?: number
+  ) => void;
 }
 
 export default function DocumentReadinessModal({
@@ -170,7 +178,9 @@ export default function DocumentReadinessModal({
     onGenerateAnyway(
       pendingParams.programId,
       pendingParams.applicationId,
-      pendingParams.programName
+      pendingParams.programName,
+      pendingParams.quarter,
+      pendingParams.year
     );
   };
 

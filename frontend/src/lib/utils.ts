@@ -58,6 +58,39 @@ export function getConfidenceColor(score: number): string {
   return "text-red-600";
 }
 
+export type Quarter = "Q1" | "Q2" | "Q3" | "Q4";
+
+export const QUARTER_FILTER_OPTIONS = [
+  { value: "all", label: "All Quarters" },
+  { value: "Q1", label: "Q1 (Jan–Mar)" },
+  { value: "Q2", label: "Q2 (Apr–Jun)" },
+  { value: "Q3", label: "Q3 (Jul–Sep)" },
+  { value: "Q4", label: "Q4 (Oct–Dec)" },
+] as const;
+
+export function getCurrentQuarterYear(): { quarter: Quarter; year: number } {
+  const now = new Date();
+  const month = now.getUTCMonth() + 1;
+  let quarter: Quarter = "Q4";
+  if (month <= 3) quarter = "Q1";
+  else if (month <= 6) quarter = "Q2";
+  else if (month <= 9) quarter = "Q3";
+  return { quarter, year: now.getUTCFullYear() };
+}
+
+export function resolveQuarterYearForPdf(quarterFilter: string): { quarter: Quarter; year: number } {
+  const current = getCurrentQuarterYear();
+  if (quarterFilter !== "all" && ["Q1", "Q2", "Q3", "Q4"].includes(quarterFilter)) {
+    return { quarter: quarterFilter as Quarter, year: current.year };
+  }
+  return current;
+}
+
+export function formatPdfQuarterYear(pdf: { quarter?: string | null; year?: number | null }): string {
+  if (pdf.quarter && pdf.year) return `${pdf.quarter} ${pdf.year}`;
+  return "";
+}
+
 export function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     qualified: "Qualified",

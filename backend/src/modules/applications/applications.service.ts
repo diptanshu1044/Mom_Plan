@@ -2,33 +2,62 @@ import { prisma } from '../../config/prisma';
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
 import { sendEmail } from '../../config/email';
 import { ApplicationStatus, ApplicationPriority, UserRole } from '@prisma/client';
+import { getQuarterForMonth } from '../programs/quarterDueDates.service';
+import { Quarter } from '../programs/quarterDueDates.types';
+
+function resolvePdfQuarterYearFilters(quarter?: string, year?: number) {
+  const now = new Date();
+  const resolvedQuarter =
+    quarter && ['Q1', 'Q2', 'Q3', 'Q4'].includes(quarter)
+      ? (quarter as Quarter)
+      : getQuarterForMonth(now.getUTCMonth() + 1);
+  const resolvedYear = year ?? now.getUTCFullYear();
+  return { quarter: resolvedQuarter, year: resolvedYear };
+}
+
+function generatedPdfsInclude(quarter?: string, year?: number, filterByQuarter = false) {
+  const pdfWhere = filterByQuarter
+    ? resolvePdfQuarterYearFilters(quarter, year)
+    : undefined;
+
+  return {
+    generated_pdfs: {
+      ...(pdfWhere ? { where: pdfWhere } : {}),
+      orderBy: { generated_at: 'desc' as const },
+    },
+  };
+}
 
 export class ApplicationsService {
-  async listApplications(userId: string, role: UserRole) {
+  async listApplications(
+    userId: string,
+    role: UserRole,
+    filters?: { quarter?: string; year?: number; filter_pdfs_by_quarter?: boolean }
+  ) {
+    const pdfInclude = generatedPdfsInclude(
+      filters?.quarter,
+      filters?.year,
+      filters?.filter_pdfs_by_quarter ?? false
+    );
+
     if (role === 'admin' || role === 'counselor') {
-      // Admins and counselors can view all applications, ordered by priority and update time
       return prisma.application.findMany({
         include: {
           program: true,
           user: {
             select: { full_name: true, email: true },
           },
-          generated_pdfs: {
-            orderBy: { generated_at: 'desc' },
-          },
+          ...pdfInclude,
         },
         orderBy: [{ priority: 'desc' }, { last_updated_at: 'desc' }],
       });
     }
 
-    // Normal users view only their own
     return prisma.application.findMany({
       where: { user_id: userId },
       include: {
         program: true,
-        generated_pdfs: {
-          orderBy: { generated_at: 'desc' },
-        },
+        ...pdfInclude,
       },
       orderBy: { last_updated_at: 'desc' },
     });
