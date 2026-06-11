@@ -9,6 +9,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   FRONTEND_URL: z.string().default('http://localhost:3000'),
   ADMIN_FRONTEND_URL: z.string().default('http://localhost:3001'),
+  /** Comma-separated list of additional allowed CORS origins */
+  CORS_ORIGINS: z.string().default(''),
 
   // ─── Database ──────────────────────────────────────────────────────────
   // Supabase: DATABASE_URL = pooled connection via Supavisor (runtime queries, port 6543)
@@ -52,6 +54,25 @@ if (!_env.success) {
 }
 
 export const env = _env.data;
+
+function normalizeOrigin(url: string): string {
+  return url.trim().replace(/\/$/, '');
+}
+
+/** Parse comma-separated origin strings into a deduplicated list. */
+export function parseCorsOrigins(...sources: string[]): string[] {
+  const origins = sources
+    .flatMap((source) => source.split(','))
+    .map(normalizeOrigin)
+    .filter(Boolean);
+  return [...new Set(origins)];
+}
+
+export const allowedOrigins = parseCorsOrigins(
+  env.FRONTEND_URL,
+  env.ADMIN_FRONTEND_URL,
+  env.CORS_ORIGINS,
+);
 
 // Warn about missing optional service keys in development
 if (env.NODE_ENV === 'development') {

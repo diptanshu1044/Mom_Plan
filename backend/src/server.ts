@@ -1,5 +1,5 @@
 import app from './app';
-import { env } from './config/env';
+import { env, allowedOrigins } from './config/env';
 import { prisma } from './config/prisma';
 
 const startServer = async () => {
@@ -35,7 +35,7 @@ const startServer = async () => {
   // ─── 3. HTTP Server ────────────────────────────────────────────────
   const server = app.listen(env.PORT, () => {
     console.log(`\n🚀 MomPlan Backend running in ${env.NODE_ENV} mode on port ${env.PORT}`);
-    console.log(`🔗 CORS origin: ${env.FRONTEND_URL}`);
+    console.log(`🔗 CORS origins: ${allowedOrigins.join(', ')}`);
     if (!dbConnected) {
       console.log('⚠️  API health endpoint is up but database routes will fail until PostgreSQL is available.');
     }

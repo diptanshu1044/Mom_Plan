@@ -2,7 +2,7 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { env } from './config/env';
+import { allowedOrigins } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 import { responseSanitizer } from './middleware/sanitize';
@@ -29,12 +29,7 @@ app.set('trust proxy', 1);
 // Security Middleware
 app.use(helmet());
 
-// CORS Configured exclusively for frontend domain as specified
-const allowedOrigins = [
-  env.FRONTEND_URL.replace(/\/$/, ''),
-  env.ADMIN_FRONTEND_URL.replace(/\/$/, '')
-];
-
+// CORS: FRONTEND_URL, ADMIN_FRONTEND_URL, and optional CORS_ORIGINS (comma-separated)
 app.use(
   cors({
     origin: allowedOrigins,
