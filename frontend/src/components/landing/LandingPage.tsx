@@ -21,9 +21,37 @@ import {
   Check,
   Sparkles,
   BookOpen,
+  Sprout,
+  Building2,
+  Globe2,
+  Landmark,
+  Minus,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/Card";
+
+type PricingFeature = {
+  text: string;
+  included: boolean;
+};
+
+type PricingPlan = {
+  name: string;
+  icon: LucideIcon;
+  price: string;
+  period?: string;
+  description: string;
+  billing?: string;
+  seatPill?: string;
+  featureHeader: string;
+  features: PricingFeature[];
+  cta: string;
+  href: string;
+  popular?: boolean;
+  badge?: string;
+  ctaVariant?: "outline" | "solid";
+};
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -131,50 +159,116 @@ const testimonials = [
   },
 ];
 
-const pricingPlans = [
+const pricingPlans: PricingPlan[] = [
   {
-    name: "Free",
+    name: "Community",
+    icon: Sprout,
     price: "$0",
     period: "/month",
-    description: "Perfect for exploring your options",
-    features: ["Basic eligibility scan", "Application links", "Self-service guide", "Public program info"],
-    cta: "Start Free",
+    description: "For small grassroots orgs & DV shelters getting started",
+    billing: "Free forever for qualifying 501(c)(3)s",
+    seatPill: "Up to 2 caseworker seats · 50 active cases/mo",
+    featureHeader: "INCLUDES",
+    features: [
+      { text: "Basic caseworker case queue", included: true },
+      { text: "Mother profile viewer", included: true },
+      { text: "Application status tracking", included: true },
+      { text: "Renewal deadline alerts", included: true },
+      { text: "Referral send (no inbox)", included: true },
+      { text: "Admin dashboard", included: false },
+      { text: "Outcomes reporting", included: false },
+      { text: "Custom report export", included: false },
+    ],
+    cta: "Apply free",
     href: "/register",
-    popular: false,
+    ctaVariant: "outline",
   },
   {
-    name: "Family",
-    price: "$9",
+    name: "Partner org",
+    icon: Building2,
+    price: "$299",
     period: "/month",
-    description: "Most popular for active families",
+    badge: "Most common",
+    description: "For established nonprofits with active caseworker teams",
+    billing: "Billed annually ($3,588/yr) · $349 month-to-month",
+    seatPill: "Up to 8 caseworker seats · $35/seat/mo additional",
+    featureHeader: "EVERYTHING IN COMMUNITY, PLUS",
     features: [
-      "Deep eligibility scanning",
-      "Auto-fill applications",
-      "Deadline SMS alerts",
-      "Multi-program tracking",
-      "Document management",
+      { text: "Full caseworker dashboard", included: true },
+      { text: "Organization admin dashboard", included: true },
+      { text: "Outcomes reporting (mothers served, $ unlocked)", included: true },
+      { text: "Two-way referral network access", included: true },
+      { text: "SMS renewal reminders for mothers", included: true },
+      { text: "Program performance breakdown", included: true },
+      { text: "Standard data export (CSV)", included: true },
+      { text: "Custom report builder", included: false },
     ],
-    cta: "Get Family Plan",
-    href: "/register?plan=family",
+    cta: "Get started",
+    href: "/register?plan=partner",
     popular: true,
+    ctaVariant: "outline",
   },
   {
-    name: "Navigator",
-    price: "$24",
+    name: "Network",
+    icon: Globe2,
+    price: "$749",
     period: "/month",
-    description: "Full concierge benefits management",
+    description: "For multi-site orgs, coalitions & legal aid networks",
+    billing: "Billed annually ($8,988/yr) · $899 month-to-month",
+    seatPill: "Up to 20 caseworker seats · $30/seat/mo additional",
+    featureHeader: "EVERYTHING IN PARTNER, PLUS",
     features: [
-      "Everything in Family",
-      "1-on-1 Expert Chat",
-      "Denial & Appeal Support",
-      "Concierge filing",
-      "Priority support",
+      { text: "Unlimited active cases", included: true },
+      { text: "Custom report builder", included: true },
+      { text: "Multi-site / branch management", included: true },
+      { text: "Referral network map & analytics", included: true },
+      { text: "Funder-ready grant report exports", included: true },
+      { text: "Priority email & phone support", included: true },
+      { text: "Dedicated onboarding session", included: true },
+      { text: "Research data dashboard", included: false },
     ],
-    cta: "Get Navigator",
-    href: "/register?plan=navigator",
-    popular: false,
+    cta: "Get Network",
+    href: "/register?plan=network",
+    ctaVariant: "solid",
+  },
+  {
+    name: "Government & enterprise",
+    icon: Landmark,
+    price: "Custom",
+    description: "For state agencies, county human services & health systems",
+    billing: "Annual contract - typically $24K–$75K/yr",
+    seatPill: "Unlimited seats · State-wide deployment",
+    featureHeader: "EVERYTHING IN NETWORK, PLUS",
+    features: [
+      { text: "Research data dashboard (WISER access)", included: true },
+      { text: "Geographic needs heatmap", included: true },
+      { text: "Demographic breakdown by race & geography", included: true },
+      { text: "Data Export API for agency systems", included: true },
+      { text: "Custom eligibility rules for your state", included: true },
+      { text: "SLA-backed uptime guarantee", included: true },
+      { text: "Dedicated implementation manager", included: true },
+    ],
+    cta: "Contact us",
+    href: "/contact",
+    ctaVariant: "outline",
   },
 ];
+
+function PricingFeatureIcon({ included }: { included: boolean }) {
+  if (included) {
+    return (
+      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-50 mt-0.5">
+        <Check className="h-2.5 w-2.5 text-emerald-600" strokeWidth={3} />
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex h-4 w-4 shrink-0 items-center justify-center mt-0.5">
+      <Minus className="h-3 w-3 text-outline-variant" strokeWidth={2} />
+    </span>
+  );
+}
 
 const stats = [
   { value: "200+", label: "Federal & State Programs" },
@@ -730,64 +824,104 @@ export default function LandingPage() {
             <p className="text-lg text-on-surface-variant">No hidden fees. Cancel anytime.</p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto items-stretch pt-6">
-            {pricingPlans.map((plan, i) => (
-              <motion.div
-                key={plan.name}
-                variants={fadeUp}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                custom={i * 0.1}
-                className="relative flex flex-col"
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4.5 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 bg-gradient-primary rounded-full text-white text-[10px] uppercase tracking-wider font-black shadow-lg shadow-primary/20 whitespace-nowrap">
-                    Most Popular
-                  </div>
-                )}
-                <Card
-                  className={cn(
-                    "h-full flex flex-col",
-                    plan.popular ? "border-2 border-primary-300 shadow-xl shadow-primary/10 ring-4 ring-primary-50" : "border-outline-variant/30"
-                  )}
-                  padding="lg"
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4 items-stretch pt-6">
+            {pricingPlans.map((plan, i) => {
+              const Icon = plan.icon;
+
+              return (
+                <motion.div
+                  key={plan.name}
+                  variants={fadeUp}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                  custom={i * 0.08}
+                  className="relative flex flex-col"
                 >
-                  <div className="mb-6">
-                    <h3 className="font-display font-bold text-xl text-on-surface mb-1">
-                      {plan.name}
-                    </h3>
-                    <p className="text-sm text-on-surface-variant mb-4">{plan.description}</p>
-                    <div className="flex items-end gap-1">
-                      <span className="font-display font-bold text-4xl text-on-surface">
-                        {plan.price}
-                      </span>
-                      <span className="text-on-surface-variant text-sm mb-1.5">{plan.period}</span>
+                  {plan.popular && (
+                    <div className="absolute -top-3.5 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-gradient-primary px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg shadow-primary/20">
+                      {plan.badge ?? "Most common"}
                     </div>
-                  </div>
+                  )}
 
-                  <ul className="space-y-3 mb-8 flex-1">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2.5">
-                        <CheckCircle2 className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
-                        <span className="text-sm text-on-surface-variant leading-tight">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <PrimaryLink
-                    href={plan.href}
+                  <Card
+                    glass={false}
+                    padding="none"
                     className={cn(
-                      "w-full text-sm py-3 rounded-xl",
-                      !plan.popular && "bg-surface-container text-on-surface-variant shadow-none border border-outline-variant hover:bg-surface-container-high hover:shadow-none hover:text-on-surface"
+                      "flex h-full flex-col p-5",
+                      plan.popular
+                        ? "border-2 border-primary-300 shadow-xl shadow-primary/10 ring-4 ring-primary-50"
+                        : "border-outline-variant/30"
                     )}
                   >
-                    {plan.cta}
-                    <ArrowRight className="ml-2 w-4 h-4" />
-                  </PrimaryLink>
-                </Card>
-              </motion.div>
-            ))}
+                    <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-lg border border-primary-100 bg-primary-50">
+                      <Icon className="h-4 w-4 text-primary-600" strokeWidth={1.5} />
+                    </div>
+
+                    <h3 className="font-display text-lg font-bold text-on-surface">{plan.name}</h3>
+                    <p className="mt-1.5 min-h-[2.5rem] text-xs leading-relaxed text-on-surface-variant">
+                      {plan.description}
+                    </p>
+
+                    <div className="mt-5 flex items-end gap-1">
+                      <span className="font-display text-3xl font-bold tracking-tight text-on-surface">
+                        {plan.price}
+                      </span>
+                      {plan.period && (
+                        <span className="mb-1 text-sm text-on-surface-variant">{plan.period}</span>
+                      )}
+                    </div>
+
+                    {plan.billing && (
+                      <p className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
+                        {plan.billing}
+                      </p>
+                    )}
+
+                    {plan.seatPill && (
+                      <div className="mt-4 rounded-lg border border-outline-variant/30 bg-surface-container-low px-3 py-2.5">
+                        <p className="text-[11px] font-medium leading-snug text-on-surface">
+                          {plan.seatPill}
+                        </p>
+                      </div>
+                    )}
+
+                    <p className="mb-3 mt-6 text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant/70">
+                      {plan.featureHeader}
+                    </p>
+
+                    <ul className="mb-6 flex-1 space-y-2.5">
+                      {plan.features.map((feature) => (
+                        <li key={feature.text} className="flex items-start gap-2.5">
+                          <PricingFeatureIcon included={feature.included} />
+                          <span
+                            className={cn(
+                              "text-[12px] leading-snug",
+                              feature.included ? "text-on-surface-variant" : "text-outline"
+                            )}
+                          >
+                            {feature.text}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <Link
+                      href={plan.href}
+                      className={cn(
+                        "inline-flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all duration-200",
+                        plan.ctaVariant === "solid"
+                          ? "bg-gradient-primary text-white shadow-primary hover:shadow-primary-lg"
+                          : "border border-outline-variant bg-white text-on-surface hover:bg-surface-container-low hover:border-primary-200"
+                      )}
+                    >
+                      {plan.cta}
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       </section>
