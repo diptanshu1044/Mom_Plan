@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -28,6 +28,71 @@ interface ApplyModalProps {
   applicationId?: string;
   pdfQuarter?: string;
   pdfYear?: number;
+}
+
+function ScrollingFileName({ text }: { text: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLSpanElement>(null);
+  const [overflow, setOverflow] = useState(false);
+  const [duration, setDuration] = useState(10);
+
+  const measure = useCallback(() => {
+    const container = containerRef.current;
+    const measureEl = measureRef.current;
+    if (!container || !measureEl || container.clientWidth === 0) return;
+
+    const textWidth = measureEl.scrollWidth;
+    const containerWidth = container.clientWidth;
+    const isOverflow = textWidth > containerWidth;
+
+    setOverflow(isOverflow);
+    if (isOverflow) {
+      setDuration(Math.max(5, (textWidth + 32) / 25));
+    }
+  }, [text]);
+
+  useLayoutEffect(() => {
+    measure();
+    const raf = requestAnimationFrame(measure);
+    const afterModalAnim = setTimeout(measure, 400);
+    const observer = new ResizeObserver(measure);
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(afterModalAnim);
+      observer.disconnect();
+    };
+  }, [measure]);
+
+  return (
+    <div ref={containerRef} className="overflow-hidden min-w-0 flex-1 relative">
+      <span
+        ref={measureRef}
+        className="invisible absolute whitespace-nowrap text-xs font-semibold pointer-events-none"
+        aria-hidden
+      >
+        {text}
+      </span>
+      {overflow ? (
+        <div
+          className="flex w-max marquee-scroll"
+          style={{ animationDuration: `${duration}s` }}
+        >
+          <span className="text-xs font-semibold text-on-surface whitespace-nowrap pr-8">
+            {text}
+          </span>
+          <span
+            className="text-xs font-semibold text-on-surface whitespace-nowrap pr-8"
+            aria-hidden
+          >
+            {text}
+          </span>
+        </div>
+      ) : (
+        <span className="text-xs font-semibold text-on-surface whitespace-nowrap">{text}</span>
+      )}
+    </div>
+  );
 }
 
 function isVaultDocumentForProgram(
@@ -325,7 +390,7 @@ export default function ApplyModal({
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-surface rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] border border-outline-variant/30"
+            className="bg-surface rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[90vh] border border-outline-variant/30"
           >
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-surface-container flex items-center justify-between bg-surface-container-lowest rounded-t-2xl">
@@ -511,15 +576,11 @@ export default function ApplyModal({
                                       : "bg-white hover:bg-surface-container border-outline-variant/30"
                                   }`}
                                 >
-                                  <div className="flex items-center gap-2 min-w-0">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
                                     <div className="shrink-0 text-base">
                                       {docTypeIcons[doc.document_type] || "📄"}
                                     </div>
-                                    <div className="truncate">
-                                      <span className="font-semibold block truncate text-on-surface">
-                                        {doc.display_name}
-                                      </span>
-                                    </div>
+                                    <ScrollingFileName text={doc.display_name} />
                                   </div>
                                   <div className="shrink-0 pl-2">
                                     <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
