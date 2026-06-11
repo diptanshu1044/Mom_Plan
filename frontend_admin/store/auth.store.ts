@@ -68,6 +68,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       refreshSession: async () => {
+        if (!get().isAuthenticated) {
+          return false;
+        }
+
         const generationAtStart = get().authGeneration;
         const wasAuthenticated = get().isAuthenticated;
         const { refreshAccessToken } = await import("../lib/api");

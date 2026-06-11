@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useAuthStore } from "@/store/auth.store";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { isHydrated, refreshSession, setInitializing } = useAuthStore();
+  const { isHydrated, isAuthenticated, refreshSession, setInitializing } = useAuthStore();
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -14,7 +14,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       setInitializing(true);
       try {
-        await refreshSession();
+        if (isAuthenticated) {
+          await refreshSession();
+        }
       } finally {
         if (!cancelled) {
           setInitializing(false);
@@ -25,7 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isHydrated, refreshSession, setInitializing]);
+  }, [isHydrated, isAuthenticated, refreshSession, setInitializing]);
 
   return <>{children}</>;
 }

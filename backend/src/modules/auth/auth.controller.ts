@@ -7,6 +7,7 @@ const authService = new AuthService();
 
 export const REFRESH_COOKIE_NAME = 'mp_rt';
 
+// Lax works for same-origin requests (via Next.js proxy). None+Secure for direct cross-origin API calls.
 const refreshCookieSameSite = env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const);
 
 const refreshCookieOptions = {
@@ -14,7 +15,7 @@ const refreshCookieOptions = {
   secure: env.NODE_ENV === 'production',
   sameSite: refreshCookieSameSite,
   maxAge: refreshTokenTtlMs,
-  path: '/api/auth',
+  path: '/',
 };
 
 function setRefreshCookie(res: Response, refreshToken: string) {
@@ -26,7 +27,7 @@ function clearRefreshCookie(res: Response) {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
     sameSite: refreshCookieSameSite,
-    path: '/api/auth',
+    path: '/',
   });
 }
 

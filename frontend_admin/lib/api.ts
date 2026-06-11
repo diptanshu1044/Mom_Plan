@@ -5,9 +5,20 @@ function normalizeApiBaseUrl(url: string): string {
   return url.trim().replace(/\/+$/, "");
 }
 
-const API_URL = normalizeApiBaseUrl(
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-);
+/**
+ * Browser: same-origin `/api/*` (proxied by Next.js) so httpOnly refresh cookies work.
+ * Server: direct backend URL for SSR/route handlers.
+ */
+function getApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    return "";
+  }
+  return normalizeApiBaseUrl(
+    process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+  );
+}
+
+const API_URL = getApiBaseUrl();
 
 function apiUrl(path: string): string {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
