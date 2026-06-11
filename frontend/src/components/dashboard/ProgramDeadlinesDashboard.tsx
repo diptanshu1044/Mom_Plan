@@ -47,28 +47,6 @@ function getDaysRemainingLabel(daysRemaining: number): string {
   return `${daysRemaining} Day${daysRemaining === 1 ? "" : "s"}`;
 }
 
-function getDaysRemainingColor(status: DashboardItem["status"]): string {
-  switch (status) {
-    case "overdue":
-      return "text-red-600";
-    case "due_soon":
-      return "text-orange-600";
-    default:
-      return "text-on-surface";
-  }
-}
-
-function getRowAccent(status: DashboardItem["status"]): string {
-  switch (status) {
-    case "overdue":
-      return "bg-red-50";
-    case "due_soon":
-      return "bg-orange-50";
-    default:
-      return "bg-white";
-  }
-}
-
 type DashboardResponse = {
   items: DashboardItem[];
   availableYears: number[];
@@ -105,17 +83,17 @@ export default function ProgramDeadlinesDashboard() {
     <div>
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: "Overdue", count: overdueCount, color: "text-red-600", bg: "bg-red-50", icon: AlertTriangle },
-          { label: "Due Soon", count: dueSoonCount, color: "text-orange-600", bg: "bg-orange-50", icon: Clock },
-          { label: "Upcoming", count: upcomingCount, color: "text-blue-600", bg: "bg-blue-50", icon: CheckCircle2 },
-        ].map(({ label, count, color, bg, icon: Icon }) => (
+          { label: "Overdue", count: overdueCount, icon: AlertTriangle },
+          { label: "Due Soon", count: dueSoonCount, icon: Clock },
+          { label: "Upcoming", count: upcomingCount, icon: CheckCircle2 },
+        ].map(({ label, count, icon: Icon }) => (
           <Card key={label} padding="sm" hover>
             <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
-                <Icon className={`w-4 h-4 ${color}`} />
+              <div className="w-9 h-9 rounded-xl bg-surface-container-low flex items-center justify-center shrink-0">
+                <Icon className="w-4 h-4 text-primary-600" />
               </div>
               <div>
-                <div className={`text-xl font-bold font-display ${color}`}>{count}</div>
+                <div className="text-xl font-bold font-display text-on-surface">{count}</div>
                 <div className="text-xs text-on-surface-variant">{label}</div>
               </div>
             </div>
@@ -230,16 +208,17 @@ export default function ProgramDeadlinesDashboard() {
               </thead>
               <tbody className="divide-y divide-outline-variant/15">
                 {items.map((item) => (
-                  <tr key={item.programId} className={getRowAccent(item.status)}>
+                  <tr
+                    key={item.programId}
+                    className="hover:bg-surface-container-low transition-colors"
+                  >
                     <td className="px-4 py-3 font-semibold text-on-surface whitespace-nowrap">
                       {item.programName}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <StatusBadge status={getScopeBadgeStatus(item.federalOrState)} />
                     </td>
-                    <td
-                      className={`px-4 py-3 font-semibold whitespace-nowrap ${getDaysRemainingColor(item.status)}`}
-                    >
+                    <td className="px-4 py-3 font-semibold text-on-surface whitespace-nowrap">
                       {getDaysRemainingLabel(item.daysRemaining)}
                     </td>
                     <td className="px-4 py-3 text-on-surface-variant whitespace-nowrap">
