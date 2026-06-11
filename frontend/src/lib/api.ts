@@ -1,6 +1,18 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+/** Strip trailing slashes so `${base}/api/...` never becomes `//api/...`. */
+function normalizeApiBaseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "");
+}
+
+const API_URL = normalizeApiBaseUrl(
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+);
+
+function apiUrl(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_URL}${normalizedPath}`;
+}
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -57,7 +69,7 @@ export async function refreshAccessToken(): Promise<RefreshResult> {
   refreshPromise = (async () => {
     try {
       const response = await axios.post(
-        `${API_URL}/api/auth/refresh`,
+        apiUrl("/api/auth/refresh"),
         {},
         { withCredentials: true }
       );
@@ -83,7 +95,7 @@ export async function revokeSession(): Promise<void> {
 
   try {
     // Use raw axios — bypass interceptors to avoid refresh loops
-    await axios.post(`${API_URL}/api/auth/logout`, {}, { withCredentials: true });
+    await axios.post(apiUrl("/api/auth/logout"), {}, { withCredentials: true });
   } catch {
     // Still clear local state even if server logout fails
   }
