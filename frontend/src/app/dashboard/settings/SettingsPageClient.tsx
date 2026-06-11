@@ -17,24 +17,22 @@ import {
   reactivateSubscription,
   openBillingPortal,
   activateCommunityPlan,
+  formatPlanPrice,
+  formatPlanBillingNote,
+  type BillingInterval,
   type OrgPlan,
 } from "@/lib/billing";
+import { BillingIntervalToggle } from "@/components/billing/BillingIntervalToggle";
 import { cn } from "@/lib/utils";
 
 const plans: {
   name: OrgPlan;
   displayName: string;
-  price: string;
-  period: string;
-  billing: string;
   features: string[];
 }[] = [
   {
     name: "community",
     displayName: "Community",
-    price: "$0",
-    period: "/month",
-    billing: "Free for qualifying 501(c)(3)s",
     features: [
       "Basic caseworker case queue",
       "Mother profile viewer",
@@ -45,9 +43,6 @@ const plans: {
   {
     name: "partner",
     displayName: "Partner Org",
-    price: "$299",
-    period: "/month",
-    billing: "Billed annually ($3,588/yr)",
     features: [
       "Full caseworker dashboard",
       "Organization admin dashboard",
@@ -58,9 +53,6 @@ const plans: {
   {
     name: "network",
     displayName: "Network",
-    price: "$749",
-    period: "/month",
-    billing: "Billed annually ($8,988/yr)",
     features: [
       "Unlimited active cases",
       "Custom report builder",
@@ -70,12 +62,32 @@ const plans: {
   },
 ];
 
+function getPlanDisplay(
+  plan: (typeof plans)[number],
+  billingInterval: BillingInterval
+): { price: string; period: string; billing: string } {
+  if (plan.name === "community") {
+    return {
+      price: "$0",
+      period: "/month",
+      billing: "Free for qualifying 501(c)(3)s",
+    };
+  }
+
+  return {
+    price: formatPlanPrice(plan.name, billingInterval),
+    period: "/month",
+    billing: formatPlanBillingNote(plan.name, billingInterval),
+  };
+}
+
 export default function SettingsPageClient() {
   const { user, refreshSession, updateUser } = useAuthStore();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>("yearly");
   const [banner, setBanner] = useState<{ type: "error" | "info"; message: string } | null>(null);
 
   useEffect(() => {
@@ -122,10 +134,10 @@ export default function SettingsPageClient() {
         updateUser({ plan: "community" });
         queryClient.invalidateQueries({ queryKey: ["billing-status"] });
       } else if (user?.plan === "community") {
-        const { url } = await startCheckout(planName);
+        const { url } = await startCheckout(planName, billingInterval);
         window.location.href = url;
       } else {
-        const result = await upgradePlan(planName);
+        const result = await upgradePlan(planName, billingInterval);
         if (result.checkoutUrl) {
           window.location.href = result.checkoutUrl;
         } else {
@@ -231,9 +243,13 @@ export default function SettingsPageClient() {
         </div>
       </Card>
 
-      <h2 className="font-display font-semibold text-xl text-on-surface mb-4">Choose Your Plan</h2>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-4">
+        <h2 className="font-display font-semibold text-xl text-on-surface">Choose Your Plan</h2>
+        <BillingIntervalToggle value={billingInterval} onChange={setBillingInterval} />
+      </div>
       <div className="grid md:grid-cols-3 gap-6 mb-8 pt-4">
         {plans.map((plan) => {
+          const display = getPlanDisplay(plan, billingInterval);
           const isCurrent = user?.plan === plan.name;
           const isPopular = plan.name === "partner";
           const canUpgrade =
@@ -263,10 +279,10 @@ export default function SettingsPageClient() {
                     )}
                   </div>
                   <div className="flex items-end gap-1">
-                    <span className="font-display font-bold text-4xl text-on-surface">{plan.price}</span>
-                    <span className="text-on-surface-variant text-sm mb-1.5">{plan.period}</span>
+                    <span className="font-display font-bold text-4xl text-on-surface">{display.price}</span>
+                    <span className="text-on-surface-variant text-sm mb-1.5">{display.period}</span>
                   </div>
-                  <p className="text-xs text-on-surface-variant mt-2">{plan.billing}</p>
+                  <p className="text-xs text-on-surface-variant mt-2">{display.billing}</p>
                 </div>
 
                 <ul className="space-y-3 mb-8 flex-1">

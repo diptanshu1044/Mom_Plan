@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -32,6 +33,12 @@ import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/Card";
 import { PricingCta } from "@/components/landing/PricingCta";
 import { HeroCarousel } from "@/components/landing/HeroCarousel";
+import { BillingIntervalToggle } from "@/components/billing/BillingIntervalToggle";
+import {
+  formatPlanBillingNote,
+  formatPlanPrice,
+  type BillingInterval,
+} from "@/lib/billing";
 
 type PricingFeature = {
   text: string;
@@ -195,7 +202,6 @@ const pricingPlans: PricingPlan[] = [
     period: "/month",
     badge: "Most common",
     description: "For established nonprofits with active caseworker teams",
-    billing: "Billed annually ($3,588/yr) · $349 month-to-month",
     seatPill: "Up to 8 caseworker seats · $35/seat/mo additional",
     featureHeader: "EVERYTHING IN COMMUNITY, PLUS",
     features: [
@@ -220,7 +226,6 @@ const pricingPlans: PricingPlan[] = [
     price: "$749",
     period: "/month",
     description: "For multi-site orgs, coalitions & legal aid networks",
-    billing: "Billed annually ($8,988/yr) · $899 month-to-month",
     seatPill: "Up to 20 caseworker seats · $30/seat/mo additional",
     featureHeader: "EVERYTHING IN PARTNER, PLUS",
     features: [
@@ -332,7 +337,27 @@ function GhostLink({
   );
 }
 
+function getLandingPlanPrice(
+  plan: PricingPlan,
+  billingInterval: BillingInterval
+): { price: string; period?: string; billing?: string } {
+  if (plan.planId === "partner" || plan.planId === "network") {
+    return {
+      price: formatPlanPrice(plan.planId, billingInterval),
+      period: "/month",
+      billing: formatPlanBillingNote(plan.planId, billingInterval),
+    };
+  }
+
+  return {
+    price: plan.price,
+    period: plan.period,
+    billing: plan.billing,
+  };
+}
+
 export default function LandingPage() {
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>("yearly");
   return (
     <main className="overflow-hidden" suppressHydrationWarning>
       <HeroCarousel />
@@ -831,11 +856,15 @@ export default function LandingPage() {
               Choose Your Support Level
             </h2>
             <p className="text-lg text-on-surface-variant">No hidden fees. Cancel anytime.</p>
+            <div className="mt-8">
+              <BillingIntervalToggle value={billingInterval} onChange={setBillingInterval} />
+            </div>
           </motion.div>
 
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4 items-stretch pt-6">
             {pricingPlans.map((plan, i) => {
               const Icon = plan.icon;
+              const display = getLandingPlanPrice(plan, billingInterval);
 
               return (
                 <motion.div
@@ -874,16 +903,16 @@ export default function LandingPage() {
 
                     <div className="mt-5 flex items-end gap-1">
                       <span className="font-display text-3xl font-bold tracking-tight text-on-surface">
-                        {plan.price}
+                        {display.price}
                       </span>
-                      {plan.period && (
-                        <span className="mb-1 text-sm text-on-surface-variant">{plan.period}</span>
+                      {display.period && (
+                        <span className="mb-1 text-sm text-on-surface-variant">{display.period}</span>
                       )}
                     </div>
 
-                    {plan.billing && (
+                    {display.billing && (
                       <p className="mt-2 text-[11px] leading-relaxed text-on-surface-variant">
-                        {plan.billing}
+                        {display.billing}
                       </p>
                     )}
 
@@ -919,6 +948,7 @@ export default function LandingPage() {
                       planId={plan.planId}
                       label={plan.cta}
                       href={plan.href}
+                      interval={billingInterval}
                       variant={plan.ctaVariant}
                     />
                   </Card>

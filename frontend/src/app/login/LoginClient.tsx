@@ -29,6 +29,7 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan");
+  const interval = searchParams.get("interval");
 
   const {
     register,
@@ -46,7 +47,7 @@ export default function LoginPage() {
       if (user.role === "admin") {
         router.push("/admin");
       } else if (plan === "community" || plan === "free" || plan === "partner" || plan === "network") {
-        const { redirect } = await completePlanSelection(plan);
+        const { redirect } = await completePlanSelection(plan, interval);
         if (redirect.startsWith("http")) {
           window.location.href = redirect;
         } else {

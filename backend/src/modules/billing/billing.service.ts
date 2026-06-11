@@ -6,11 +6,16 @@ import { sendEmail } from '../../config/email';
 import { SubscriptionStatus, UserPlan } from '@prisma/client';
 import Stripe from 'stripe';
 import {
+  addBillingPeriod,
   assertBillablePlan,
+  getAmountCents,
   getPlanConfig,
+  getStripePriceId,
   isMockStripeMode,
   isUpgrade,
+  parseBillingInterval,
   toUserPlan,
+  type BillingInterval,
   type OrgPlanId,
 } from './billing.plans';
 
@@ -29,11 +34,6 @@ function mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionStatus
   return mapping[status] ?? 'active';
 }
 
-function addOneYear(from = new Date()): Date {
-  const end = new Date(from);
-  end.setFullYear(end.getFullYear() + 1);
-  return end;
-}
 
 export class BillingService {
   private async getUserOrThrow(userId: string) {
@@ -79,6 +79,7 @@ export class BillingService {
     currentPeriodStart?: Date | null;
     currentPeriodEnd?: Date | null;
     cancelAtPeriodEnd?: boolean;
+    billingInterval?: BillingInterval;
     amountCents?: number;
     stripePaymentIntentId?: string | null;
     skipEmail?: boolean;
@@ -89,13 +90,15 @@ export class BillingService {
       stripeCustomerId,
       stripeSubscriptionId,
       status = 'active',
-      currentPeriodStart = new Date(),
-      currentPeriodEnd = addOneYear(),
+      billingInterval = 'yearly',
       cancelAtPeriodEnd = false,
       amountCents,
       stripePaymentIntentId,
       skipEmail = false,
     } = params;
+
+    const periodStart = params.currentPeriodStart ?? new Date();
+    const periodEnd = params.currentPeriodEnd ?? addBillingPeriod(periodStart, billingInterval);
 
     const user = await this.getUserOrThrow(userId);
 
@@ -110,8 +113,8 @@ export class BillingService {
         data: {
           plan,
           status,
-          current_period_start: currentPeriodStart,
-          current_period_end: currentPeriodEnd,
+          current_period_start: periodStart,
+          current_period_end: periodEnd,
           cancel_at_period_end: cancelAtPeriodEnd,
           stripe_customer_id: stripeCustomerId ?? subscription.stripe_customer_id,
         },
@@ -133,8 +136,8 @@ export class BillingService {
           status,
           stripe_customer_id: stripeCustomerId,
           stripe_subscription_id: stripeSubscriptionId,
-          current_period_start: currentPeriodStart,
-          current_period_end: currentPeriodEnd,
+          current_period_start: periodStart,
+          current_period_end: periodEnd,
           cancel_at_period_end: cancelAtPeriodEnd,
         },
       });
@@ -211,12 +214,18 @@ export class BillingService {
     return subscription;
   }
 
-  async createCheckoutSession(userId: string, plan: string) {
+  async createCheckoutSession(userId: string, plan: string, intervalInput?: string) {
     const user = await this.getUserOrThrow(userId);
     const planConfig = assertBillablePlan(plan);
+    const interval = parseBillingInterval(intervalInput);
+    const planId = plan as OrgPlanId;
+    const stripePriceId = getStripePriceId(planId, interval);
+    const amountCents = getAmountCents(planId, interval);
 
     if (isMockStripeMode()) {
-      console.log(`⚠️ [MOCK STRIPE CHECKOUT] Plan: ${plan} for User: ${user.email}`);
+      console.log(
+        `⚠️ [MOCK STRIPE CHECKOUT] Plan: ${plan} (${interval}) for User: ${user.email}`
+      );
       const mockSubId = `sub_mock_${Date.now()}`;
       const mockCustomerId = user.stripe_customer_id ?? `cus_mock_${userId}`;
 
@@ -225,11 +234,18 @@ export class BillingService {
         plan: toUserPlan(plan),
         stripeCustomerId: mockCustomerId,
         stripeSubscriptionId: mockSubId,
-        amountCents: planConfig.annualAmountCents,
+        billingInterval: interval,
+        amountCents,
         stripePaymentIntentId: `pi_mock_${Date.now()}`,
       });
 
-      return { url: `${env.FRONTEND_URL}/dashboard/billing/success?mock=true&plan=${plan}` };
+      return {
+        url: `${env.FRONTEND_URL}/dashboard/billing/success?mock=true&plan=${plan}&interval=${interval}`,
+      };
+    }
+
+    if (!stripePriceId) {
+      throw new BadRequestError('Stripe price is not configured for this plan');
     }
 
     const customerId = await this.ensureStripeCustomer(user);
@@ -237,13 +253,13 @@ export class BillingService {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
-      line_items: [{ price: planConfig.stripePriceId!, quantity: 1 }],
+      line_items: [{ price: stripePriceId, quantity: 1 }],
       mode: 'subscription',
       success_url: SUCCESS_URL,
       cancel_url: CANCEL_URL,
-      metadata: { userId: user.id, plan },
+      metadata: { userId: user.id, plan, interval },
       subscription_data: {
-        metadata: { userId: user.id, plan },
+        metadata: { userId: user.id, plan, interval },
       },
     });
 
@@ -254,10 +270,14 @@ export class BillingService {
     return { url: session.url };
   }
 
-  async upgradeSubscription(userId: string, targetPlan: string) {
+  async upgradeSubscription(userId: string, targetPlan: string, intervalInput?: string) {
     const user = await this.getUserOrThrow(userId);
-    const planConfig = assertBillablePlan(targetPlan);
+    assertBillablePlan(targetPlan);
     const target = toUserPlan(targetPlan);
+    const interval = parseBillingInterval(intervalInput);
+    const planId = targetPlan as OrgPlanId;
+    const stripePriceId = getStripePriceId(planId, interval);
+    const amountCents = getAmountCents(planId, interval);
 
     if (!isUpgrade(user.plan, target)) {
       throw new BadRequestError('Target plan must be higher than your current plan');
@@ -271,15 +291,20 @@ export class BillingService {
         plan: target,
         stripeCustomerId: user.stripe_customer_id ?? `cus_mock_${userId}`,
         stripeSubscriptionId: activeSub?.stripe_subscription_id ?? `sub_mock_${Date.now()}`,
-        amountCents: planConfig.annualAmountCents,
+        billingInterval: interval,
+        amountCents,
         stripePaymentIntentId: `pi_mock_upgrade_${Date.now()}`,
       });
       return { plan: target, upgraded: true };
     }
 
     if (!activeSub?.stripe_subscription_id || !user.stripe_customer_id) {
-      const checkout = await this.createCheckoutSession(userId, targetPlan);
+      const checkout = await this.createCheckoutSession(userId, targetPlan, interval);
       return { checkoutUrl: checkout.url, upgraded: false };
+    }
+
+    if (!stripePriceId) {
+      throw new BadRequestError('Stripe price is not configured for this plan');
     }
 
     const stripeSub = await stripe.subscriptions.retrieve(activeSub.stripe_subscription_id);
@@ -287,11 +312,11 @@ export class BillingService {
       items: [
         {
           id: stripeSub.items.data[0].id,
-          price: planConfig.stripePriceId!,
+          price: stripePriceId,
         },
       ],
       proration_behavior: 'create_prorations',
-      metadata: { userId, plan: targetPlan },
+      metadata: { userId, plan: targetPlan, interval },
     });
 
     await this.syncSubscriptionFromStripe(updated, userId, target);
@@ -523,9 +548,10 @@ export class BillingService {
     }
 
     const planConfig = getPlanConfig(planStr);
+    const interval = parseBillingInterval(session.metadata?.interval);
     const customerId = typeof session.customer === 'string' ? session.customer : null;
 
-    let periodEnd = addOneYear();
+    let periodEnd = addBillingPeriod(new Date(), interval);
     if (subId && !isMockStripeMode()) {
       try {
         const stripeSub = await stripe.subscriptions.retrieve(subId);
@@ -540,8 +566,9 @@ export class BillingService {
       plan: toUserPlan(planStr),
       stripeCustomerId: customerId,
       stripeSubscriptionId: subId,
+      billingInterval: interval,
       currentPeriodEnd: periodEnd,
-      amountCents: planConfig?.annualAmountCents,
+      amountCents: planConfig ? getAmountCents(planStr as OrgPlanId, interval) : undefined,
       stripePaymentIntentId:
         typeof session.payment_intent === 'string' ? session.payment_intent : `pi_checkout_${session.id}`,
     });

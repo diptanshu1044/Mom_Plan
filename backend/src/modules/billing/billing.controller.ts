@@ -8,7 +8,11 @@ export class BillingController {
   async checkout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) throw new UnauthorizedError();
-      const session = await billingService.createCheckoutSession(req.user.id, req.body.plan);
+      const session = await billingService.createCheckoutSession(
+        req.user.id,
+        req.body.plan,
+        req.body.interval
+      );
       res.status(200).json({ success: true, data: session });
     } catch (error) {
       next(error);
@@ -28,7 +32,11 @@ export class BillingController {
   async upgrade(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) throw new UnauthorizedError();
-      const result = await billingService.upgradeSubscription(req.user.id, req.body.plan);
+      const result = await billingService.upgradeSubscription(
+        req.user.id,
+        req.body.plan,
+        req.body.interval
+      );
       res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);

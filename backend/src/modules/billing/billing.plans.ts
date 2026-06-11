@@ -6,6 +6,9 @@ export type OrgPlanId = (typeof ORG_PLANS)[number];
 
 export const BILLABLE_PLANS: OrgPlanId[] = ['partner', 'network'];
 
+export const BILLING_INTERVALS = ['monthly', 'yearly'] as const;
+export type BillingInterval = (typeof BILLING_INTERVALS)[number];
+
 export const PLAN_HIERARCHY: Record<OrgPlanId, number> = {
   community: 0,
   partner: 1,
@@ -15,9 +18,12 @@ export const PLAN_HIERARCHY: Record<OrgPlanId, number> = {
 export interface PlanConfig {
   id: OrgPlanId;
   displayName: string;
+  /** Monthly amount in cents — validated on backend only */
+  monthlyAmountCents: number;
   /** Annual amount in cents — validated on backend only */
   annualAmountCents: number;
-  stripePriceId: string | null;
+  stripePriceIdMonthly: string | null;
+  stripePriceIdAnnual: string | null;
 }
 
 export function isMockStripeMode(): boolean {
@@ -34,22 +40,50 @@ export function getAllPlanConfigs(): Record<OrgPlanId, PlanConfig> {
     community: {
       id: 'community',
       displayName: 'Community',
+      monthlyAmountCents: 0,
       annualAmountCents: 0,
-      stripePriceId: null,
+      stripePriceIdMonthly: null,
+      stripePriceIdAnnual: null,
     },
     partner: {
       id: 'partner',
       displayName: 'Partner Org',
-      annualAmountCents: 358_800, // $3,588/year ($299/mo)
-      stripePriceId: env.STRIPE_PRICE_PARTNER_ANNUAL || 'price_momplan_partner_annual',
+      monthlyAmountCents: 34_900, // $349/mo
+      annualAmountCents: 358_800, // $3,588/yr ($299/mo)
+      stripePriceIdMonthly: env.STRIPE_PRICE_PARTNER_MONTHLY || 'price_momplan_partner_monthly',
+      stripePriceIdAnnual: env.STRIPE_PRICE_PARTNER_ANNUAL || 'price_momplan_partner_annual',
     },
     network: {
       id: 'network',
       displayName: 'Network',
-      annualAmountCents: 898_800, // $8,988/year ($749/mo)
-      stripePriceId: env.STRIPE_PRICE_NETWORK_ANNUAL || 'price_momplan_network_annual',
+      monthlyAmountCents: 89_900, // $899/mo
+      annualAmountCents: 898_800, // $8,988/yr ($749/mo)
+      stripePriceIdMonthly: env.STRIPE_PRICE_NETWORK_MONTHLY || 'price_momplan_network_monthly',
+      stripePriceIdAnnual: env.STRIPE_PRICE_NETWORK_ANNUAL || 'price_momplan_network_annual',
     },
   };
+}
+
+export function getAmountCents(plan: OrgPlanId, interval: BillingInterval): number {
+  const config = getPlanConfig(plan);
+  if (!config) return 0;
+  return interval === 'monthly' ? config.monthlyAmountCents : config.annualAmountCents;
+}
+
+export function getStripePriceId(plan: OrgPlanId, interval: BillingInterval): string | null {
+  const config = getPlanConfig(plan);
+  if (!config) return null;
+  return interval === 'monthly' ? config.stripePriceIdMonthly : config.stripePriceIdAnnual;
+}
+
+export function addBillingPeriod(from: Date, interval: BillingInterval): Date {
+  const end = new Date(from);
+  if (interval === 'monthly') {
+    end.setMonth(end.getMonth() + 1);
+  } else {
+    end.setFullYear(end.getFullYear() + 1);
+  }
+  return end;
 }
 
 export function assertBillablePlan(plan: string): PlanConfig {
@@ -69,4 +103,8 @@ export function toUserPlan(plan: string): UserPlan {
 
 export function isUpgrade(fromPlan: UserPlan, toPlan: UserPlan): boolean {
   return PLAN_HIERARCHY[fromPlan as OrgPlanId] < PLAN_HIERARCHY[toPlan as OrgPlanId];
+}
+
+export function parseBillingInterval(value: string | undefined): BillingInterval {
+  return value === 'monthly' ? 'monthly' : 'yearly';
 }

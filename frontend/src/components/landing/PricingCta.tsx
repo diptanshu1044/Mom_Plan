@@ -6,23 +6,34 @@ import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
-import { activateCommunityPlan, startCheckout } from "@/lib/billing";
+import { activateCommunityPlan, startCheckout, type BillingInterval } from "@/lib/billing";
 
 type PricingCtaProps = {
   planId: "community" | "partner" | "network" | "enterprise";
   label: string;
   href: string;
+  interval?: BillingInterval;
   variant?: "outline" | "solid";
   className?: string;
 };
 
-function registerUrlForPlan(planId: PricingCtaProps["planId"]): string {
+function registerUrlForPlan(
+  planId: PricingCtaProps["planId"],
+  interval: BillingInterval = "yearly"
+): string {
   if (planId === "enterprise") return "/contact";
   if (planId === "community") return "/register?plan=community";
-  return `/register?plan=${planId}`;
+  return `/register?plan=${planId}&interval=${interval}`;
 }
 
-export function PricingCta({ planId, label, href, variant = "outline", className }: PricingCtaProps) {
+export function PricingCta({
+  planId,
+  label,
+  href,
+  interval = "yearly",
+  variant = "outline",
+  className,
+}: PricingCtaProps) {
   const router = useRouter();
   const { isHydrated, isInitializing, ensureSession } = useAuthStore();
   const [loading, setLoading] = useState(false);
@@ -53,7 +64,7 @@ export function PricingCta({ planId, label, href, variant = "outline", className
     try {
       const sessionActive = await ensureSession();
       if (!sessionActive) {
-        router.push(registerUrlForPlan(planId));
+        router.push(registerUrlForPlan(planId, interval));
         return;
       }
 
@@ -61,13 +72,13 @@ export function PricingCta({ planId, label, href, variant = "outline", className
         await activateCommunityPlan();
         router.push("/dashboard/billing/success?plan=community");
       } else {
-        const { url } = await startCheckout(planId);
+        const { url } = await startCheckout(planId, interval);
         window.location.href = url;
       }
     } catch {
       const retrySession = await ensureSession();
       if (!retrySession) {
-        router.push(registerUrlForPlan(planId));
+        router.push(registerUrlForPlan(planId, interval));
         return;
       }
       setError("Something went wrong. Please try again or contact support.");

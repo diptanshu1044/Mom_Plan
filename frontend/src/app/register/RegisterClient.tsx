@@ -51,6 +51,7 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get("plan") || "community";
+  const interval = searchParams.get("interval");
 
   const {
     register,
@@ -78,7 +79,7 @@ function RegisterForm() {
 
       const normalizedPlan = plan === "free" ? "community" : plan;
       if (normalizedPlan === "community" || normalizedPlan === "partner" || normalizedPlan === "network") {
-        const { redirect } = await completePlanSelection(normalizedPlan);
+        const { redirect } = await completePlanSelection(normalizedPlan, interval);
         if (redirect.startsWith("http")) {
           window.location.href = redirect;
         } else {

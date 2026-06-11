@@ -34,7 +34,9 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().default(''),
   STRIPE_SECRET_KEY: z.string().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().default(''),
+  STRIPE_PRICE_PARTNER_MONTHLY: z.string().default(''),
   STRIPE_PRICE_PARTNER_ANNUAL: z.string().default(''),
+  STRIPE_PRICE_NETWORK_MONTHLY: z.string().default(''),
   STRIPE_PRICE_NETWORK_ANNUAL: z.string().default(''),
   /** When true, simulates successful Stripe payments without charging cards */
   MOCK_STRIPE_PAYMENTS: z
