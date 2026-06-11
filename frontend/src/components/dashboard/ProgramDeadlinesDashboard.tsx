@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
 import { Calendar, ChevronDown, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/Badge";
-import { CardSkeleton } from "@/components/ui/Skeleton";
+import { TableSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
-import { formatDate } from "@/lib/utils";
 
 const PROGRAM_TYPE_OPTIONS = [
   { value: "all", label: "All" },
@@ -40,23 +38,41 @@ function getScopeBadgeStatus(federalOrState: string): "federal" | "state" {
   return federalOrState.toLowerCase().includes("federal") ? "federal" : "state";
 }
 
-function getDaysLabel(daysRemaining: number): string {
-  if (daysRemaining < 0) {
-    const overdueDays = Math.abs(daysRemaining);
-    return `${overdueDays} day${overdueDays === 1 ? "" : "s"} overdue`;
+function formatTableDate(date: string): string {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(d);
+}
+
+function getDaysRemainingLabel(daysRemaining: number): string {
+  if (daysRemaining < 0) return "Overdue";
+  if (daysRemaining === 0) return "Today";
+  return `${daysRemaining} Day${daysRemaining === 1 ? "" : "s"}`;
+}
+
+function getDaysRemainingColor(status: DashboardItem["status"]): string {
+  switch (status) {
+    case "overdue":
+      return "text-red-600";
+    case "due_soon":
+      return "text-orange-600";
+    default:
+      return "text-on-surface";
   }
-  if (daysRemaining === 0) return "Due today";
-  return `${daysRemaining} day${daysRemaining === 1 ? "" : "s"} remaining`;
 }
 
 function getRowAccent(status: DashboardItem["status"]): string {
   switch (status) {
     case "overdue":
-      return "bg-red-50 border-red-100";
+      return "bg-red-50";
     case "due_soon":
-      return "bg-orange-50 border-orange-100";
+      return "bg-orange-50";
     default:
-      return "bg-surface-container-low border-transparent";
+      return "bg-white";
   }
 }
 
@@ -153,11 +169,9 @@ export default function ProgramDeadlinesDashboard() {
       </div>
 
       {isLoading ? (
-        <div className="space-y-3">
-          {[0, 1, 2, 3].map((i) => (
-            <CardSkeleton key={i} />
-          ))}
-        </div>
+        <Card padding="md">
+          <TableSkeleton rows={5} />
+        </Card>
       ) : items.length === 0 ? (
         <Card className="text-center" padding="lg">
           <Calendar className="w-10 h-10 text-on-surface-variant/30 mx-auto mb-3" />
@@ -169,35 +183,48 @@ export default function ProgramDeadlinesDashboard() {
           </p>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {items.map((item, i) => (
-            <motion.div
-              key={item.programId}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-            >
-              <Card padding="sm" className={`border ${getRowAccent(item.status)}`} hover>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h3 className="font-semibold text-sm text-on-surface">{item.programName}</h3>
+        <Card padding="none" className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[36rem] text-sm">
+              <thead>
+                <tr className="border-b border-outline-variant/20 bg-surface-container-low">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-on-surface-variant">
+                    Program Name
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-on-surface-variant">
+                    Type
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-on-surface-variant">
+                    Days Remaining
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-on-surface-variant">
+                    Due Date
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/15">
+                {items.map((item) => (
+                  <tr key={item.programId} className={getRowAccent(item.status)}>
+                    <td className="px-4 py-3 font-semibold text-on-surface whitespace-nowrap">
+                      {item.programName}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <StatusBadge status={getScopeBadgeStatus(item.federalOrState)} />
-                      <StatusBadge status={item.status} />
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-on-surface-variant">
-                      <Calendar className="w-3 h-3 shrink-0" />
-                      <span>Next due {formatDate(item.nextDueDate)}</span>
-                    </div>
-                  </div>
-                  <div className="text-sm font-semibold text-on-surface shrink-0 sm:text-right">
-                    {getDaysLabel(item.daysRemaining)}
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+                    </td>
+                    <td
+                      className={`px-4 py-3 font-semibold whitespace-nowrap ${getDaysRemainingColor(item.status)}`}
+                    >
+                      {getDaysRemainingLabel(item.daysRemaining)}
+                    </td>
+                    <td className="px-4 py-3 text-on-surface-variant whitespace-nowrap">
+                      {formatTableDate(item.nextDueDate)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </div>
   );
