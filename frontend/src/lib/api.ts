@@ -13,7 +13,12 @@ function getAccessToken(): string | null {
   return window.__momplan_access_token__ ?? null;
 }
 
-let refreshPromise: Promise<{ accessToken: string; user?: any } | null> | null = null;
+export type RefreshResult =
+  | { status: "success"; accessToken: string; user?: any }
+  | { status: "unauthorized" }
+  | { status: "error" };
+
+let refreshPromise: Promise<RefreshResult> | null = null;
 
 function isAuthRefreshRequest(config?: InternalAxiosRequestConfig): boolean {
   const url = config?.url ?? "";
@@ -44,7 +49,7 @@ async function syncAccessToken(accessToken: string) {
   }
 }
 
-export async function refreshAccessToken(): Promise<{ accessToken: string; user?: any } | null> {
+export async function refreshAccessToken(): Promise<RefreshResult> {
   if (refreshPromise) {
     return refreshPromise;
   }
@@ -58,9 +63,12 @@ export async function refreshAccessToken(): Promise<{ accessToken: string; user?
       );
       const { accessToken, user } = response.data.data;
       await syncAccessToken(accessToken);
-      return { accessToken, user };
-    } catch {
-      return null;
+      return { status: "success", accessToken, user };
+    } catch (error) {
+      if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+        return { status: "unauthorized" };
+      }
+      return { status: "error" };
     } finally {
       refreshPromise = null;
     }
@@ -98,16 +106,11 @@ export async function ensureAccessToken(): Promise<string | null> {
   const existing = getAccessToken();
   if (existing) return existing;
 
-  try {
-    const { useAuthStore } = await import("@/store/auth.store");
-    const { isAuthenticated } = useAuthStore.getState();
-    if (!isAuthenticated) return null;
-
-    const refreshed = await refreshAccessToken();
-    return refreshed?.accessToken ?? getAccessToken();
-  } catch {
-    return null;
+  const refreshed = await refreshAccessToken();
+  if (refreshed.status === "success") {
+    return refreshed.accessToken;
   }
+  return getAccessToken();
 }
 
 api.interceptors.request.use(async (config) => {
@@ -143,9 +146,12 @@ api.interceptors.response.use(
     // Always attempt refresh on 401 — covers expired tokens and missing in-memory tokens after reload
     const generationAtRefreshStart = await getAuthGeneration();
     const refreshed = await refreshAccessToken();
-    if (!refreshed) {
+    if (refreshed.status !== "success") {
       const generationAfterRefresh = await getAuthGeneration();
-      if (generationAtRefreshStart === null || generationAfterRefresh === generationAtRefreshStart) {
+      const shouldForceLogout =
+        refreshed.status === "unauthorized" &&
+        (generationAtRefreshStart === null || generationAfterRefresh === generationAtRefreshStart);
+      if (shouldForceLogout) {
         await revokeSession();
       }
       return Promise.reject(error);

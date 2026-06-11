@@ -7,10 +7,12 @@ const authService = new AuthService();
 
 export const REFRESH_COOKIE_NAME = 'mp_rt';
 
+const refreshCookieSameSite = env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const);
+
 const refreshCookieOptions = {
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
+  sameSite: refreshCookieSameSite,
   maxAge: refreshTokenTtlMs,
   path: '/api/auth',
 };
@@ -23,7 +25,7 @@ function clearRefreshCookie(res: Response) {
   res.clearCookie(REFRESH_COOKIE_NAME, {
     httpOnly: true,
     secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: refreshCookieSameSite,
     path: '/api/auth',
   });
 }

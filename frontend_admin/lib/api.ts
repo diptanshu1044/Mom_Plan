@@ -21,14 +21,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-let refreshPromise: Promise<string | null> | null = null;
+export type RefreshResult =
+  | { status: "success"; accessToken: string }
+  | { status: "unauthorized" }
+  | { status: "error" };
+
+let refreshPromise: Promise<RefreshResult> | null = null;
 
 function isAuthRefreshRequest(config?: InternalAxiosRequestConfig): boolean {
   const url = config?.url ?? "";
   return url.includes("/api/auth/refresh");
 }
 
-export async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<RefreshResult> {
   if (refreshPromise) return refreshPromise;
 
   refreshPromise = (async () => {
@@ -40,9 +45,12 @@ export async function refreshAccessToken(): Promise<string | null> {
       );
       const { accessToken } = response.data.data;
       setInMemoryToken(accessToken);
-      return accessToken;
-    } catch {
-      return null;
+      return { status: "success", accessToken };
+    } catch (error) {
+      if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+        return { status: "unauthorized" };
+      }
+      return { status: "error" };
     } finally {
       refreshPromise = null;
     }
@@ -65,13 +73,13 @@ api.interceptors.response.use(
     }
 
     originalRequest._retry = true;
-    const accessToken = await refreshAccessToken();
+    const refreshed = await refreshAccessToken();
 
-    if (!accessToken) {
+    if (refreshed.status !== "success") {
       return Promise.reject(error);
     }
 
-    originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+    originalRequest.headers.Authorization = `Bearer ${refreshed.accessToken}`;
     return api(originalRequest);
   }
 );

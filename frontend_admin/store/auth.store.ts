@@ -69,14 +69,20 @@ export const useAuthStore = create<AuthState>()(
 
       refreshSession: async () => {
         const generationAtStart = get().authGeneration;
+        const wasAuthenticated = get().isAuthenticated;
         const { refreshAccessToken } = await import("../lib/api");
-        const accessToken = await refreshAccessToken();
+        const refreshed = await refreshAccessToken();
 
         if (generationAtStart !== get().authGeneration) {
           return get().isAuthenticated;
         }
 
-        if (!accessToken) {
+        if (refreshed.status === "error") {
+          // Preserve local session on temporary refresh failures (network, server restart, etc.)
+          return wasAuthenticated || get().isAuthenticated;
+        }
+
+        if (refreshed.status === "unauthorized") {
           if (get().accessToken) {
             return get().isAuthenticated;
           }
@@ -90,6 +96,7 @@ export const useAuthStore = create<AuthState>()(
           }
           return false;
         }
+        const accessToken = refreshed.accessToken;
 
         try {
           const profileResponse = await api.get("/api/user/profile");

@@ -123,6 +123,7 @@ export const useAuthStore = create<AuthState>()(
 
       refreshSession: async () => {
         const generationAtStart = get().authGeneration;
+        const wasAuthenticated = get().isAuthenticated;
 
         try {
           const result = await refreshAccessToken();
@@ -132,7 +133,12 @@ export const useAuthStore = create<AuthState>()(
             return get().isAuthenticated;
           }
 
-          if (!result) {
+          if (result.status === "error") {
+            // Temporary/network failure: preserve existing session state and retry later.
+            return wasAuthenticated || get().isAuthenticated;
+          }
+
+          if (result.status === "unauthorized") {
             if (get().accessToken) {
               return get().isAuthenticated;
             }
