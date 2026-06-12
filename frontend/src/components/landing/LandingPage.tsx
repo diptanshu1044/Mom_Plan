@@ -191,7 +191,7 @@ const pricingPlans: PricingPlan[] = [
       { text: "Custom report export", included: false },
     ],
     cta: "Apply free",
-    href: "/register?plan=community",
+    href: "/login",
     ctaVariant: "outline",
   },
   {
@@ -215,7 +215,7 @@ const pricingPlans: PricingPlan[] = [
       { text: "Custom report builder", included: false },
     ],
     cta: "Get started",
-    href: "/register?plan=partner",
+    href: "/login",
     popular: true,
     ctaVariant: "outline",
   },
@@ -239,7 +239,7 @@ const pricingPlans: PricingPlan[] = [
       { text: "Research data dashboard", included: false },
     ],
     cta: "Get Network",
-    href: "/register?plan=network",
+    href: "/login",
     ctaVariant: "solid",
   },
   {

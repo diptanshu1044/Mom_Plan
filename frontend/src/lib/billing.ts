@@ -75,25 +75,6 @@ export async function openBillingPortal() {
   return res.data.data as { url: string };
 }
 
-function parseBillingInterval(value: string | null | undefined): BillingInterval {
-  return value === "monthly" ? "monthly" : "yearly";
-}
-
-/** Post-registration or pricing-page plan selection handler */
-export async function completePlanSelection(plan: string, intervalInput?: string | null) {
-  const interval = parseBillingInterval(intervalInput);
-
-  if (plan === "community" || plan === "free") {
-    await activateCommunityPlan();
-    return { redirect: "/dashboard/billing/success?plan=community" };
-  }
-  if (plan === "partner" || plan === "network") {
-    const { url } = await startCheckout(plan, interval);
-    return { redirect: url };
-  }
-  return { redirect: "/dashboard" };
-}
-
 export const PLAN_LABELS: Record<OrgPlan, string> = {
   community: "Community",
   partner: "Partner Org",

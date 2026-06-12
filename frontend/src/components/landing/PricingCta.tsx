@@ -17,14 +17,7 @@ type PricingCtaProps = {
   className?: string;
 };
 
-function registerUrlForPlan(
-  planId: PricingCtaProps["planId"],
-  interval: BillingInterval = "yearly"
-): string {
-  if (planId === "enterprise") return "/contact";
-  if (planId === "community") return "/register?plan=community";
-  return `/register?plan=${planId}&interval=${interval}`;
-}
+const LOGIN_URL = "/login";
 
 export function PricingCta({
   planId,
@@ -64,13 +57,13 @@ export function PricingCta({
     try {
       const sessionActive = await ensureSession();
       if (!sessionActive) {
-        router.push(registerUrlForPlan(planId, interval));
+        router.push(LOGIN_URL);
         return;
       }
 
       if (planId === "community") {
         await activateCommunityPlan();
-        router.push("/dashboard/billing/success?plan=community");
+        router.push("/dashboard/settings");
       } else {
         const { url } = await startCheckout(planId, interval);
         window.location.href = url;
@@ -78,7 +71,7 @@ export function PricingCta({
     } catch {
       const retrySession = await ensureSession();
       if (!retrySession) {
-        router.push(registerUrlForPlan(planId, interval));
+        router.push(LOGIN_URL);
         return;
       }
       setError("Something went wrong. Please try again or contact support.");

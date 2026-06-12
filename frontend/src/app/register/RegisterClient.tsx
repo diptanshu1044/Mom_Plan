@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
-import { completePlanSelection } from "@/lib/billing";
 import { getApiErrorMessage } from "@/lib/errors";
 
 const registerSchema = z
@@ -50,8 +49,7 @@ function RegisterForm() {
   const { setAuth } = useAuthStore();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const plan = searchParams.get("plan") || "community";
-  const interval = searchParams.get("interval");
+  const redirectTo = searchParams.get("redirect");
 
   const {
     register,
@@ -77,14 +75,8 @@ function RegisterForm() {
       const { user, accessToken } = response.data.data;
       setAuth(user, accessToken);
 
-      const normalizedPlan = plan === "free" ? "community" : plan;
-      if (normalizedPlan === "community" || normalizedPlan === "partner" || normalizedPlan === "network") {
-        const { redirect } = await completePlanSelection(normalizedPlan, interval);
-        if (redirect.startsWith("http")) {
-          window.location.href = redirect;
-        } else {
-          router.push(redirect);
-        }
+      if (redirectTo === "eligibility") {
+        router.push("/eligibility");
       } else {
         router.push("/dashboard");
       }
@@ -126,12 +118,7 @@ function RegisterForm() {
                 Create your account
               </h1>
               <p className="text-sm text-on-surface-variant">
-                Start discovering benefits your family qualifies for{" "}
-                {plan !== "community" && plan !== "free" && (
-                  <span className="font-medium text-primary-600">
-                    • {plan.charAt(0).toUpperCase() + plan.slice(1)} Plan
-                  </span>
-                )}
+                Start discovering benefits your family qualifies for
               </p>
             </div>
 
@@ -255,7 +242,7 @@ function RegisterForm() {
             <p className="text-center text-sm text-on-surface-variant mt-6">
               Already have an account?{" "}
               <Link
-                href={`/login?plan=${encodeURIComponent(plan)}`}
+                href="/login"
                 className="text-primary-500 hover:text-primary-600 font-semibold"
               >
                 Sign in
