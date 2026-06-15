@@ -55,7 +55,7 @@ export function Sidebar() {
 
   const isActive = (href: string) =>
     href === "/dashboard"
-      ? pathname === href || pathname === "/cases"
+      ? pathname === href || pathname.startsWith("/cases")
       : pathname === href || pathname.startsWith(href + "/");
 
   return (

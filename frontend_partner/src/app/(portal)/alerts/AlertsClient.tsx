@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search, Bell, FolderOpen, MessageCircle } from "lucide-react";
 import { api } from "@/lib/api";
@@ -9,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuarterTabs, currentQuarter } from "@/components/cases/QuarterTabs";
-import { CaseDetailPanel } from "@/components/cases/CaseDetailPanel";
 import { usePartnerAuthStore } from "@/store/auth.store";
 import { formatDate, formatRelativeDate, initials, cn } from "@/lib/utils";
 import type { AlertItem, AlertSummary, CaseFilterOptions } from "@/types";
@@ -50,6 +50,7 @@ async function fetchFilters(): Promise<CaseFilterOptions> {
 }
 
 export function AlertsClient() {
+  const router = useRouter();
   const { user } = usePartnerAuthStore();
   const queryClient = useQueryClient();
   const [quarter, setQuarter] = useState(currentQuarter());
@@ -58,7 +59,6 @@ export function AlertsClient() {
   const [program, setProgram] = useState("all");
   const [caseworker, setCaseworker] = useState("all");
   const [showSnoozed, setShowSnoozed] = useState(false);
-  const [selectedCase, setSelectedCase] = useState<string | null>(null);
 
   const { data: summary } = useQuery({
     queryKey: ["partner-alerts-summary", quarter],
@@ -272,7 +272,7 @@ export function AlertsClient() {
                               <Button variant="outline" size="sm" className="gap-1">
                                 <MessageCircle className="w-3.5 h-3.5" /> Message
                               </Button>
-                              <Button size="sm" className="gap-1" onClick={() => setSelectedCase(alert.case_id)}>
+                              <Button size="sm" className="gap-1" onClick={() => router.push(`/cases/${alert.case_id}`)}>
                                 <FolderOpen className="w-3.5 h-3.5" /> Open Case
                               </Button>
                             </div>
@@ -287,8 +287,6 @@ export function AlertsClient() {
           </div>
         )}
       </div>
-
-      <CaseDetailPanel caseId={selectedCase} onClose={() => setSelectedCase(null)} />
     </div>
   );
 }

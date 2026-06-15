@@ -5,6 +5,16 @@ import { UnauthorizedError } from '../../utils/errors';
 const svc = new PartnerCasesService();
 
 export class PartnerCasesController {
+  async createCase(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.orgUser) throw new UnauthorizedError('Not authenticated');
+      const data = await svc.createCase(req.orgUser.orgId, req.orgUser.orgUserId, req.body);
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async listCases(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.orgUser) throw new UnauthorizedError('Not authenticated');

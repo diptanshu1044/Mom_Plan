@@ -1,5 +1,6 @@
+import { randomUUID } from 'crypto';
 import { prisma } from '../../config/prisma';
-import { NotFoundError } from '../../utils/errors';
+import { BadRequestError, NotFoundError } from '../../utils/errors';
 
 const PROGRAM_SHORT: Record<string, string> = {
   snap: 'SNAP',
@@ -182,6 +183,103 @@ function mapCaseRow(
 }
 
 export class PartnerCasesService {
+  async createCase(
+    orgId: string,
+    orgUserId: string,
+    input: {
+      first_name: string;
+      last_name: string;
+      email?: string;
+      phone?: string;
+      dob?: string;
+      address?: string;
+      program_id: string;
+      caseworker_id?: string;
+      intake_date?: string;
+      quarter?: string;
+      notes?: string;
+    }
+  ) {
+    const program = await prisma.benefitProgram.findFirst({
+      where: { id: input.program_id, is_active: true },
+    });
+    if (!program) throw new BadRequestError('Invalid program');
+
+    const caseworkerId = input.caseworker_id ?? orgUserId;
+    const caseworker = await prisma.orgUser.findFirst({
+      where: { id: caseworkerId, org_id: orgId, is_active: true },
+    });
+    if (!caseworker) throw new BadRequestError('Invalid caseworker');
+
+    const fullName = `${input.first_name.trim()} ${input.last_name.trim()}`;
+    const email =
+      input.email?.trim() ||
+      `intake+${randomUUID().slice(0, 8)}@intake.momplan.internal`;
+    const quarter = (input.quarter ?? currentQuarter()).toUpperCase();
+    const intakeDate = input.intake_date ? new Date(input.intake_date) : new Date();
+    const dob = input.dob ? new Date(input.dob) : null;
+
+    const created = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          full_name: fullName,
+          password_hash: '',
+        },
+      });
+
+      await tx.familyProfile.create({
+        data: {
+          user_id: user.id,
+          first_name: input.first_name.trim(),
+          last_name: input.last_name.trim(),
+          phone: input.phone?.trim() || null,
+          email: input.email?.trim() || null,
+          date_of_birth: dob,
+          street_address: input.address?.trim() || null,
+        },
+      });
+
+      const mother = await tx.mother.create({
+        data: {
+          user_id: user.id,
+          caseworker_id: caseworkerId,
+          dob,
+          phone: input.phone?.trim() || null,
+          address: input.address?.trim() || null,
+          enrollment_status: 'enrolled',
+        },
+      });
+
+      const partnerCase = await tx.partnerCase.create({
+        data: {
+          mother_id: mother.id,
+          caseworker_id: caseworkerId,
+          program_id: input.program_id,
+          status: 'not_started',
+          urgency_level: 'normal',
+          quarter,
+          intake_date: intakeDate,
+          last_activity: new Date(),
+        },
+      });
+
+      await tx.statusHistory.create({
+        data: {
+          case_id: partnerCase.id,
+          old_status: null,
+          new_status: 'not_started',
+          changed_by: orgUserId,
+          notes: input.notes?.trim() || 'Case opened via partner portal',
+        },
+      });
+
+      return partnerCase;
+    });
+
+    return this.getCaseDetail(orgId, created.id);
+  }
+
   async listCases(
     orgId: string,
     filters: {
@@ -396,8 +494,9 @@ export class PartnerCasesService {
         orderBy: { full_name: 'asc' },
       }),
       prisma.benefitProgram.findMany({
-        where: { is_active: true, partner_cases: { some: { caseworker: { org_id: orgId } } } },
+        where: { is_active: true },
         select: { id: true, name: true },
+        orderBy: { name: 'asc' },
       }),
     ]);
 

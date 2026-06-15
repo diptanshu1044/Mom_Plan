@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -57,6 +59,7 @@ async function fetchCases(status?: string): Promise<Case[]> {
 }
 
 export function CasesClient() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("all");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
@@ -137,8 +140,10 @@ export function CasesClient() {
           <Button variant="outline" size="sm" className="gap-1.5">
             <Filter className="w-3.5 h-3.5" /> Filter
           </Button>
-          <Button size="sm" className="gap-1.5">
-            <Plus className="w-3.5 h-3.5" /> New Case
+          <Button size="sm" className="gap-1.5" asChild>
+            <Link href="/cases/new">
+              <Plus className="w-3.5 h-3.5" /> New Case
+            </Link>
           </Button>
         </div>
       </div>
@@ -221,6 +226,7 @@ export function CasesClient() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.03, duration: 0.2 }}
                   className="border-b border-surface-border last:border-0 hover:bg-primary-subtle/50 transition-colors cursor-pointer group"
+                  onClick={() => router.push(`/cases/${c.id}`)}
                 >
                   <td className="px-4 py-3 text-text-soft font-mono text-xs">
                     {c.case_number}
