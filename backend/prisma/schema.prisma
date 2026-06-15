@@ -107,6 +107,7 @@ model User {
   subscriptions          Subscription[]
   payments               Payment[]
   billing_events         BillingEvent[]
+  mother_profile         Mother?             @relation("MotherUser")
 
   @@map("users")
 }
@@ -217,7 +218,7 @@ model FamilyProfile {
   has_health_insurance   Boolean?  @default(false)
   immigration_status     String?
   legal_issues           String[]  @default([])
-  urgency                Int?   @map("urgency_level")
+  urgency                String? @map("urgency_level")
   has_savings            Boolean?  @default(false)
   domestic_violence      Boolean?  @default(false)
 
@@ -762,7 +763,7 @@ model OrgUser {
 
 model Mother {
   id                String           @id @default(uuid()) @db.Uuid
-  user_id           String?          @db.Uuid
+  user_id           String?          @unique @db.Uuid
   caseworker_id     String?          @db.Uuid
   dob               DateTime?        @db.Date
   phone             String?
@@ -771,6 +772,7 @@ model Mother {
   created_at        DateTime         @default(now()) @db.Timestamptz
 
   // Relations
+  user       User?         @relation("MotherUser", fields: [user_id], references: [id], onDelete: Cascade)
   caseworker OrgUser?      @relation("MotherCaseworker", fields: [caseworker_id], references: [id], onDelete: SetNull)
   cases      PartnerCase[] @relation("PartnerCaseMother")
 
