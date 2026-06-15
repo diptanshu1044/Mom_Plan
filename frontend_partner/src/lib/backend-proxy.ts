@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const REFRESH_COOKIE = "mp_rt";
+const REFRESH_COOKIE = "mp_org_rt";
 
 const STRIP_RESPONSE_HEADERS = new Set([
   "content-encoding",

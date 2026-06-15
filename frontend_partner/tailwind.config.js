@@ -74,6 +74,8 @@ module.exports = {
         'gradient-card': 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(245,240,255,0.95) 100%)',
         'gradient-progress': 'linear-gradient(90deg, #C084FC, #9333EA)',
         'gradient-pink-purple': 'linear-gradient(135deg, #D946A8, #9333EA)',
+        'gradient-sidebar': 'linear-gradient(180deg, #7C3AED 0%, #6D28D9 45%, #5B21B6 100%)',
+        'gradient-sidebar-warm': 'linear-gradient(165deg, #9333EA 0%, #7C3AED 35%, #6D28D9 70%, #581C87 100%)',
       },
       boxShadow: {
         partner: '0 4px 16px rgba(147,51,234,0.25)',

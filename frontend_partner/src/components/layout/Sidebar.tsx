@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard,
-  FolderOpen,
   ArrowLeftRight,
   FileText,
   BarChart3,
@@ -15,36 +14,32 @@ import {
   Building2,
   Users,
   Bell,
-  ChevronRight,
+  AlertTriangle,
+  Sparkles,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, initials } from "@/lib/utils";
 import { usePartnerAuthStore } from "@/store/auth.store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { initials } from "@/lib/utils";
 
 const NAV = [
   {
-    section: "Overview",
-    items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    ],
+    section: "Home",
+    items: [{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
   },
   {
-    section: "Operations",
+    section: "Your caseload",
     items: [
-      { label: "Cases", href: "/cases", icon: FolderOpen },
+      { label: "Deadline Alerts", href: "/alerts", icon: AlertTriangle },
       { label: "Referrals", href: "/referrals", icon: ArrowLeftRight },
       { label: "Documents", href: "/documents", icon: FileText },
     ],
   },
   {
     section: "Insights",
-    items: [
-      { label: "Analytics", href: "/analytics", icon: BarChart3 },
-    ],
+    items: [{ label: "Analytics", href: "/analytics", icon: BarChart3 }],
   },
   {
-    section: "Management",
+    section: "Workspace",
     items: [
       { label: "Organization", href: "/organization", icon: Building2 },
       { label: "Team", href: "/team", icon: Users },
@@ -60,35 +55,45 @@ export function Sidebar() {
 
   const isActive = (href: string) =>
     href === "/dashboard"
-      ? pathname === href
+      ? pathname === href || pathname === "/cases"
       : pathname === href || pathname.startsWith(href + "/");
 
   return (
-    <aside className="w-[288px] min-w-[288px] h-screen flex flex-col bg-gradient-to-b from-[#1e0a3c] via-[#2d1260] to-[#1a0a30] border-r border-white/10 overflow-hidden">
+    <aside className="relative w-[272px] min-w-[272px] h-screen flex flex-col bg-gradient-sidebar-warm overflow-hidden">
+      {/* Warm decorative glow */}
+      <div className="pointer-events-none absolute -top-20 -left-16 w-56 h-56 rounded-full bg-pink-400/20 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-32 -right-10 w-40 h-40 rounded-full bg-violet-300/15 blur-2xl" />
+
       {/* Brand */}
-      <div className="px-6 pt-7 pb-6 border-b border-white/10">
+      <div className="relative px-5 pt-7 pb-5">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-partner rounded-xl flex items-center justify-center shadow-partner">
-            <Heart className="w-4 h-4 text-white fill-white" />
+          <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/25 flex items-center justify-center shadow-lg shrink-0">
+            <Heart className="w-5 h-5 text-white fill-white" />
           </div>
-          <div>
-            <div className="text-white font-extrabold text-base leading-none">MomPlan</div>
-            <div className="text-white/45 text-[10px] font-semibold tracking-widest uppercase mt-0.5">
-              Partner Portal
+          <div className="min-w-0">
+            <div className="text-white font-extrabold text-[15px] leading-tight tracking-tight">
+              MomPlan
+            </div>
+            <div className="flex items-center gap-1 text-white/60 text-[11px] font-medium mt-0.5">
+              <Sparkles className="w-3 h-3 text-pink-200" />
+              Supporting every mom
             </div>
           </div>
         </div>
 
-        {/* Organization badge */}
         {organization && (
-          <div className="mt-4 px-3 py-2.5 rounded-xl bg-white/10 border border-white/15">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-gradient-partner flex items-center justify-center text-xs font-bold text-white shrink-0">
+          <div className="mt-5 px-3.5 py-3 rounded-2xl bg-white/12 backdrop-blur-md border border-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-300 to-violet-400 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-md">
                 {initials(organization.name)}
               </div>
               <div className="min-w-0">
-                <div className="text-white/90 text-xs font-semibold truncate">{organization.name}</div>
-                <div className="text-white/40 text-[10px] truncate">{organization.type}</div>
+                <div className="text-white text-sm font-semibold truncate leading-tight">
+                  {organization.name}
+                </div>
+                <div className="text-white/50 text-[11px] truncate mt-0.5">
+                  {organization.type ?? "Partner organization"}
+                </div>
               </div>
             </div>
           </div>
@@ -96,43 +101,40 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+      <nav className="relative flex-1 overflow-y-auto px-3 pb-4 space-y-6">
         {NAV.map((group) => (
           <div key={group.section}>
-            <div className="px-3 mb-2 text-[10px] font-bold text-white/30 uppercase tracking-widest">
+            <div className="px-3 mb-2 text-[11px] font-semibold text-white/45 tracking-wide">
               {group.section}
             </div>
-            <ul className="space-y-0.5">
+            <ul className="space-y-1">
               {group.items.map((item) => {
                 const active = isActive(item.href);
                 return (
-                  <li key={item.href}>
+                  <li key={`${group.section}-${item.label}`}>
                     <Link
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 group relative",
+                        "flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-[13px] font-semibold transition-all duration-200 group relative",
                         active
-                          ? "bg-white/15 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
-                          : "text-white/55 hover:text-white hover:bg-white/8"
+                          ? "text-partner-800"
+                          : "text-white/75 hover:text-white hover:bg-white/10"
                       )}
                     >
                       {active && (
                         <motion.div
                           layoutId="activeNav"
-                          className="absolute inset-0 bg-white/12 rounded-xl"
-                          transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                          className="absolute inset-0 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.15)]"
+                          transition={{ type: "spring", bounce: 0.12, duration: 0.4 }}
                         />
                       )}
                       <item.icon
                         className={cn(
-                          "w-[18px] h-[18px] shrink-0 relative z-10 transition-colors",
-                          active ? "text-partner-300" : "text-white/40 group-hover:text-white/70"
+                          "w-[18px] h-[18px] shrink-0 relative z-10",
+                          active ? "text-partner-600" : "text-white/55 group-hover:text-white/90"
                         )}
                       />
                       <span className="relative z-10 flex-1">{item.label}</span>
-                      {active && (
-                        <ChevronRight className="w-3.5 h-3.5 text-white/40 relative z-10" />
-                      )}
                     </Link>
                   </li>
                 );
@@ -143,22 +145,26 @@ export function Sidebar() {
       </nav>
 
       {/* User footer */}
-      <div className="p-4 border-t border-white/10">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/8 transition-colors group">
-          <Avatar className="w-8 h-8 shrink-0">
+      <div className="relative p-4 mt-auto">
+        <div className="flex items-center gap-3 px-3.5 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-colors">
+          <Avatar className="w-9 h-9 shrink-0 ring-2 ring-white/30">
             <AvatarImage src={user?.avatar_url ?? ""} alt={user?.full_name} />
-            <AvatarFallback className="text-xs">{initials(user?.full_name)}</AvatarFallback>
+            <AvatarFallback className="text-xs bg-gradient-to-br from-pink-300 to-violet-400 text-white font-bold">
+              {initials(user?.full_name)}
+            </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <div className="text-white/90 text-xs font-semibold truncate">{user?.full_name}</div>
-            <div className="text-white/40 text-[10px] truncate">{user?.email}</div>
+            <div className="text-white text-sm font-semibold truncate leading-tight">
+              {user?.full_name ?? "Welcome"}
+            </div>
+            <div className="text-white/45 text-[11px] truncate">{user?.email}</div>
           </div>
           <button
             onClick={() => logout()}
-            className="text-white/30 hover:text-white/80 transition-colors p-1 rounded-lg hover:bg-white/10"
+            className="text-white/40 hover:text-white transition-colors p-2 rounded-xl hover:bg-white/10"
             title="Sign out"
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>

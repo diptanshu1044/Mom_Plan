@@ -46,12 +46,15 @@ export function clearInMemoryToken() {
 }
 
 function isRefreshRequest(config?: InternalAxiosRequestConfig): boolean {
-  return (config?.url ?? "").includes("/api/auth/refresh");
+  return (config?.url ?? "").includes("/api/partner/auth/refresh");
 }
 
 function isLoginRequest(config?: InternalAxiosRequestConfig): boolean {
   const url = config?.url ?? "";
-  return url.includes("/api/auth/login") || url.includes("/api/auth/register");
+  return (
+    url.includes("/api/partner/auth/login") ||
+    url.includes("/api/partner/auth/register")
+  );
 }
 
 async function getAuthGeneration(): Promise<number | null> {
@@ -77,7 +80,7 @@ export async function refreshAccessToken(): Promise<RefreshResult> {
   refreshPromise = (async (): Promise<RefreshResult> => {
     try {
       const response = await axios.post(
-        `${API_URL}/api/auth/refresh`,
+        `${API_URL}/api/partner/auth/refresh`,
         {},
         { withCredentials: true }
       );
@@ -103,7 +106,7 @@ export async function refreshAccessToken(): Promise<RefreshResult> {
 export async function revokeSession(): Promise<void> {
   clearInMemoryToken();
   try {
-    await axios.post(`${API_URL}/api/auth/logout`, {}, { withCredentials: true });
+    await axios.post(`${API_URL}/api/partner/auth/logout`, {}, { withCredentials: true });
   } catch {}
   try {
     const { usePartnerAuthStore } = await import("@/store/auth.store");

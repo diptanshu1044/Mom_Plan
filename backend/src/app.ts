@@ -21,6 +21,11 @@ import billingRoutes from './modules/billing/billing.routes';
 import billingWebhookRoutes from './modules/billing/billing.webhook.routes';
 import adminRoutes from './modules/admin/admin.routes';
 import pdfRoutes from './modules/pdf/pdf.routes';
+import partnerAuthRoutes from './modules/partner/partner-auth.routes';
+import partnerOrgRoutes from './modules/partner/partner-org.routes';
+import partnerCasesRoutes from './modules/partner/partner-cases.routes';
+import partnerDashboardRoutes from './modules/partner/partner-dashboard.routes';
+import partnerAlertsRoutes from './modules/partner/partner-alerts.routes';
 
 const app: Application = express();
 
@@ -71,6 +76,11 @@ app.use('/api/deadlines', deadlinesRoutes);
 app.use('/api/sessions', sessionsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/pdf', pdfRoutes);
+app.use('/api/partner/auth',         partnerAuthRoutes);
+app.use('/api/partner/organization', partnerOrgRoutes);
+app.use('/api/partner/cases',        partnerCasesRoutes);
+app.use('/api/partner/dashboard',    partnerDashboardRoutes);
+app.use('/api/partner/alerts',       partnerAlertsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

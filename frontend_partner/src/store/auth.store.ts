@@ -110,15 +110,12 @@ export const usePartnerAuthStore = create<AuthState>()(
           const { accessToken, user } = result;
           setInMemoryToken(accessToken);
 
-          try {
-            const profileRes = await api.get("/api/partner/profile");
-            if (genAtStart !== get().authGeneration) return get().isAuthenticated;
-            const profile = (profileRes.data?.data ?? user) as PartnerUser;
-            set({ user: profile, accessToken, isAuthenticated: true });
-          } catch {
-            if (genAtStart !== get().authGeneration) return get().isAuthenticated;
-            set({ user: user as PartnerUser | null, accessToken, isAuthenticated: true });
-          }
+          if (genAtStart !== get().authGeneration) return get().isAuthenticated;
+          set((state) => ({
+            user: (user as PartnerUser | null) ?? state.user,
+            accessToken,
+            isAuthenticated: true,
+          }));
 
           return true;
         } catch {

@@ -36,27 +36,27 @@ import { initials } from "@/lib/utils";
 const STEPS = [
   {
     id: "profile",
-    label: "Organization Profile",
+    label: "Confirm Profile",
     icon: Building2,
-    description: "Core identity and mission",
+    description: "Add a tagline & services",
   },
   {
     id: "location",
-    label: "Location & Contact",
+    label: "Confirm Location",
     icon: MapPin,
-    description: "Where you operate",
+    description: "Add your service area",
   },
   {
     id: "team",
     label: "Team Setup",
     icon: Users,
-    description: "Who's on your team",
+    description: "Primary contact & invites",
   },
   {
     id: "preferences",
     label: "Preferences",
     icon: Palette,
-    description: "Customize your experience",
+    description: "Customize your portal",
   },
   {
     id: "launch",
@@ -326,7 +326,7 @@ export function OnboardingClient() {
       state: organization?.state ?? draft.location?.state ?? "",
       zip: organization?.zip ?? draft.location?.zip ?? "",
       country: organization?.country ?? draft.location?.country ?? "United States",
-      email: organization?.email ?? draft.location?.email ?? "",
+      email: (organization as any)?.contact_email ?? organization?.email ?? draft.location?.email ?? "",
       phone: organization?.phone ?? draft.location?.phone ?? "",
       service_area: draft.location?.service_area ?? "",
     },
@@ -380,7 +380,7 @@ export function OnboardingClient() {
   const handleLaunch = async () => {
     setIsSubmitting(true);
     try {
-      await api.post("/api/partner/onboarding/complete", {
+      await api.post("/api/partner/organization/onboarding/complete", {
         ...draft.profile,
         ...draft.location,
         ...draft.team,
@@ -468,8 +468,8 @@ export function OnboardingClient() {
               {currentStep === 0 && (
                 <StepCard
                   icon={Building2}
-                  title="Organization Profile 🌷"
-                  description="Tell us about your organization's identity and mission."
+                  title="Confirm Your Profile 🌷"
+                  description="Your registration details are pre-filled. Add a tagline and services to complete your public profile."
                 >
                   <form onSubmit={profileForm.handleSubmit(handleProfile)} className="space-y-4">
                     <FormField label="Organization Name" required error={profileForm.formState.errors.name?.message}>
@@ -501,8 +501,8 @@ export function OnboardingClient() {
               {currentStep === 1 && (
                 <StepCard
                   icon={MapPin}
-                  title="Location & Contact 🏡"
-                  description="Where do you operate and how can people reach you?"
+                  title="Confirm Location & Contact 🏡"
+                  description="Your address and contact details are pre-filled. Add the counties or cities you serve."
                 >
                   <form onSubmit={locationForm.handleSubmit(handleLocation)} className="space-y-4">
                     <FormField label="Street Address" required error={locationForm.formState.errors.address?.message}>

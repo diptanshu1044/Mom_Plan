@@ -720,9 +720,27 @@ model PartnerOrganization {
   id            String   @id @default(uuid()) @db.Uuid
   name          String
   type          String?
+  website       String?
+  description   String?
+  phone         String?
   address       String?
+  city          String?
+  state         String?
+  zip           String?
+  country       String?
   contact_email String?
-  created_at    DateTime @default(now()) @db.Timestamptz
+  employees     String?
+  founded       String?
+  tax_id                   String?
+  linkedin                 String?
+  tagline                  String?
+  services_offered         String?
+  service_area             String?
+  primary_language         String?   @default("English")
+  notification_frequency   String?   @default("daily")
+  case_numbering_prefix    String?   @default("CASE")
+  onboarding_completed     Boolean   @default(false)
+  created_at               DateTime  @default(now()) @db.Timestamptz
 
   // Relations
   org_users          OrgUser[]            @relation("OrgUserOrganization")
@@ -738,7 +756,8 @@ model OrgUser {
   id                String    @id @default(uuid()) @db.Uuid
   full_name         String
   email             String    @unique
-  role              String?
+  password_hash     String
+  role              String    
   org_id            String    @db.Uuid
   caseload_capacity Int?
   is_active         Boolean   @default(true)
@@ -757,8 +776,24 @@ model OrgUser {
   referrals          Referral[]          @relation("ReferralReferredBy")
   status_changes     StatusHistory[]     @relation("StatusHistoryChangedBy")
 
+  refresh_tokens OrgRefreshToken[] @relation("OrgRefreshTokenUser")
+
   @@index([org_id])
   @@map("org_users")
+}
+
+model OrgRefreshToken {
+  id          String   @id @default(uuid()) @db.Uuid
+  token       String   @unique
+  org_user_id String   @db.Uuid
+  revoked     Boolean  @default(false)
+  expires_at  DateTime @db.Timestamptz
+  created_at  DateTime @default(now()) @db.Timestamptz
+
+  orgUser OrgUser @relation("OrgRefreshTokenUser", fields: [org_user_id], references: [id], onDelete: Cascade)
+
+  @@index([org_user_id])
+  @@map("org_refresh_tokens")
 }
 
 model Mother {

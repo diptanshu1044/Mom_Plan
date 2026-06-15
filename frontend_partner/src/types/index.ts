@@ -55,7 +55,135 @@ export interface Organization {
   updated_at: string;
 }
 
-// ---- Case ----
+// ---- Case Management (Partner Portal) ----
+
+export type PartnerCaseStatus =
+  | "not_started"
+  | "in_progress"
+  | "submitted"
+  | "approved"
+  | "renewal_due"
+  | "denied";
+
+export type UrgencyLevel = "high" | "moderate" | "normal";
+
+export interface CaseListItem {
+  id: string;
+  mother_id: string;
+  mother_name: string;
+  mother_initials: string;
+  mother_number: string;
+  program: string;
+  program_code: string;
+  status: PartnerCaseStatus;
+  urgency: UrgencyLevel;
+  deadline_date: string | null;
+  deadline_label: string | null;
+  last_activity: { description: string; date: string } | null;
+  caseworker: {
+    id: string;
+    name: string;
+    full_name: string;
+    initials: string;
+  } | null;
+  quarter?: string | null;
+  intake_date?: string | null;
+  created_at: string;
+}
+
+export interface CaseDetail extends CaseListItem {
+  alert?: { message: string; severity: string } | null;
+  client_info: {
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    household_size: number | null;
+    children: { name: string; age: string }[];
+    preferred_contact: string;
+    language: string;
+    dob: string | null;
+    age: number | null;
+    assigned_date: string;
+  };
+  eligibility: {
+    monthly_income: number | null;
+    income_threshold_pct: number;
+    eligible: boolean;
+    last_verified: string | null;
+    needs_update: boolean;
+    proof_of_residency: string;
+    postpartum_status: string | null;
+    next_review_date: string | null;
+  };
+  documents: {
+    id: string;
+    name: string;
+    status: "missing" | "pending" | "on_file";
+    uploaded_at: string;
+    expiry_date: string | null;
+  }[];
+  activity_log: {
+    id: string;
+    type: string;
+    description: string;
+    date: string;
+    color: string;
+  }[];
+  deadlines: {
+    id: string;
+    type: string;
+    due_date: string;
+    is_resolved: boolean;
+    days_remaining: number;
+  }[];
+}
+
+export interface DashboardSummary {
+  renewal_due_soon: number;
+  incomplete_docs: number;
+  approved_this_quarter: number;
+  total_assigned: number;
+  quarter: string;
+  year: number;
+}
+
+export interface AlertItem {
+  id: string;
+  case_id: string;
+  client_name: string;
+  case_number: string;
+  days_remaining: number;
+  due_date: string;
+  description: string;
+  alert_type: string;
+  program: string;
+  program_code: string;
+  urgency_bucket: "critical" | "soon" | "upcoming" | "on_track";
+  is_snoozed: boolean;
+  last_activity: { description: string; date: string } | null;
+  caseworker: {
+    id: string;
+    name: string;
+    full_name: string;
+    initials: string;
+  } | null;
+}
+
+export interface AlertSummary {
+  critical: number;
+  soon: number;
+  upcoming: number;
+  on_track: number;
+  total_cases: number;
+}
+
+export interface CaseFilterOptions {
+  statuses: string[];
+  programs: { id: string; label: string }[];
+  caseworkers: { id: string; name: string; full_name: string }[];
+}
+
+// ---- Case (legacy) ----
 
 export type CaseStatus =
   | "open"
