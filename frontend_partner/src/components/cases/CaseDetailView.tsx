@@ -18,7 +18,7 @@ const DOC_STATUS: Record<string, string> = {
 const ACTIVITY_COLORS: Record<string, string> = {
   red: "bg-status-error",
   yellow: "bg-status-warning",
-  blue: "bg-status-info",
+  blue: "bg-primary-500",
   green: "bg-status-success",
 };
 

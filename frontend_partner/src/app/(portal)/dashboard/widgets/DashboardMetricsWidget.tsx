@@ -45,7 +45,7 @@ export function DashboardMetricsWidget() {
       value: formatNumber(data.pending_referrals),
       subtitle: `${formatNumber(data.accepted_referrals)} accepted`,
       icon: ArrowLeftRight,
-      iconBg: "bg-gradient-to-br from-blue-400 to-blue-600",
+      iconBg: "bg-gradient-to-br from-secondary-400 to-secondary-600",
       trend: { value: -5, label: "vs last month" },
       badge: "Referrals",
     },

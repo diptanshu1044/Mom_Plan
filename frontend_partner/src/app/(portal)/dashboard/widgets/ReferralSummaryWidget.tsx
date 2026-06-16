@@ -36,7 +36,7 @@ export function ReferralSummaryWidget() {
     <Card className="flex flex-col h-full">
       <CardHeader className="flex-row items-center justify-between pb-3">
         <CardTitle className="text-base flex items-center gap-2">
-          <ArrowLeftRight className="w-4 h-4 text-blue-500" />
+          <ArrowLeftRight className="w-4 h-4 text-secondary-500" />
           Recent Referrals
         </CardTitle>
         <Link

@@ -25,7 +25,7 @@ const STATUS_STYLES: Record<string, { dot: string; bg: string; text: string; lab
 
 const PROGRAM_COLORS: Record<string, string> = {
   WIC: "bg-primary-100 text-primary-700",
-  SNAP: "bg-blue-100 text-blue-700",
+  SNAP: "bg-secondary-100 text-secondary-700",
   Medicaid: "bg-green-100 text-green-700",
   TANF: "bg-red-100 text-red-700",
   CCAP: "bg-orange-100 text-orange-700",
@@ -122,7 +122,7 @@ export function CaseManagementClient() {
   return (
     <div className="flex flex-col min-h-full">
       {/* Purple header */}
-      <div className="bg-gradient-to-r from-partner-800 via-partner-700 to-partner-800 text-white px-8 pt-6 pb-0">
+      <div className="bg-gradient-primary text-white px-8 pt-6 pb-0">
         <div className="flex items-start justify-between mb-5">
           <div>
             <h1 className="text-2xl font-extrabold">Family Support Navigator</h1>

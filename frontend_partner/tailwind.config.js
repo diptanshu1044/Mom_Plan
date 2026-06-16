@@ -97,11 +97,11 @@ module.exports = {
           success: '#10B981',
           warning: '#F59E0B',
           error: '#EF4444',
-          info: '#3B82F6',
+          info: '#4d41df',
           'success-bg': '#ECFDF5',
           'warning-bg': '#FFFBEB',
           'error-bg': '#FEF2F2',
-          'info-bg': '#EFF6FF',
+          'info-bg': '#f0effe',
         },
       },
       backgroundImage: {

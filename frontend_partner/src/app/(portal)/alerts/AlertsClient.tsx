@@ -27,7 +27,7 @@ const ALERT_TYPE_COLORS: Record<string, string> = {
 };
 
 const PROGRAM_COLORS: Record<string, string> = {
-  SNAP: "bg-blue-100 text-blue-700",
+  SNAP: "bg-secondary-100 text-secondary-700",
   Medicaid: "bg-green-100 text-green-700",
   WIC: "bg-primary-100 text-primary-700",
   TANF: "bg-orange-100 text-orange-700",
@@ -101,7 +101,7 @@ export function AlertsClient() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <div className="bg-gradient-to-r from-partner-800 via-partner-700 to-partner-800 text-white px-8 pt-6 pb-0">
+      <div className="bg-gradient-primary text-white px-8 pt-6 pb-0">
         <div className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-1">
           Family Support Navigator · Case Management
         </div>

@@ -94,7 +94,7 @@ interface StatusBarItem {
 
 const STATUS_COLORS: Record<string, string> = {
   open: "#10B981",
-  in_progress: "#3B82F6",
+  in_progress: "#674bb5",
   pending: "#F59E0B",
   closed: "#4d41df",
   cancelled: "#EF4444",

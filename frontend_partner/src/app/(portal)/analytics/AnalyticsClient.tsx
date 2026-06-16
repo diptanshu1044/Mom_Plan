@@ -89,7 +89,7 @@ export function AnalyticsClient() {
             value: formatNumber(m?.total_referrals ?? 0),
             subtitle: `${m?.accepted_referrals ?? 0} accepted`,
             icon: ArrowLeftRight,
-            iconBg: "bg-gradient-to-br from-blue-400 to-blue-600",
+            iconBg: "bg-gradient-to-br from-secondary-400 to-secondary-600",
             trend: { value: 8 },
           },
           {
@@ -155,7 +155,7 @@ export function AnalyticsClient() {
               <TabsContent value="referrals">
                 <CasesAreaChart
                   data={data?.referralTrend ?? []}
-                  color="#3B82F6"
+                  color="#674bb5"
                   height={240}
                 />
               </TabsContent>

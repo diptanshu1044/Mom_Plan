@@ -48,7 +48,7 @@ export function CaseShowClient({ caseId }: CaseShowClientProps) {
 
   return (
     <div className="flex flex-col min-h-full">
-      <div className="bg-gradient-to-r from-partner-800 via-partner-700 to-partner-800 text-white px-8 py-4">
+      <div className="bg-gradient-primary text-white px-8 py-4">
         <Button
           variant="ghost"
           size="sm"

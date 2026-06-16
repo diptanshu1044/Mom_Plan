@@ -30,7 +30,7 @@ const TYPE_ICONS: Record<DocumentType, typeof FileText> = {
 };
 
 const TYPE_COLORS: Record<DocumentType, string> = {
-  report: "bg-blue-100 text-blue-700",
+  report: "bg-secondary-100 text-secondary-700",
   consent: "bg-green-100 text-green-700",
   referral_letter: "bg-partner-100 text-partner-700",
   intake_form: "bg-orange-100 text-orange-700",
