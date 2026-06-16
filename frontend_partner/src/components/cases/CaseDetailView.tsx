@@ -34,7 +34,7 @@ export function CaseDetailView({ caseData: c, caseId, headerActions }: CaseDetai
   });
 
   return (
-    <>
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       {c.alert && (
         <div className="bg-status-error-bg border-b border-status-error/20 px-6 py-3 flex items-start justify-between gap-3">
           <p className="text-sm text-status-error font-medium flex-1">{c.alert.message}</p>
@@ -50,8 +50,8 @@ export function CaseDetailView({ caseData: c, caseId, headerActions }: CaseDetai
         </div>
       )}
 
-      <div className="px-6 py-5 border-b border-surface-border flex items-start justify-between">
-        <div className="flex items-center gap-4">
+      <div className="px-6 py-5 border-b border-surface-border flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 shrink-0">
+        <div className="flex items-center gap-4 min-w-0">
           <Avatar className="w-12 h-12">
             <AvatarFallback className="bg-partner-100 text-partner-700 font-bold">
               {c.mother_initials}
@@ -72,7 +72,7 @@ export function CaseDetailView({ caseData: c, caseId, headerActions }: CaseDetai
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           <Button size="sm" variant="outline" className="gap-1.5">
             <Phone className="w-3.5 h-3.5" /> Log contact
           </Button>
@@ -86,7 +86,7 @@ export function CaseDetailView({ caseData: c, caseId, headerActions }: CaseDetai
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-primary-subtle/50 rounded-xl border border-surface-border p-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-soft mb-3">
@@ -234,6 +234,6 @@ export function CaseDetailView({ caseData: c, caseId, headerActions }: CaseDetai
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

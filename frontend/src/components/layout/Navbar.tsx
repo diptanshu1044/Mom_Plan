@@ -101,7 +101,7 @@ export function Navbar() {
                   Sign In
                 </Link>
                 <Link
-                  href="/register"
+                  href="/signup"
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-gradient-primary shadow-primary hover:shadow-primary-lg hover:-translate-y-0.5 transition-all duration-200"
                 >
                   Get Started Free
@@ -161,7 +161,7 @@ export function Navbar() {
                   Sign In
                 </Link>
                 <Link
-                  href="/register"
+                  href="/signup"
                   onClick={() => setIsMobileOpen(false)}
                   className="flex items-center justify-center w-full px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-gradient-primary shadow-primary hover:shadow-primary-lg transition-all duration-200"
                 >

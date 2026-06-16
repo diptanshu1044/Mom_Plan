@@ -17,6 +17,13 @@ export interface AuthUser {
   state?: string;
   zip_code?: string;
   profile_picture?: string;
+  partner_org_id?: string;
+  partner_organization?: {
+    id: string;
+    name: string;
+    city?: string | null;
+    state?: string | null;
+  } | null;
   family_profile?: {
     household_size: number;
     num_children: number;

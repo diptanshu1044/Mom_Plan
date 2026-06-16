@@ -272,7 +272,7 @@ export function AlertsClient() {
                               <Button variant="outline" size="sm" className="gap-1">
                                 <MessageCircle className="w-3.5 h-3.5" /> Message
                               </Button>
-                              <Button size="sm" className="gap-1" onClick={() => router.push(`/cases/${alert.case_id}`)}>
+                              <Button size="sm" className="gap-1" onClick={() => router.push(`/cases?case=${alert.case_id}`)}>
                                 <FolderOpen className="w-3.5 h-3.5" /> Open Case
                               </Button>
                             </div>

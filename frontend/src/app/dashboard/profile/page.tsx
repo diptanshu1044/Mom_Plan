@@ -26,6 +26,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { PlanBadge } from "@/components/ui/Badge";
+import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 
@@ -137,6 +138,7 @@ const profileSchema = z.object({
   state: z.string().optional(),
   zip_code: z.string().optional(),
   profile_picture: z.string().optional(),
+  partner_org_id: z.string().uuid("Please select a partner organization"),
 
   // Family profile base fields
   household_size: z.string().optional(),
@@ -194,6 +196,7 @@ export default function ProfilePage() {
       state: currentUser?.state || "",
       zip_code: currentUser?.zip_code || "",
       profile_picture: currentUser?.profile_picture || "",
+      partner_org_id: currentUser?.partner_org_id || "",
       household_size: String(currentUser?.family_profile?.household_size || ""),
       num_children: String(currentUser?.family_profile?.num_children || ""),
       monthly_income: String(currentUser?.family_profile?.monthly_income || ""),
@@ -394,6 +397,16 @@ export default function ProfilePage() {
                   type="date"
                   {...profileForm.register("date_of_birth")}
                 />
+                <div className="sm:col-span-2">
+                  <PartnerOrgSelect
+                    value={profileForm.watch("partner_org_id") || ""}
+                    onChange={(id) =>
+                      profileForm.setValue("partner_org_id", id, { shouldValidate: true })
+                    }
+                    error={profileForm.formState.errors.partner_org_id?.message}
+                    required
+                  />
+                </div>
                 <Select
                   label="Preferred Language"
                   options={PREFERRED_LANGUAGE_OPTIONS}

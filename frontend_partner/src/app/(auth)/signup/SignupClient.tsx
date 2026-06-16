@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { initials } from "@/lib/utils";
+import { getMotherPortalUrl } from "@/lib/portal-urls";
 
 // ---- Constants ----
 
@@ -468,6 +469,14 @@ export function SignupClient() {
 
       {/* ---- RIGHT PANEL ---- */}
       <main className="flex-1 overflow-y-auto px-6 sm:px-10 lg:px-14 py-11">
+        <a
+          href={getMotherPortalUrl("/signup/mother")}
+          className="inline-flex items-center gap-1.5 text-sm text-text-soft hover:text-primary transition-colors mb-6 max-w-[600px]"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Sign up as a Mother instead
+        </a>
+
         {/* Progress bar */}
         <div className="max-w-[600px] mb-10">
           <div className="flex justify-between mb-2.5">

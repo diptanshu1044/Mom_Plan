@@ -980,7 +980,7 @@ export default function LandingPage() {
             <p className="text-lg text-white/60 max-w-xl mx-auto mb-10">
               Join 52,000+ families who&apos;ve already discovered thousands in hidden government benefits.
             </p>
-            <PrimaryLink href="/register" className="px-10 py-4">
+            <PrimaryLink href="/signup" className="px-10 py-4">
               Get Started Free Today
               <ArrowRight className="w-5 h-5" />
             </PrimaryLink>

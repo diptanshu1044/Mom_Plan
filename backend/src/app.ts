@@ -26,6 +26,7 @@ import partnerOrgRoutes from './modules/partner/partner-org.routes';
 import partnerCasesRoutes from './modules/partner/partner-cases.routes';
 import partnerDashboardRoutes from './modules/partner/partner-dashboard.routes';
 import partnerAlertsRoutes from './modules/partner/partner-alerts.routes';
+import partnerOrganizationsRoutes from './modules/partner/partner-organizations.routes';
 
 const app: Application = express();
 
@@ -81,6 +82,7 @@ app.use('/api/partner/organization', partnerOrgRoutes);
 app.use('/api/partner/cases',        partnerCasesRoutes);
 app.use('/api/partner/dashboard',    partnerDashboardRoutes);
 app.use('/api/partner/alerts',       partnerAlertsRoutes);
+app.use('/api/partner-organizations', partnerOrganizationsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

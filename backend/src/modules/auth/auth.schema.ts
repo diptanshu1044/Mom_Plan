@@ -6,6 +6,7 @@ export const registerSchema = z.object({
     password: z.string().min(8),
     full_name: z.string().min(1),
     phone: z.string().optional(),
+    partner_org_id: z.string().uuid('Please select a partner organization'),
   }),
 });
 

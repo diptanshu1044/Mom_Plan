@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CaseShowClient } from "@/components/cases/CaseShowClient";
+import { CaseRedirectClient } from "./CaseRedirectClient";
 
 export const metadata: Metadata = { title: "Case Details" };
 
@@ -9,5 +9,5 @@ export default async function CaseShowPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <CaseShowClient caseId={id} />;
+  return <CaseRedirectClient caseId={id} />;
 }

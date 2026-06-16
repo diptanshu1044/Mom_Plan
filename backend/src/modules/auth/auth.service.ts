@@ -6,6 +6,9 @@ import { env, refreshTokenTtlMs } from '../../config/env';
 import { BadRequestError, UnauthorizedError, NotFoundError } from '../../utils/errors';
 import { sendEmail } from '../../config/email';
 import { UserRole, UserPlan } from '@prisma/client';
+import { MotherOrgEnrollmentService } from '../partner/mother-org-enrollment.service';
+
+const motherOrgEnrollment = new MotherOrgEnrollmentService();
 
 const resetTokensCache = new Map<string, string>();
 
@@ -107,7 +110,13 @@ export class AuthService {
     };
   }
 
-  async register(data: { email: string; password: string; full_name: string; phone?: string }) {
+  async register(data: {
+    email: string;
+    password: string;
+    full_name: string;
+    phone?: string;
+    partner_org_id: string;
+  }) {
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
     });
@@ -126,6 +135,8 @@ export class AuthService {
         phone: data.phone,
       },
     });
+
+    await motherOrgEnrollment.enrollUserInPartnerOrg(user.id, data.partner_org_id);
 
     await sendEmail({
       to: user.email,

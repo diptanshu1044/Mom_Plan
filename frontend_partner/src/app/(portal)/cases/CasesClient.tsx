@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
-  Plus,
   Search,
   Filter,
   FolderOpen,
@@ -139,11 +138,6 @@ export function CasesClient() {
           </div>
           <Button variant="outline" size="sm" className="gap-1.5">
             <Filter className="w-3.5 h-3.5" /> Filter
-          </Button>
-          <Button size="sm" className="gap-1.5" asChild>
-            <Link href="/cases/new">
-              <Plus className="w-3.5 h-3.5" /> New Case
-            </Link>
           </Button>
         </div>
       </div>

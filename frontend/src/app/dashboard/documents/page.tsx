@@ -203,6 +203,12 @@ function DocumentsContent() {
   const [pdfQuarterFilter, setPdfQuarterFilter] = useState<string>(defaultQuarter);
   const [activeTab, setActiveTab] = useState<"uploaded" | "generated">("uploaded");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const [showBulkDocDeleteConfirm, setShowBulkDocDeleteConfirm] = useState(false);
+  const [isBulkDeletingDocs, setIsBulkDeletingDocs] = useState(false);
+  const [selectedPdfIds, setSelectedPdfIds] = useState<Set<string>>(new Set());
+  const [showBulkPdfDeleteConfirm, setShowBulkPdfDeleteConfirm] = useState(false);
+  const [isBulkDeletingPdfs, setIsBulkDeletingPdfs] = useState(false);
   const { viewPdf, downloadPdf, isViewing, isDownloading } = usePdfGeneration();
   const [selectedDocType, setSelectedDocType] = useState<string>(typeParam || "government_id");
 
@@ -212,6 +218,11 @@ function DocumentsContent() {
       setSelectedDocType(typeParam);
     }
   }, [typeParam]);
+
+  useEffect(() => {
+    setSelectedDocIds(new Set());
+    setSelectedPdfIds(new Set());
+  }, [activeTab, pdfQuarterFilter]);
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ["documents"],
@@ -297,6 +308,84 @@ function DocumentsContent() {
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (err) {
       console.error("Failed to view document", err);
+    }
+  };
+
+  const toggleDocSelection = (docId: string) => {
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) {
+        next.delete(docId);
+      } else {
+        next.add(docId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllDocs = () => {
+    if (!documents?.length) return;
+    const allSelected =
+      documents.length > 0 && selectedDocIds.size === documents.length;
+    setSelectedDocIds(
+      allSelected ? new Set() : new Set(documents.map((doc: { id: string }) => doc.id))
+    );
+  };
+
+  const handleBulkDeleteDocs = async () => {
+    if (selectedDocIds.size === 0) return;
+    setIsBulkDeletingDocs(true);
+    try {
+      await Promise.all(
+        Array.from(selectedDocIds).map((id) => api.delete(`/api/documents/${id}`))
+      );
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      setSelectedDocIds(new Set());
+      setShowBulkDocDeleteConfirm(false);
+    } catch (err) {
+      console.error("Failed to delete selected documents", err);
+    } finally {
+      setIsBulkDeletingDocs(false);
+    }
+  };
+
+  const togglePdfSelection = (pdfId: string) => {
+    setSelectedPdfIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(pdfId)) {
+        next.delete(pdfId);
+      } else {
+        next.add(pdfId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllPdfs = () => {
+    if (!generatedPdfs?.length) return;
+    const allSelected =
+      generatedPdfs.length > 0 && selectedPdfIds.size === generatedPdfs.length;
+    setSelectedPdfIds(
+      allSelected ? new Set() : new Set(generatedPdfs.map((pdf: { id: string }) => pdf.id))
+    );
+  };
+
+  const handleBulkDeletePdfs = async () => {
+    if (selectedPdfIds.size === 0) return;
+    setIsBulkDeletingPdfs(true);
+    try {
+      await Promise.all(
+        Array.from(selectedPdfIds).map((id) => api.delete(`/api/pdf/${id}`))
+      );
+      queryClient.invalidateQueries({ queryKey: ["generated-pdfs"] });
+      queryClient.invalidateQueries({ queryKey: ["applications"] });
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      setSelectedPdfIds(new Set());
+      setShowBulkPdfDeleteConfirm(false);
+    } catch (err) {
+      console.error("Failed to delete selected PDFs", err);
+    } finally {
+      setIsBulkDeletingPdfs(false);
     }
   };
 
@@ -464,6 +553,37 @@ function DocumentsContent() {
       )}
 
       {/* Documents List */}
+      {activeTab === "uploaded" && !isLoading && documents && documents.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <label className="flex items-center gap-2 text-sm text-on-surface-variant cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={selectedDocIds.size === documents.length}
+              ref={(el) => {
+                if (el) {
+                  el.indeterminate =
+                    selectedDocIds.size > 0 && selectedDocIds.size < documents.length;
+                }
+              }}
+              onChange={toggleSelectAllDocs}
+              className="w-4 h-4 rounded border-outline-variant/60 text-primary-600 focus:ring-primary-500 cursor-pointer"
+            />
+            Select all
+          </label>
+          {selectedDocIds.size > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowBulkDocDeleteConfirm(true)}
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+            >
+              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+              Delete {selectedDocIds.size} selected
+            </Button>
+          )}
+        </div>
+      )}
+
       {activeTab === "uploaded" && (
         isLoading ? (
           <div className="space-y-3">
@@ -487,6 +607,13 @@ function DocumentsContent() {
               >
                 <Card padding="sm" hover>
                   <div className="flex items-center gap-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedDocIds.has(doc.id)}
+                      onChange={() => toggleDocSelection(doc.id)}
+                      aria-label={`Select ${doc.display_name}`}
+                      className="w-4 h-4 shrink-0 rounded border-outline-variant/60 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    />
                     <div className="text-2xl shrink-0">
                       {docTypeIcons[doc.document_type] || "📄"}
                     </div>
@@ -584,6 +711,37 @@ function DocumentsContent() {
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
             </div>
           </div>
+
+          {!loadingPdfs && generatedPdfs && generatedPdfs.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
+              <label className="flex items-center gap-2 text-sm text-on-surface-variant cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={selectedPdfIds.size === generatedPdfs.length}
+                  ref={(el) => {
+                    if (el) {
+                      el.indeterminate =
+                        selectedPdfIds.size > 0 && selectedPdfIds.size < generatedPdfs.length;
+                    }
+                  }}
+                  onChange={toggleSelectAllPdfs}
+                  className="w-4 h-4 rounded border-outline-variant/60 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                />
+                Select all
+              </label>
+              {selectedPdfIds.size > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBulkPdfDeleteConfirm(true)}
+                  className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                  Delete {selectedPdfIds.size} selected
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -612,6 +770,13 @@ function DocumentsContent() {
               >
                 <Card padding="sm" hover>
                   <div className="flex items-center gap-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedPdfIds.has(pdf.id)}
+                      onChange={() => togglePdfSelection(pdf.id)}
+                      aria-label={`Select ${pdf.program?.name || "Application Package"}`}
+                      className="w-4 h-4 shrink-0 rounded border-outline-variant/60 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    />
                     <div className="w-10 h-10 rounded-lg bg-primary-50 text-primary-500 flex items-center justify-center shrink-0">
                       <FileText className="w-5 h-5" />
                     </div>
@@ -667,6 +832,110 @@ function DocumentsContent() {
           </div>
         )
       )}
+
+      {/* Bulk Document Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showBulkDocDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-glass-lg w-full max-w-sm p-6"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-on-surface">
+                    Delete {selectedDocIds.size} document{selectedDocIds.size !== 1 ? "s" : ""}?
+                  </h3>
+                  <p className="text-xs text-on-surface-variant">This cannot be undone.</p>
+                </div>
+              </div>
+              <p className="text-sm text-on-surface-variant mb-6">
+                The selected documents will be permanently removed from your vault and any linked applications.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="ghost"
+                  size="md"
+                  className="flex-1"
+                  onClick={() => setShowBulkDocDeleteConfirm(false)}
+                  disabled={isBulkDeletingDocs}
+                >
+                  Keep
+                </Button>
+                <button
+                  disabled={isBulkDeletingDocs}
+                  onClick={handleBulkDeleteDocs}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {isBulkDeletingDocs ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Bulk PDF Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showBulkPdfDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-glass-lg w-full max-w-sm p-6"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-on-surface">
+                    Delete {selectedPdfIds.size} PDF{selectedPdfIds.size !== 1 ? "s" : ""}?
+                  </h3>
+                  <p className="text-xs text-on-surface-variant">This cannot be undone.</p>
+                </div>
+              </div>
+              <p className="text-sm text-on-surface-variant mb-6">
+                The selected application packages will be permanently removed from your account.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="ghost"
+                  size="md"
+                  className="flex-1"
+                  onClick={() => setShowBulkPdfDeleteConfirm(false)}
+                  disabled={isBulkDeletingPdfs}
+                >
+                  Keep
+                </Button>
+                <button
+                  disabled={isBulkDeletingPdfs}
+                  onClick={handleBulkDeletePdfs}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {isBulkDeletingPdfs ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>

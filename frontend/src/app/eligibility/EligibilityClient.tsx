@@ -674,7 +674,7 @@ export default function EligibilityPage() {
       if (typeof window !== "undefined") {
         localStorage.setItem("pending_eligibility_scan", JSON.stringify(dataToSubmit));
       }
-      router.push("/register?redirect=eligibility");
+      router.push("/signup/mother?redirect=eligibility");
       return;
     }
     setIsScanning(true);
@@ -838,7 +838,7 @@ export default function EligibilityPage() {
               </Button>
             ) : (
               <>
-                <Button size="lg" onClick={() => router.push("/register")} className="bg-gradient-primary text-white font-bold px-8 shadow-primary">
+                <Button size="lg" onClick={() => router.push("/signup/mother")} className="bg-gradient-primary text-white font-bold px-8 shadow-primary">
                   Save My Match Profile <ArrowRight className="w-5 h-5 ml-1" />
                 </Button>
                 <Button variant="ghost" size="lg" onClick={() => router.push("/login")} className="hover:bg-surface-container">

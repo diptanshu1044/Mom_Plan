@@ -87,6 +87,7 @@ model User {
   last_active_at         DateTime  @default(now()) @db.Timestamptz
   status                 UserStatus @default(active)
   profile_picture        String?
+  partner_org_id         String?    @db.Uuid
 
   // Relations
   refresh_tokens         RefreshToken[]
@@ -108,7 +109,9 @@ model User {
   payments               Payment[]
   billing_events         BillingEvent[]
   mother_profile         Mother?             @relation("MotherUser")
+  partner_organization   PartnerOrganization? @relation("UserPartnerOrg", fields: [partner_org_id], references: [id], onDelete: SetNull)
 
+  @@index([partner_org_id])
   @@map("users")
 }
 
@@ -748,6 +751,7 @@ model PartnerOrganization {
   metrics_snapshots  OrgMetricsSnapshot[] @relation("OrgMetricsSnapshotOrg")
   referrals_from     Referral[]           @relation("ReferralFromOrg")
   referrals_to       Referral[]           @relation("ReferralToOrg")
+  member_users       User[]               @relation("UserPartnerOrg")
 
   @@map("partner_organizations")
 }

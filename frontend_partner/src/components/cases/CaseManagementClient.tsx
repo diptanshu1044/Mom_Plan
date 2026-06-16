@@ -1,17 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Plus, FolderOpen, MessageCircle } from "lucide-react";
+import { Search, FolderOpen, MessageCircle } from "lucide-react";
 import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuarterTabs, currentQuarter } from "@/components/cases/QuarterTabs";
 import { SummaryCards } from "@/components/cases/SummaryCards";
+import { CaseDetailPanel } from "@/components/cases/CaseDetailPanel";
 import { usePartnerAuthStore } from "@/store/auth.store";
 import { formatDate, initials, cn } from "@/lib/utils";
 import type { CaseListItem, DashboardSummary, CaseFilterOptions } from "@/types";
@@ -63,12 +62,39 @@ async function fetchFilters(): Promise<CaseFilterOptions> {
 
 export function CaseManagementClient() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user } = usePartnerAuthStore();
   const [quarter, setQuarter] = useState(currentQuarter());
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [program, setProgram] = useState("all");
   const [caseworker, setCaseworker] = useState("all");
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+
+  const openCase = useCallback(
+    (id: string) => {
+      setSelectedCaseId(id);
+      if (pathname === "/cases") {
+        router.replace(`/cases?case=${id}`, { scroll: false });
+      }
+    },
+    [pathname, router]
+  );
+
+  const closeCase = useCallback(() => {
+    setSelectedCaseId(null);
+    if (pathname === "/cases") {
+      router.replace("/cases", { scroll: false });
+    }
+  }, [pathname, router]);
+
+  useEffect(() => {
+    const caseFromUrl = searchParams.get("case");
+    if (pathname === "/cases" && caseFromUrl) {
+      setSelectedCaseId(caseFromUrl);
+    }
+  }, [pathname, searchParams]);
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ["partner-dashboard-summary", quarter],
@@ -160,11 +186,6 @@ export function CaseManagementClient() {
               ))}
             </SelectContent>
           </Select>
-          <Button className="gap-1.5 ml-auto" asChild>
-            <Link href="/cases/new">
-              <Plus className="w-4 h-4" /> Add Case
-            </Link>
-          </Button>
         </div>
 
         {/* Legend */}
@@ -206,7 +227,7 @@ export function CaseManagementClient() {
                     <tr
                       key={c.id}
                       className={cn("border-b border-surface-border last:border-0 hover:bg-primary-subtle/30 cursor-pointer transition-colors", rowBg(c.status, c.urgency))}
-                      onClick={() => router.push(`/cases/${c.id}`)}
+                      onClick={() => openCase(c.id)}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -253,7 +274,7 @@ export function CaseManagementClient() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                          <button className="p-1.5 rounded-lg hover:bg-primary-subtle text-text-soft" onClick={() => router.push(`/cases/${c.id}`)}>
+                          <button className="p-1.5 rounded-lg hover:bg-primary-subtle text-text-soft" onClick={() => openCase(c.id)}>
                             <FolderOpen className="w-4 h-4" />
                           </button>
                           <button className="p-1.5 rounded-lg hover:bg-primary-subtle text-text-soft">
@@ -268,6 +289,8 @@ export function CaseManagementClient() {
           </table>
         </div>
       </div>
+
+      <CaseDetailPanel caseId={selectedCaseId} onClose={closeCase} />
     </div>
   );
 }

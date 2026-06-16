@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { api } from "@/lib/api";
 import { CaseDetailView } from "@/components/cases/CaseDetailView";
@@ -17,37 +19,77 @@ async function fetchCase(id: string): Promise<CaseDetail> {
 }
 
 export function CaseDetailPanel({ caseId, onClose }: CaseDetailPanelProps) {
-  const { data: c, isLoading } = useQuery({
+  const { data: caseData, isLoading } = useQuery({
     queryKey: ["partner-case-detail", caseId],
     queryFn: () => fetchCase(caseId!),
     enabled: !!caseId,
   });
 
-  if (!caseId) return null;
+  useEffect(() => {
+    if (!caseId) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [caseId, onClose]);
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-white shadow-partner-xl z-50 flex flex-col overflow-hidden animate-slide-in-left">
-        {isLoading || !c ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="w-8 h-8 rounded-full border-2 border-partner-500 border-t-transparent animate-spin" />
-          </div>
-        ) : (
-          <CaseDetailView
-            caseData={c}
-            caseId={caseId}
-            headerActions={
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg hover:bg-primary-subtle text-text-soft"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            }
+    <AnimatePresence>
+      {caseId && (
+        <>
+          <motion.div
+            key="case-panel-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/25 backdrop-blur-[2px] z-40"
+            onClick={onClose}
+            aria-hidden
           />
-        )}
-      </div>
-    </>
+          <motion.aside
+            key="case-panel-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Case details"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 32, stiffness: 320 }}
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg sm:max-w-xl lg:w-[min(42rem,46vw)] bg-white shadow-partner-xl border-l border-surface-border"
+          >
+            <div className="flex flex-col h-full w-full overflow-hidden">
+              {isLoading || !caseData ? (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full border-2 border-partner-500 border-t-transparent animate-spin" />
+                </div>
+              ) : (
+                <CaseDetailView
+                  caseData={caseData}
+                  caseId={caseId}
+                  headerActions={
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="p-2 rounded-lg hover:bg-primary-subtle text-text-soft shrink-0"
+                      aria-label="Close case details"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  }
+                />
+              )}
+            </div>
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
   );
 }

@@ -3,14 +3,17 @@
 import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Heart, Mail, Lock, User, Phone, Eye, EyeOff, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Mail, Lock, User, Phone, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { getPartnerPortalUrl } from "@/lib/portal-urls";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Card } from "@/components/ui/Card";
+import { SignupBgPattern } from "@/components/signup/SignupBgPattern";
+import { SignupBrandPill } from "@/components/signup/SignupBrandPill";
+import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -20,6 +23,7 @@ const registerSchema = z
     full_name: z.string().min(2, "Full name must be at least 2 characters"),
     email: z.string().email("Invalid email address"),
     phone: z.string().optional(),
+    partner_org_id: z.string().uuid("Please select a partner organization"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
   })
@@ -54,6 +58,7 @@ function RegisterForm() {
   const {
     register,
     handleSubmit,
+    control,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormData>({
@@ -71,6 +76,7 @@ function RegisterForm() {
         email: data.email,
         password: data.password,
         phone: data.phone,
+        partner_org_id: data.partner_org_id,
       });
       const { user, accessToken } = response.data.data;
       setAuth(user, accessToken);
@@ -86,42 +92,54 @@ function RegisterForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4 py-12" suppressHydrationWarning>
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary-100/50 rounded-full blur-3xl pointer-events-none" suppressHydrationWarning />
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-secondary-100/40 rounded-full blur-3xl pointer-events-none" suppressHydrationWarning />
+    <div className="relative min-h-screen overflow-x-hidden bg-gradient-hero" suppressHydrationWarning>
+      <SignupBgPattern />
 
-      <div className="w-full max-w-md relative">
-        {/* Logo */}
+      <div className="relative z-10 min-h-screen flex flex-col items-center px-6 pt-8 pb-12">
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          className="text-center mb-7"
         >
-          <Link href="/" className="inline-flex items-center gap-2.5 hover:opacity-80 transition-opacity">
-            <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-primary">
-              <Heart className="w-5.5 h-5.5 text-white" fill="white" />
-            </div>
-            <span className="font-display font-bold text-2xl text-on-surface">
-              Mom<span className="text-gradient">Plan</span>
-            </span>
-          </Link>
+          <SignupBrandPill />
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
+          transition={{ delay: 0.08 }}
+          className="w-full max-w-[680px] bg-white rounded-3xl shadow-glass-lg border border-primary-100 overflow-hidden"
         >
-          <Card padding="lg" className="shadow-glass-lg">
-            <div className="mb-6">
-              <h1 className="font-display font-bold text-2xl text-on-surface mb-1">
-                Create your account
-              </h1>
-              <p className="text-sm text-on-surface-variant">
-                Start discovering benefits your family qualifies for
-              </p>
-            </div>
+          <div className="h-1 bg-gradient-to-r from-primary-500 to-secondary-500" />
 
+          <div className="px-6 sm:px-8 pt-6 pb-0">
+            <div className="flex items-center gap-2.5 mb-1">
+              <span className="text-[22px] leading-none">🌸</span>
+              <h1 className="font-display font-semibold text-[22px] text-on-surface">
+                Mother Sign Up
+              </h1>
+              <Link
+                href="/signup"
+                className="ml-auto rounded-full bg-primary-50 border-0 px-3 py-1 text-[11px] font-bold text-on-surface-variant hover:text-primary-600 transition-colors"
+              >
+                ← Change
+              </Link>
+            </div>
+            <p className="text-[13px] text-on-surface-variant/80 mb-5">
+              Start discovering benefits your family qualifies for. Your information stays private and secure.
+            </p>
+            <p className="text-xs text-on-surface-variant mb-5">
+              Looking for an organization account?{" "}
+              <a
+                href={getPartnerPortalUrl("/signup")}
+                className="text-primary-500 hover:text-primary-600 font-semibold"
+              >
+                Sign up as an Organization instead
+              </a>
+            </p>
+          </div>
+
+          <div className="px-6 sm:px-8 pb-8">
             {error && (
               <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
                 {error}
@@ -157,6 +175,19 @@ function RegisterForm() {
                 leftIcon={<Phone className="w-4 h-4" />}
                 hint="For deadline SMS alerts"
                 {...register("phone")}
+              />
+
+              <Controller
+                name="partner_org_id"
+                control={control}
+                render={({ field }) => (
+                  <PartnerOrgSelect
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    error={errors.partner_org_id?.message}
+                    required
+                  />
+                )}
               />
 
               <div>
@@ -215,28 +246,22 @@ function RegisterForm() {
                 variant="primary"
                 size="lg"
                 loading={isSubmitting}
-                className="w-full mt-2"
+                className="w-full mt-2 rounded-full"
               >
                 Create Account
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </form>
 
-            {/* Benefits of signing up */}
-            <div className="mt-6 pt-6 border-t border-outline-variant/20">
-              <p className="text-xs text-on-surface-variant mb-3 font-medium">What you get for free:</p>
-              <ul className="space-y-2">
-                {[
-                  "Basic eligibility scan across 200+ programs",
-                  "Personalized benefit dashboard",
-                  "Application tracking",
-                ].map((benefit) => (
-                  <li key={benefit} className="flex items-center gap-2 text-xs text-on-surface-variant">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                    {benefit}
-                  </li>
-                ))}
-              </ul>
+            <div className="flex flex-wrap gap-1.5 mt-5">
+              {["🔒 Private & secure", "💜 Free to use", "🤝 No judgment here"].map((badge) => (
+                <span
+                  key={badge}
+                  className="text-[11px] font-bold text-on-surface-variant px-2.5 py-1 rounded-full bg-primary-50 border border-primary-100"
+                >
+                  {badge}
+                </span>
+              ))}
             </div>
 
             <p className="text-center text-sm text-on-surface-variant mt-6">
@@ -248,10 +273,10 @@ function RegisterForm() {
                 Sign in
               </Link>
             </p>
-          </Card>
+          </div>
         </motion.div>
 
-        <p className="text-center text-xs text-on-surface-variant mt-6 opacity-60">
+        <p className="text-center text-xs text-on-surface-variant mt-6 opacity-60 max-w-[680px]">
           By creating an account, you agree to our{" "}
           <Link href="/terms" className="underline">Terms</Link> and{" "}
           <Link href="/privacy" className="underline">Privacy Policy</Link>

@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getMotherPortalUrl } from "@/lib/portal-urls";
 
 const schema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -194,7 +195,15 @@ export function LoginClient() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 text-center space-y-3">
+            <p className="text-sm text-text-soft">
+              <a
+                href={getMotherPortalUrl("/login")}
+                className="text-primary font-semibold hover:underline"
+              >
+                Sign in as a Mother instead
+              </a>
+            </p>
             <p className="text-sm text-text-soft">
               New to MomPlan Partner?{" "}
               <Link href="/signup" className="text-primary font-semibold hover:underline">

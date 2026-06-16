@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { useAuthStore } from "@/store/auth.store";
 import { getApiErrorMessage } from "@/lib/errors";
+import { getPartnerPortalUrl } from "@/lib/portal-urls";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -152,10 +153,19 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <p className="text-center text-sm text-on-surface-variant mt-6">
-              Don't have an account?{" "}
+            <p className="text-center text-sm text-on-surface-variant mt-4">
+              <a
+                href={getPartnerPortalUrl("/login")}
+                className="text-primary-500 hover:text-primary-600 font-semibold"
+              >
+                Sign in as an Organization instead
+              </a>
+            </p>
+
+            <p className="text-center text-sm text-on-surface-variant mt-4">
+              Don&apos;t have an account?{" "}
               <Link
-                href="/register"
+                href="/signup"
                 className="text-primary-500 hover:text-primary-600 font-semibold"
               >
                 Sign up free

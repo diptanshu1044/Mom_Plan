@@ -12,7 +12,6 @@ import {
   CheckCircle,
   Download,
   Eye,
-  Paperclip,
   Upload,
   Globe,
   Plus,
@@ -137,7 +136,6 @@ export default function ApplyModal({
   const [uploadError, setUploadError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  // Fetch applications list to see if there is an existing one if not provided
   const { data: applications } = useQuery({
     queryKey: ["applications", pdfQuarter, pdfYear],
     queryFn: () =>
@@ -152,14 +150,12 @@ export default function ApplyModal({
     enabled: isOpen,
   });
 
-  // Fetch user's documents
   const { data: documents } = useQuery({
     queryKey: ["documents"],
     queryFn: () => api.get("/api/documents").then((r) => r.data.data),
     enabled: isOpen,
   });
 
-  // Fetch generated PDFs for the active quarter (fallback when not linked to application yet)
   const { data: quarterPdfs } = useQuery({
     queryKey: ["generated-pdfs", pdfQuarter, pdfYear],
     queryFn: () =>
@@ -411,7 +407,6 @@ export default function ApplyModal({
             </div>
 
             {success ? (
-              /* Success View */
               <div className="p-12 text-center flex-1 flex flex-col items-center justify-center space-y-4">
                 <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center animate-bounce">
                   <CheckCircle className="w-10 h-10" />
@@ -429,10 +424,7 @@ export default function ApplyModal({
                 </div>
               </div>
             ) : (
-              /* Main Form View */
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                
-                {/* Notice & Website Discouragement Panel */}
                 <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/60 text-sm space-y-3">
                   <div className="flex items-start gap-2.5">
                     <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />

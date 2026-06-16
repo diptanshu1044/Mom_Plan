@@ -1,5 +1,8 @@
 import { prisma } from '../../config/prisma';
-import { NotFoundError } from '../../utils/errors';
+import { BadRequestError, NotFoundError } from '../../utils/errors';
+import { MotherOrgEnrollmentService } from '../partner/mother-org-enrollment.service';
+
+const motherOrgEnrollment = new MotherOrgEnrollmentService();
 
 /**
  * Converts a Prisma Decimal object (or string/number) to a plain JS number.
@@ -48,6 +51,10 @@ export class UserService {
         last_active_at: true,
         status: true,
         profile_picture: true,
+        partner_org_id: true,
+        partner_organization: {
+          select: { id: true, name: true, city: true, state: true },
+        },
         family_profile: true,
       },
     });
@@ -64,7 +71,7 @@ export class UserService {
     data: any
   ) {
     const { 
-      full_name, phone, email, state, zip_code,
+      full_name, phone, email, state, zip_code, partner_org_id,
       household_size, num_children, children_ages, monthly_income,
       employment_status, housing_status, has_disability, is_pregnant,
       
@@ -90,11 +97,20 @@ export class UserService {
     // Only update email if provided (requires uniqueness check implicitly via Prisma)
     if (email !== undefined) userUpdate.email = email;
 
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: userUpdate,
-      include: { family_profile: true }
-    });
+    if (partner_org_id !== undefined) {
+      if (!partner_org_id) {
+        throw new BadRequestError('Partner organization is required');
+      }
+      await motherOrgEnrollment.enrollUserInPartnerOrg(userId, partner_org_id);
+    }
+
+    if (Object.keys(userUpdate).length > 0) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: userUpdate,
+        include: { family_profile: true },
+      });
+    }
 
     // Update Family Profile if any family fields are present
     const hasFamilyData = [
