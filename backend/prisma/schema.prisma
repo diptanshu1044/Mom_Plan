@@ -93,6 +93,8 @@ model User {
   status                 UserStatus @default(active)
   profile_picture        String?
   partner_org_id         String?    @db.Uuid
+  org_name               String?
+  org_type               String?
 
   // Relations
   refresh_tokens         RefreshToken[]

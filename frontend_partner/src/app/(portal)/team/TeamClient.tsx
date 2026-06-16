@@ -10,6 +10,7 @@ import {
   UserX,
   Trash2,
   Users,
+  Copy,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { usePartnerAuthStore } from "@/store/auth.store";
@@ -63,9 +64,37 @@ export function TeamClient() {
       return res.data.data as { temporary_password: string };
     },
     onSuccess: (data) => {
+      const temporaryPassword = data.temporary_password;
       toast({
         title: "Password reset",
-        description: `Temporary password: ${data.temporary_password}`,
+        description: "Copy the temporary password to share with the team member.",
+        action: (
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="shrink-0"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(temporaryPassword);
+                toast({
+                  title: "Copied",
+                  description: "Temporary password copied to clipboard.",
+                  variant: "success",
+                });
+              } catch {
+                toast({
+                  title: "Copy failed",
+                  description: "Unable to copy the password. Please try again.",
+                  variant: "destructive",
+                });
+              }
+            }}
+          >
+            <Copy className="w-4 h-4" />
+            Copy
+          </Button>
+        ),
         variant: "success",
       });
     },

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Nunito, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers/Providers";
+import { getAppUrl } from "@/lib/portal-urls";
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -18,9 +19,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "https://partner.momplan.ai"
-  ),
+  metadataBase: new URL(getAppUrl()),
   title: {
     default: "MomPlan Partner Portal",
     template: "%s | MomPlan Partner Portal",

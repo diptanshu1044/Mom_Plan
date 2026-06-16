@@ -52,6 +52,8 @@ export class UserService {
         status: true,
         profile_picture: true,
         partner_org_id: true,
+        org_name: true,
+        org_type: true,
         partner_organization: {
           select: { id: true, name: true, city: true, state: true },
         },
@@ -72,6 +74,7 @@ export class UserService {
   ) {
     const { 
       full_name, phone, email, state, zip_code, partner_org_id,
+      org_name, org_type,
       household_size, num_children, children_ages, monthly_income,
       employment_status, housing_status, has_disability, is_pregnant,
       
@@ -94,6 +97,8 @@ export class UserService {
     if (state !== undefined) userUpdate.state = state;
     if (zip_code !== undefined) userUpdate.zip_code = zip_code;
     if (profile_picture !== undefined) userUpdate.profile_picture = profile_picture;
+    if (org_name !== undefined) userUpdate.org_name = org_name || null;
+    if (org_type !== undefined) userUpdate.org_type = org_type || null;
     // Only update email if provided (requires uniqueness check implicitly via Prisma)
     if (email !== undefined) userUpdate.email = email;
 

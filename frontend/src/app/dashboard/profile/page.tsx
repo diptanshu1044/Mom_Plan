@@ -27,6 +27,7 @@ import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { PlanBadge } from "@/components/ui/Badge";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
+import { ORG_TYPE_OPTIONS } from "@/lib/org-types";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 
@@ -138,6 +139,8 @@ const profileSchema = z.object({
   state: z.string().optional(),
   zip_code: z.string().optional(),
   profile_picture: z.string().optional(),
+  org_name: z.string().min(2, "Organization name is required"),
+  org_type: z.string().min(1, "Please select an organization type"),
   partner_org_id: z.string().uuid("Please select a partner organization"),
 
   // Family profile base fields
@@ -196,6 +199,8 @@ export default function ProfilePage() {
       state: currentUser?.state || "",
       zip_code: currentUser?.zip_code || "",
       profile_picture: currentUser?.profile_picture || "",
+      org_name: currentUser?.org_name || "",
+      org_type: currentUser?.org_type || "",
       partner_org_id: currentUser?.partner_org_id || "",
       household_size: String(currentUser?.family_profile?.household_size || ""),
       num_children: String(currentUser?.family_profile?.num_children || ""),
@@ -396,6 +401,20 @@ export default function ProfilePage() {
                   label="Date of Birth"
                   type="date"
                   {...profileForm.register("date_of_birth")}
+                />
+                <Input
+                  label="Organization Name"
+                  error={profileForm.formState.errors.org_name?.message}
+                  required
+                  {...profileForm.register("org_name")}
+                />
+                <Select
+                  label="Organization Type"
+                  options={ORG_TYPE_OPTIONS}
+                  placeholder="Select organization type…"
+                  error={profileForm.formState.errors.org_type?.message}
+                  required
+                  {...profileForm.register("org_type")}
                 />
                 <div className="sm:col-span-2">
                   <PartnerOrgSelect

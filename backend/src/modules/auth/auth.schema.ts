@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { orgTypeSchema } from '../../constants/org-types';
 
 export const registerSchema = z.object({
   body: z.object({
@@ -7,6 +8,8 @@ export const registerSchema = z.object({
     full_name: z.string().min(1),
     phone: z.string().optional(),
     partner_org_id: z.string().uuid('Please select a partner organization'),
+    org_name: z.string().min(2, 'Organization name is required'),
+    org_type: orgTypeSchema,
   }),
 });
 

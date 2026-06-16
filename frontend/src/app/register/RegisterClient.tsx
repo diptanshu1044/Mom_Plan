@@ -7,13 +7,14 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Mail, Lock, User, Phone, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Mail, Lock, User, Phone, Eye, EyeOff, ArrowRight, Building2 } from "lucide-react";
 import { getPartnerPortalUrl } from "@/lib/portal-urls";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
+import { Input, Select } from "@/components/ui/Input";
 import { SignupBgPattern } from "@/components/signup/SignupBgPattern";
 import { SignupBrandPill } from "@/components/signup/SignupBrandPill";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
+import { ORG_TYPE_OPTIONS } from "@/lib/org-types";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -23,6 +24,8 @@ const registerSchema = z
     full_name: z.string().min(2, "Full name must be at least 2 characters"),
     email: z.string().email("Invalid email address"),
     phone: z.string().optional(),
+    org_name: z.string().min(2, "Organization name is required"),
+    org_type: z.string().min(1, "Please select an organization type"),
     partner_org_id: z.string().uuid("Please select a partner organization"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
@@ -76,6 +79,8 @@ function RegisterForm() {
         email: data.email,
         password: data.password,
         phone: data.phone,
+        org_name: data.org_name,
+        org_type: data.org_type,
         partner_org_id: data.partner_org_id,
       });
       const { user, accessToken } = response.data.data;
@@ -175,6 +180,25 @@ function RegisterForm() {
                 leftIcon={<Phone className="w-4 h-4" />}
                 hint="For deadline SMS alerts"
                 {...register("phone")}
+              />
+
+              <Input
+                label="Organization Name"
+                type="text"
+                placeholder="e.g. Atlanta Women's Center"
+                leftIcon={<Building2 className="w-4 h-4" />}
+                error={errors.org_name?.message}
+                required
+                {...register("org_name")}
+              />
+
+              <Select
+                label="Organization Type"
+                options={ORG_TYPE_OPTIONS}
+                placeholder="Select organization type…"
+                error={errors.org_type?.message}
+                required
+                {...register("org_type")}
               />
 
               <Controller
