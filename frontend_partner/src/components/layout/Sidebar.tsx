@@ -19,32 +19,33 @@ import {
 } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { usePartnerAuthStore } from "@/store/auth.store";
+import { isOrgAdmin } from "@/lib/auth-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const NAV = [
   {
     section: "Home",
-    items: [{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+    items: [{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, adminOnly: false }],
   },
   {
     section: "Your caseload",
     items: [
-      { label: "Deadline Alerts", href: "/alerts", icon: AlertTriangle },
-      { label: "Referrals", href: "/referrals", icon: ArrowLeftRight },
-      { label: "Documents", href: "/documents", icon: FileText },
+      { label: "Deadline Alerts", href: "/alerts", icon: AlertTriangle, adminOnly: false },
+      { label: "Referrals", href: "/referrals", icon: ArrowLeftRight, adminOnly: false },
+      { label: "Documents", href: "/documents", icon: FileText, adminOnly: false },
     ],
   },
   {
     section: "Insights",
-    items: [{ label: "Analytics", href: "/analytics", icon: BarChart3 }],
+    items: [{ label: "Analytics", href: "/analytics", icon: BarChart3, adminOnly: false }],
   },
   {
     section: "Workspace",
     items: [
-      { label: "Organization", href: "/organization", icon: Building2 },
-      { label: "Team", href: "/team", icon: Users },
-      { label: "Notifications", href: "/notifications", icon: Bell },
-      { label: "Settings", href: "/settings", icon: Settings },
+      { label: "Organization", href: "/organization", icon: Building2, adminOnly: true },
+      { label: "Team", href: "/team", icon: Users, adminOnly: true },
+      { label: "Notifications", href: "/notifications", icon: Bell, adminOnly: false },
+      { label: "Settings", href: "/settings", icon: Settings, adminOnly: false },
     ],
   },
 ];
@@ -52,6 +53,12 @@ const NAV = [
 export function Sidebar() {
   const pathname = usePathname();
   const { user, organization, logout } = usePartnerAuthStore();
+  const isAdmin = isOrgAdmin(user);
+
+  const visibleNav = NAV.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => !item.adminOnly || isAdmin),
+  })).filter((group) => group.items.length > 0);
 
   const isActive = (href: string) =>
     href === "/dashboard"
@@ -102,7 +109,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="relative flex-1 overflow-y-auto px-3 pb-4 space-y-6">
-        {NAV.map((group) => (
+        {visibleNav.map((group) => (
           <div key={group.section}>
             <div className="px-3 mb-2 text-[11px] font-semibold text-white/45 tracking-wide">
               {group.section}

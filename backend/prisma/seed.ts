@@ -425,7 +425,7 @@ async function seedPartnerOrg() {
     update: {},
     create: {
       id: DEMO_ADMIN_ID, full_name: 'K. Marshall', email: 'admin@blossomcommunityhub.org',
-      password_hash, role: 'admin', org_id: DEMO_ORG_ID, is_active: true,
+      password_hash, role: 'admin', org_id: DEMO_ORG_ID, is_active: true, must_change_password: false,
     },
   });
 
@@ -434,7 +434,8 @@ async function seedPartnerOrg() {
     update: {},
     create: {
       id: DEMO_CASEWORKER1, full_name: 'R. Patel', email: 'rpatel@blossomcommunityhub.org',
-      password_hash, role: 'counselor', org_id: DEMO_ORG_ID, is_active: true, caseload_capacity: 30,
+      password_hash, role: 'caseworker', org_id: DEMO_ORG_ID, is_active: true, caseload_capacity: 30,
+      must_change_password: false,
     },
   });
 
@@ -443,7 +444,8 @@ async function seedPartnerOrg() {
     update: {},
     create: {
       id: DEMO_CASEWORKER2, full_name: 'S. Nguyen', email: 'snguyen@blossomcommunityhub.org',
-      password_hash, role: 'counselor', org_id: DEMO_ORG_ID, is_active: true, caseload_capacity: 25,
+      password_hash, role: 'caseworker', org_id: DEMO_ORG_ID, is_active: true, caseload_capacity: 25,
+      must_change_password: false,
     },
   });
 

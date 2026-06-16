@@ -36,8 +36,8 @@ export function LoginClient() {
 
   const onSubmit = async (data: FormData) => {
     try {
-      await login(data.email, data.password);
-      router.push("/dashboard");
+      const user = await login(data.email, data.password);
+      router.push(user.must_change_password ? "/change-password" : "/dashboard");
     } catch {
       toast({
         variant: "destructive",

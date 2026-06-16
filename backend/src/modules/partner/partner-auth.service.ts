@@ -77,6 +77,7 @@ async function issueSession(orgUser: {
   full_name: string;
   role: string;
   org_id: string;
+  must_change_password: boolean;
   organization: FullOrg;
 }) {
   const accessToken = generateAccessToken({
@@ -94,6 +95,7 @@ async function issueSession(orgUser: {
       full_name: orgUser.full_name,
       role: orgUser.role,
       org_id: orgUser.org_id,
+      must_change_password: orgUser.must_change_password,
     },
     accessToken,
     refreshToken,
@@ -162,6 +164,7 @@ export class PartnerAuthService {
           role:          'admin',
           org_id:        org.id,
           is_active:     true,
+          must_change_password: false,
         },
       });
 
@@ -240,6 +243,35 @@ export class PartnerAuthService {
     return issueSession({
       ...orgUser,
       organization: orgUser.organization,
+    });
+  }
+
+  async changePassword(orgUserId: string, currentPassword: string, newPassword: string) {
+    const orgUser = await prisma.orgUser.findUnique({
+      where: { id: orgUserId },
+      include: { organization: true },
+    });
+
+    if (!orgUser || !orgUser.is_active) {
+      throw new UnauthorizedError('Account not found or inactive');
+    }
+
+    const valid = await bcrypt.compare(currentPassword, orgUser.password_hash);
+    if (!valid) {
+      throw new BadRequestError('Current password is incorrect');
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, 10);
+
+    const updated = await prisma.orgUser.update({
+      where: { id: orgUserId },
+      data: { password_hash, must_change_password: false },
+      include: { organization: true },
+    });
+
+    return issueSession({
+      ...updated,
+      organization: updated.organization,
     });
   }
 }

@@ -184,8 +184,9 @@ export interface PartnerUser {
   id: string;
   email: string;
   full_name: string;
-  role: "partner_admin" | "partner_member" | "admin" | "counselor";
-  organization_id?: string | null;
+  role: "admin" | "caseworker";
+  org_id?: string | null;
+  must_change_password?: boolean;
   avatar_url?: string | null;
   phone?: string | null;
   title?: string | null;

@@ -98,4 +98,27 @@ export class PartnerAuthController {
       next(error);
     }
   }
+
+  async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.orgUser) throw new UnauthorizedError('Not authenticated');
+      const { current_password, new_password } = req.body;
+      const result = await partnerAuthService.changePassword(
+        req.orgUser.orgUserId,
+        current_password,
+        new_password
+      );
+      setRefreshCookie(res, result.refreshToken);
+      res.status(200).json({
+        success: true,
+        data: {
+          user:         result.user,
+          accessToken:  result.accessToken,
+          organization: result.organization,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

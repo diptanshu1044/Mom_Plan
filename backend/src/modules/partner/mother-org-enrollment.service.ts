@@ -25,7 +25,7 @@ async function pickCaseworker(orgId: string): Promise<string> {
     where: {
       org_id: orgId,
       is_active: true,
-      role: { in: ['counselor', 'admin', 'partner_member'] },
+      role: { in: ['caseworker', 'admin'] },
     },
     include: { _count: { select: { cases: true } } },
     orderBy: { full_name: 'asc' },

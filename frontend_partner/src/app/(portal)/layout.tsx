@@ -1,17 +1,32 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { usePartnerAuthStore } from "@/store/auth.store";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { isAdminOnlyRoute, isOrgAdmin } from "@/lib/auth-utils";
 
 export default function PortalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isHydrated } = usePartnerAuthStore();
+  const { isAuthenticated, isHydrated, user } = usePartnerAuthStore();
   const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!isHydrated || !isAuthenticated) return;
+
+    if (user?.must_change_password) {
+      router.replace("/change-password");
+      return;
+    }
+
+    if (isAdminOnlyRoute(pathname) && !isOrgAdmin(user)) {
+      router.replace("/dashboard");
+    }
+  }, [isHydrated, isAuthenticated, user, pathname, router]);
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
@@ -31,6 +46,9 @@ export default function PortalLayout({
   }
 
   if (!isAuthenticated) return null;
+
+  if (user?.must_change_password) return null;
+  if (isAdminOnlyRoute(pathname) && !isOrgAdmin(user)) return null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">

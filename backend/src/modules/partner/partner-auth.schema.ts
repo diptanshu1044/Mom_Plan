@@ -40,3 +40,10 @@ export const partnerRefreshSchema = z.object({
     refreshToken: z.string().optional(),
   }),
 });
+
+export const partnerChangePasswordSchema = z.object({
+  body: z.object({
+    current_password: z.string().min(1, 'Current password is required'),
+    new_password: z.string().min(8, 'Password must be at least 8 characters'),
+  }),
+});

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
-import { UnauthorizedError } from '../../utils/errors';
+import { ForbiddenError, UnauthorizedError } from '../../utils/errors';
 import { OrgUserTokenPayload } from './partner-auth.service';
 
 declare global {
@@ -35,7 +35,7 @@ export function requireOrgRole(...roles: string[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.orgUser) return next(new UnauthorizedError('Not authenticated'));
     if (!roles.includes(req.orgUser.role)) {
-      return next(new UnauthorizedError('Insufficient permissions'));
+      return next(new ForbiddenError('Insufficient permissions'));
     }
     next();
   };
