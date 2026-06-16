@@ -1,4 +1,9 @@
 import { prisma } from '../../config/prisma';
+import {
+  caseListWhere,
+  OrgAccessContext,
+  isOrgAdmin,
+} from './partner-access';
 
 const PROGRAM_SHORT: Record<string, string> = {
   snap: 'SNAP',
@@ -84,8 +89,8 @@ function snoozeData(notes: string | null): { snoozed_until?: string } {
 }
 
 export class PartnerAlertsService {
-  async getSummary(orgId: string, quarter?: string) {
-    const alerts = await this.fetchAlerts(orgId, { quarter, showSnoozed: false });
+  async getSummary(ctx: OrgAccessContext, quarter?: string) {
+    const alerts = await this.fetchAlerts(ctx, { quarter, showSnoozed: false });
     const counts = { critical: 0, soon: 0, upcoming: 0, on_track: 0 };
     for (const a of alerts) {
       counts[a.urgency_bucket]++;
@@ -94,7 +99,7 @@ export class PartnerAlertsService {
   }
 
   async listAlerts(
-    orgId: string,
+    ctx: OrgAccessContext,
     filters: {
       quarter?: string;
       search?: string;
@@ -104,7 +109,7 @@ export class PartnerAlertsService {
       showSnoozed?: boolean;
     }
   ) {
-    let alerts = await this.fetchAlerts(orgId, filters);
+    let alerts = await this.fetchAlerts(ctx, filters);
 
     if (!filters.showSnoozed) {
       alerts = alerts.filter((a) => !a.is_snoozed);
@@ -127,21 +132,18 @@ export class PartnerAlertsService {
   }
 
   private async fetchAlerts(
-    orgId: string,
+    ctx: OrgAccessContext,
     filters: { quarter?: string; program?: string; caseworker?: string; showSnoozed?: boolean }
   ) {
+    const caseworkerFilter = isOrgAdmin(ctx) ? filters.caseworker : undefined;
+
     const deadlines = await prisma.caseDeadline.findMany({
       where: {
         is_resolved: false,
         case: {
+          ...caseListWhere(ctx, caseworkerFilter),
           ...(filters.quarter ? { quarter: filters.quarter.toUpperCase() } : {}),
           ...(filters.program && filters.program !== 'all' ? { program_id: filters.program } : {}),
-          caseworker: {
-            org_id: orgId,
-            ...(filters.caseworker && filters.caseworker !== 'all'
-              ? { id: filters.caseworker }
-              : {}),
-          },
         },
       },
       include: {
@@ -207,11 +209,11 @@ export class PartnerAlertsService {
     return results;
   }
 
-  async snoozeAlert(orgId: string, deadlineId: string, days = 3) {
+  async snoozeAlert(ctx: OrgAccessContext, deadlineId: string, days = 3) {
     const deadline = await prisma.caseDeadline.findFirst({
       where: {
         id: deadlineId,
-        case: { caseworker: { org_id: orgId } },
+        case: caseListWhere(ctx),
       },
     });
     if (!deadline) return null;

@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QuarterTabs, currentQuarter } from "@/components/cases/QuarterTabs";
 import { usePartnerAuthStore } from "@/store/auth.store";
+import { isOrgAdmin } from "@/lib/auth-utils";
 import { formatDate, formatRelativeDate, initials, cn } from "@/lib/utils";
 import type { AlertItem, AlertSummary, CaseFilterOptions } from "@/types";
 
@@ -52,6 +53,7 @@ async function fetchFilters(): Promise<CaseFilterOptions> {
 export function AlertsClient() {
   const router = useRouter();
   const { user } = usePartnerAuthStore();
+  const isAdmin = isOrgAdmin(user);
   const queryClient = useQueryClient();
   const [quarter, setQuarter] = useState(currentQuarter());
   const [search, setSearch] = useState("");
@@ -176,15 +178,17 @@ export function AlertsClient() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={caseworker} onValueChange={setCaseworker}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="All Caseworkers" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Caseworkers</SelectItem>
-              {filters?.caseworkers.map((cw) => (
-                <SelectItem key={cw.id} value={cw.id}>{cw.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isAdmin && (
+            <Select value={caseworker} onValueChange={setCaseworker}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="All Caseworkers" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Caseworkers</SelectItem>
+                {filters?.caseworkers.map((cw) => (
+                  <SelectItem key={cw.id} value={cw.id}>{cw.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <div className="flex rounded-lg border border-surface-border overflow-hidden ml-auto">
             <button
               className={cn("px-4 py-2 text-sm font-semibold", !showSnoozed ? "bg-partner-600 text-white" : "bg-white text-text-mid")}

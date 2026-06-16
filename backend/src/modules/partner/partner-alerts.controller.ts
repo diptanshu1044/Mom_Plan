@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { PartnerAlertsService } from './partner-alerts.service';
+import { toAccessContext } from './partner-access';
 import { UnauthorizedError } from '../../utils/errors';
 
 const svc = new PartnerAlertsService();
@@ -8,7 +9,8 @@ export class PartnerAlertsController {
   async getSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.orgUser) throw new UnauthorizedError('Not authenticated');
-      const data = await svc.getSummary(req.orgUser.orgId, req.query.quarter as string | undefined);
+      const ctx = toAccessContext(req.orgUser);
+      const data = await svc.getSummary(ctx, req.query.quarter as string | undefined);
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);
@@ -18,7 +20,8 @@ export class PartnerAlertsController {
   async listAlerts(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.orgUser) throw new UnauthorizedError('Not authenticated');
-      const data = await svc.listAlerts(req.orgUser.orgId, {
+      const ctx = toAccessContext(req.orgUser);
+      const data = await svc.listAlerts(ctx, {
         quarter: req.query.quarter as string | undefined,
         search: req.query.search as string | undefined,
         alertType: req.query.type as string | undefined,
@@ -35,8 +38,9 @@ export class PartnerAlertsController {
   async snoozeAlert(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.orgUser) throw new UnauthorizedError('Not authenticated');
+      const ctx = toAccessContext(req.orgUser);
       const days = req.body?.days ? Number(req.body.days) : 3;
-      const data = await svc.snoozeAlert(req.orgUser.orgId, req.params.id, days);
+      const data = await svc.snoozeAlert(ctx, req.params.id, days);
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);

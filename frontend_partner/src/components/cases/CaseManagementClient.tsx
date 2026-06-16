@@ -12,6 +12,7 @@ import { QuarterTabs, currentQuarter } from "@/components/cases/QuarterTabs";
 import { SummaryCards } from "@/components/cases/SummaryCards";
 import { CaseDetailPanel } from "@/components/cases/CaseDetailPanel";
 import { usePartnerAuthStore } from "@/store/auth.store";
+import { isOrgAdmin } from "@/lib/auth-utils";
 import { formatDate, initials, cn } from "@/lib/utils";
 import type { CaseListItem, DashboardSummary, CaseFilterOptions } from "@/types";
 
@@ -65,6 +66,7 @@ export function CaseManagementClient() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user } = usePartnerAuthStore();
+  const isAdmin = isOrgAdmin(user);
   const [quarter, setQuarter] = useState(currentQuarter());
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -133,7 +135,7 @@ export function CaseManagementClient() {
               {quarter} · {QUARTER_LABEL(quarter)}
             </span>
             <span className="px-3 py-1 rounded-full bg-white/15 text-sm font-semibold">
-              {summary?.total_assigned ?? "—"} Active Cases
+              {summary?.total_assigned ?? "—"} {isAdmin ? "Active Cases" : "My Cases"}
             </span>
             <Avatar className="w-9 h-9 ring-2 ring-white/30">
               <AvatarFallback className="bg-white/20 text-white text-xs font-bold">
@@ -146,7 +148,7 @@ export function CaseManagementClient() {
       </div>
 
       <div className="flex-1 p-8 space-y-6 bg-surface">
-        {summary && <SummaryCards data={summary} loading={summaryLoading} />}
+        {summary && <SummaryCards data={summary} loading={summaryLoading} scope={isAdmin ? "org" : "mine"} />}
 
         {/* Filters */}
         <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
@@ -177,15 +179,17 @@ export function CaseManagementClient() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={caseworker} onValueChange={setCaseworker}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="All Caseworkers" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Caseworkers</SelectItem>
-              {filters?.caseworkers.map((cw) => (
-                <SelectItem key={cw.id} value={cw.id}>{cw.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isAdmin && (
+            <Select value={caseworker} onValueChange={setCaseworker}>
+              <SelectTrigger className="w-44"><SelectValue placeholder="All Caseworkers" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Caseworkers</SelectItem>
+                {filters?.caseworkers.map((cw) => (
+                  <SelectItem key={cw.id} value={cw.id}>{cw.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {/* Legend */}

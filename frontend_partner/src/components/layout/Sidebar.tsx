@@ -16,6 +16,7 @@ import {
   Bell,
   AlertTriangle,
   Sparkles,
+  Baby,
 } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { usePartnerAuthStore } from "@/store/auth.store";
@@ -30,6 +31,7 @@ const NAV = [
   {
     section: "Your caseload",
     items: [
+      { label: "Mothers", href: "/mothers", icon: Baby, adminOnly: false },
       { label: "Deadline Alerts", href: "/alerts", icon: AlertTriangle, adminOnly: false },
       { label: "Referrals", href: "/referrals", icon: ArrowLeftRight, adminOnly: false },
       { label: "Documents", href: "/documents", icon: FileText, adminOnly: false },

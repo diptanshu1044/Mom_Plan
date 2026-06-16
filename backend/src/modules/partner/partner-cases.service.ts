@@ -1,6 +1,12 @@
 import { randomUUID } from 'crypto';
 import { prisma } from '../../config/prisma';
-import { BadRequestError, NotFoundError } from '../../utils/errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
+import {
+  caseListWhere,
+  motherOrgWhere,
+  OrgAccessContext,
+  isOrgAdmin,
+} from './partner-access';
 
 const PROGRAM_SHORT: Record<string, string> = {
   snap: 'SNAP',
@@ -103,15 +109,6 @@ const caseInclude = {
   status_history: { orderBy: { changed_at: 'desc' as const }, take: 1 },
 } as const;
 
-function orgCaseWhere(orgId: string, caseworkerId?: string) {
-  return {
-    caseworker: {
-      org_id: orgId,
-      ...(caseworkerId ? { id: caseworkerId } : {}),
-    },
-  };
-}
-
 function mapCaseRow(
   c: Awaited<ReturnType<typeof prisma.partnerCase.findFirst>> & {
     mother: NonNullable<Awaited<ReturnType<typeof prisma.partnerCase.findFirst>>> extends infer T
@@ -184,8 +181,7 @@ function mapCaseRow(
 
 export class PartnerCasesService {
   async createCase(
-    orgId: string,
-    orgUserId: string,
+    ctx: OrgAccessContext,
     input: {
       first_name: string;
       last_name: string;
@@ -205,9 +201,9 @@ export class PartnerCasesService {
     });
     if (!program) throw new BadRequestError('Invalid program');
 
-    const caseworkerId = input.caseworker_id ?? orgUserId;
+    const caseworkerId = input.caseworker_id ?? ctx.orgUserId;
     const caseworker = await prisma.orgUser.findFirst({
-      where: { id: caseworkerId, org_id: orgId, is_active: true },
+      where: { id: caseworkerId, org_id: ctx.orgId, is_active: true },
     });
     if (!caseworker) throw new BadRequestError('Invalid caseworker');
 
@@ -269,7 +265,7 @@ export class PartnerCasesService {
           case_id: partnerCase.id,
           old_status: null,
           new_status: 'not_started',
-          changed_by: orgUserId,
+          changed_by: ctx.orgUserId,
           notes: input.notes?.trim() || 'Case opened via partner portal',
         },
       });
@@ -277,11 +273,11 @@ export class PartnerCasesService {
       return partnerCase;
     });
 
-    return this.getCaseDetail(orgId, created.id);
+    return this.getCaseDetail(ctx, created.id);
   }
 
   async listCases(
-    orgId: string,
+    ctx: OrgAccessContext,
     filters: {
       quarter?: string;
       year?: number;
@@ -295,9 +291,11 @@ export class PartnerCasesService {
     const year = filters.year ?? new Date().getFullYear();
     const quarter = filters.quarter ?? currentQuarter();
 
+    const caseworkerFilter = isOrgAdmin(ctx) ? filters.caseworker : undefined;
+
     const cases = await prisma.partnerCase.findMany({
       where: {
-        ...orgCaseWhere(orgId, filters.caseworker),
+        ...caseListWhere(ctx, caseworkerFilter),
         ...(filters.quarter ? { quarter: filters.quarter.toUpperCase() } : {}),
         ...(filters.status && filters.status !== 'all' ? { status: filters.status } : {}),
         ...(filters.program && filters.program !== 'all' ? { program_id: filters.program } : {}),
@@ -329,9 +327,9 @@ export class PartnerCasesService {
     );
   }
 
-  async getCaseDetail(orgId: string, caseId: string) {
+  async getCaseDetail(ctx: OrgAccessContext, caseId: string) {
     const c = await prisma.partnerCase.findFirst({
-      where: { id: caseId, ...orgCaseWhere(orgId) },
+      where: { id: caseId, ...caseListWhere(ctx) },
       include: {
         ...caseInclude,
         deadlines: { orderBy: { due_date: 'asc' } },
@@ -342,7 +340,17 @@ export class PartnerCasesService {
       },
     });
 
-    if (!c) throw new NotFoundError('Case not found');
+    if (!c) {
+      const inOrg = await prisma.partnerCase.findFirst({
+        where: {
+          id: caseId,
+          mother: motherOrgWhere(ctx.orgId),
+        },
+        select: { id: true },
+      });
+      if (inOrg) throw new ForbiddenError('You do not have access to this case');
+      throw new NotFoundError('Case not found');
+    }
 
     const motherName = await resolveMotherName(c.mother);
     const motherNumber = formatMotherNumber(c.mother_id);
@@ -443,13 +451,13 @@ export class PartnerCasesService {
     };
   }
 
-  async getDashboardSummary(orgId: string, quarter?: string, year?: number) {
+  async getDashboardSummary(ctx: OrgAccessContext, quarter?: string, year?: number) {
     const q = (quarter ?? currentQuarter()).toUpperCase();
     const y = year ?? new Date().getFullYear();
     const { start } = quarterDateRange(q, y);
 
     const cases = await prisma.partnerCase.findMany({
-      where: { ...orgCaseWhere(orgId), quarter: q },
+      where: { ...caseListWhere(ctx), quarter: q },
       include: {
         deadlines: { where: { is_resolved: false } },
         documents: true,
@@ -486,10 +494,14 @@ export class PartnerCasesService {
     };
   }
 
-  async getFilterOptions(orgId: string) {
+  async getFilterOptions(ctx: OrgAccessContext) {
+    const caseworkerWhere = isOrgAdmin(ctx)
+      ? { org_id: ctx.orgId, is_active: true, role: 'caseworker' as const }
+      : { id: ctx.orgUserId, org_id: ctx.orgId, is_active: true };
+
     const [caseworkers, programs] = await Promise.all([
       prisma.orgUser.findMany({
-        where: { org_id: orgId, is_active: true },
+        where: caseworkerWhere,
         select: { id: true, full_name: true },
         orderBy: { full_name: 'asc' },
       }),
@@ -511,16 +523,23 @@ export class PartnerCasesService {
     };
   }
 
-  async sendReminder(orgId: string, caseId: string, orgUserId: string) {
+  async sendReminder(ctx: OrgAccessContext, caseId: string) {
     const c = await prisma.partnerCase.findFirst({
-      where: { id: caseId, ...orgCaseWhere(orgId) },
+      where: { id: caseId, ...caseListWhere(ctx) },
     });
-    if (!c) throw new NotFoundError('Case not found');
+    if (!c) {
+      const inOrg = await prisma.partnerCase.findFirst({
+        where: { id: caseId, mother: motherOrgWhere(ctx.orgId) },
+        select: { id: true },
+      });
+      if (inOrg) throw new ForbiddenError('You do not have access to this case');
+      throw new NotFoundError('Case not found');
+    }
 
     await prisma.communication.create({
       data: {
         case_id: caseId,
-        sent_by: orgUserId,
+        sent_by: ctx.orgUserId,
         type: 'reminder',
         channel: 'email',
         message: 'Renewal reminder sent to client',

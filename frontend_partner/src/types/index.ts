@@ -166,6 +166,30 @@ export interface DashboardSummary {
   year: number;
 }
 
+export interface MotherListItem {
+  id: string;
+  name: string;
+  email: string | null;
+  status: string;
+  caseworker: { id: string; full_name: string } | null;
+  created_at: string;
+}
+
+export interface MotherDetail extends MotherListItem {
+  cases: {
+    id: string;
+    program: string;
+    status: string;
+    quarter: string;
+    created_at: string;
+  }[];
+}
+
+export interface AssignableCaseworker {
+  id: string;
+  full_name: string;
+}
+
 export interface AlertItem {
   id: string;
   case_id: string;
