@@ -159,6 +159,6 @@ export class MotherOrgEnrollmentService {
       });
     });
 
-    return { org_id: org.id, org_name: org.name };
+    return { org_id: org.id };
   }
 }

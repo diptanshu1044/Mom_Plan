@@ -17,7 +17,6 @@ export interface AuthUser {
   state?: string;
   zip_code?: string;
   profile_picture?: string;
-  org_name?: string | null;
   org_type?: string | null;
   partner_org_id?: string;
   partner_organization?: {

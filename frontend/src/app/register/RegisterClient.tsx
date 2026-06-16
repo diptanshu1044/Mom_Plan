@@ -7,7 +7,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { Mail, Lock, User, Phone, Eye, EyeOff, ArrowRight, Building2 } from "lucide-react";
+import { Mail, Lock, User, Phone, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { getPartnerPortalUrl } from "@/lib/portal-urls";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
@@ -24,7 +24,6 @@ const registerSchema = z
     full_name: z.string().min(2, "Full name must be at least 2 characters"),
     email: z.string().email("Invalid email address"),
     phone: z.string().optional(),
-    org_name: z.string().min(2, "Organization name is required"),
     org_type: z.string().min(1, "Please select an organization type"),
     partner_org_id: z.string().uuid("Please select a partner organization"),
     password: z.string().min(8, "Password must be at least 8 characters"),
@@ -79,7 +78,6 @@ function RegisterForm() {
         email: data.email,
         password: data.password,
         phone: data.phone,
-        org_name: data.org_name,
         org_type: data.org_type,
         partner_org_id: data.partner_org_id,
       });
@@ -180,16 +178,6 @@ function RegisterForm() {
                 leftIcon={<Phone className="w-4 h-4" />}
                 hint="For deadline SMS alerts"
                 {...register("phone")}
-              />
-
-              <Input
-                label="Organization Name"
-                type="text"
-                placeholder="e.g. Atlanta Women's Center"
-                leftIcon={<Building2 className="w-4 h-4" />}
-                error={errors.org_name?.message}
-                required
-                {...register("org_name")}
               />
 
               <Select

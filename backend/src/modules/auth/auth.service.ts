@@ -116,7 +116,6 @@ export class AuthService {
     full_name: string;
     phone?: string;
     partner_org_id: string;
-    org_name: string;
     org_type: string;
   }) {
     const existingUser = await prisma.user.findUnique({
@@ -135,7 +134,6 @@ export class AuthService {
         password_hash,
         full_name: data.full_name,
         phone: data.phone,
-        org_name: data.org_name,
         org_type: data.org_type,
       },
     });
