@@ -97,7 +97,7 @@ export function AnalyticsClient() {
             value: formatNumber(m?.total_mothers_served ?? 0, true),
             subtitle: `+${m?.new_mothers_this_month ?? 0} this month`,
             icon: Users,
-            iconBg: "bg-gradient-to-br from-pink-400 to-pink-600",
+            iconBg: "bg-gradient-to-br from-primary-400 to-primary-600",
             trend: { value: 11 },
           },
           {
@@ -122,7 +122,7 @@ export function AnalyticsClient() {
               : "—",
             subtitle: "Referrals accepted",
             icon: TrendingUp,
-            iconBg: "bg-gradient-to-br from-violet-400 to-violet-600",
+            iconBg: "bg-gradient-to-br from-secondary-400 to-secondary-600",
             trend: { value: 5 },
           },
         ].map((card, i) => (

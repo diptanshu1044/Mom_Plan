@@ -10,7 +10,7 @@ function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>)
       )}
       style={{
         backgroundImage:
-          "linear-gradient(90deg, #f5f0ff 25%, #ede5ff 50%, #f5f0ff 75%)",
+          "linear-gradient(90deg, #f0effe 25%, #e3dfff 50%, #f0effe 75%)",
         backgroundSize: "200% 100%",
         animation: "shimmer 1.8s infinite linear",
       }}

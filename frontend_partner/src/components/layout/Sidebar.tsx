@@ -61,8 +61,8 @@ export function Sidebar() {
   return (
     <aside className="relative w-[272px] min-w-[272px] h-screen flex flex-col bg-gradient-sidebar-warm overflow-hidden">
       {/* Warm decorative glow */}
-      <div className="pointer-events-none absolute -top-20 -left-16 w-56 h-56 rounded-full bg-pink-400/20 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-32 -right-10 w-40 h-40 rounded-full bg-violet-300/15 blur-2xl" />
+      <div className="pointer-events-none absolute -top-20 -left-16 w-56 h-56 rounded-full bg-primary-400/20 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-32 -right-10 w-40 h-40 rounded-full bg-secondary-300/15 blur-2xl" />
 
       {/* Brand */}
       <div className="relative px-5 pt-7 pb-5">
@@ -75,7 +75,7 @@ export function Sidebar() {
               MomPlan
             </div>
             <div className="flex items-center gap-1 text-white/60 text-[11px] font-medium mt-0.5">
-              <Sparkles className="w-3 h-3 text-pink-200" />
+              <Sparkles className="w-3 h-3 text-primary-200" />
               Supporting every mom
             </div>
           </div>
@@ -84,7 +84,7 @@ export function Sidebar() {
         {organization && (
           <div className="mt-5 px-3.5 py-3 rounded-2xl bg-white/12 backdrop-blur-md border border-white/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-300 to-violet-400 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-md">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-300 to-secondary-400 flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-md">
                 {initials(organization.name)}
               </div>
               <div className="min-w-0">
@@ -149,7 +149,7 @@ export function Sidebar() {
         <div className="flex items-center gap-3 px-3.5 py-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 hover:bg-white/15 transition-colors">
           <Avatar className="w-9 h-9 shrink-0 ring-2 ring-white/30">
             <AvatarImage src={user?.avatar_url ?? ""} alt={user?.full_name} />
-            <AvatarFallback className="text-xs bg-gradient-to-br from-pink-300 to-violet-400 text-white font-bold">
+            <AvatarFallback className="text-xs bg-gradient-to-br from-primary-300 to-secondary-400 text-white font-bold">
               {initials(user?.full_name)}
             </AvatarFallback>
           </Avatar>

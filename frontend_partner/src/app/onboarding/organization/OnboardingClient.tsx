@@ -758,7 +758,7 @@ function FormField({
     <div className="space-y-1.5">
       <Label>
         {label}
-        {required && <span className="text-pink-500 ml-0.5">*</span>}
+        {required && <span className="text-primary-500 ml-0.5">*</span>}
       </Label>
       {children}
       {hint && !error && <p className="text-xs text-text-soft">{hint}</p>}

@@ -29,7 +29,7 @@ const ALERT_TYPE_COLORS: Record<string, string> = {
 const PROGRAM_COLORS: Record<string, string> = {
   SNAP: "bg-blue-100 text-blue-700",
   Medicaid: "bg-green-100 text-green-700",
-  WIC: "bg-purple-100 text-purple-700",
+  WIC: "bg-primary-100 text-primary-700",
   TANF: "bg-orange-100 text-orange-700",
 };
 

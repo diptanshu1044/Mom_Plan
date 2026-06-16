@@ -150,7 +150,7 @@ function Field({
     <div className="mb-4">
       <Label className="mb-1.5 flex items-center gap-1">
         {label}
-        {required && <span className="text-pink-500">*</span>}
+        {required && <span className="text-primary-500">*</span>}
       </Label>
       {children}
       {hint && !error && (
@@ -183,11 +183,11 @@ function NativeSelect({
       onChange={(e) => onChange(e.target.value)}
       className="flex h-11 w-full rounded-xl border-[1.5px] border-surface-border bg-primary-subtle px-3.5 py-2.5 text-sm text-text-dark transition-all duration-200 outline-none focus:border-primary-500 focus:bg-white focus:shadow-focus appearance-none cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
       style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239333EA' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234d41df' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`,
         backgroundRepeat: "no-repeat",
         backgroundPosition: "right 14px center",
         paddingRight: "38px",
-        color: value ? "#3B0764" : "#B39DCA",
+        color: value ? "#1b1b1e" : "#777587",
       }}
     >
       <option value="">{placeholder}</option>
@@ -334,7 +334,7 @@ export function SignupClient() {
   return (
     <div className="min-h-screen flex font-sans bg-gradient-partner-soft">
       {/* ---- LEFT SIDEBAR ---- */}
-      <aside className="hidden lg:flex w-[296px] min-w-[296px] flex-col sticky top-0 h-screen overflow-hidden relative bg-gradient-partner shadow-[4px_0_32px_rgba(147,51,234,0.18)]">
+      <aside className="hidden lg:flex w-[296px] min-w-[296px] flex-col sticky top-0 h-screen overflow-hidden relative bg-gradient-partner shadow-[4px_0_32px_rgba(77,65,223,0.18)]">
         <Blossoms />
 
         {/* Brand */}
@@ -372,7 +372,7 @@ export function SignupClient() {
                         : cur
                         ? "#fff"
                         : "rgba(255,255,255,0.18)",
-                      color: done || cur ? "#9333EA" : "rgba(255,255,255,0.5)",
+                      color: done || cur ? "#4d41df" : "rgba(255,255,255,0.5)",
                       boxShadow: cur ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
                     }}
                   >
@@ -429,9 +429,9 @@ export function SignupClient() {
               className="w-[46px] h-[46px] rounded-xl shrink-0 flex items-center justify-center text-sm font-bold transition-all duration-300"
               style={{
                 background: preview.orgName
-                  ? "linear-gradient(135deg, #F3D0FF, #C084FC)"
+                  ? "linear-gradient(135deg, #e3dfff, #7a71ff)"
                   : "rgba(255,255,255,0.15)",
-                color: preview.orgName ? "#9333EA" : "rgba(255,255,255,0.35)",
+                color: preview.orgName ? "#4d41df" : "rgba(255,255,255,0.35)",
                 fontSize: preview.orgName ? "15px" : "20px",
               }}
             >
@@ -797,7 +797,7 @@ function StepNav({
             style={{
               height: "8px",
               width: i === step ? "24px" : "8px",
-              background: i === step ? "#9333EA" : i < step ? "#C084FC" : "#E9D5FF",
+              background: i === step ? "#4d41df" : i < step ? "#7a71ff" : "#e3dfff",
             }}
           />
         ))}

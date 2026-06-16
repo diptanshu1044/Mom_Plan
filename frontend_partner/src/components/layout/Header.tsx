@@ -54,7 +54,7 @@ export function Header({ title, description, action }: HeaderProps) {
         {/* Notifications */}
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="w-5 h-5" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-pink-500 rounded-full border-2 border-white" />
+          <span className="absolute top-2 right-2 w-2 h-2 bg-primary-500 rounded-full border-2 border-white" />
         </Button>
 
         {/* Avatar */}

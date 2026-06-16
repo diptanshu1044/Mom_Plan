@@ -138,7 +138,7 @@ export function LoginClient() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email address <span className="text-pink-500">*</span></Label>
+              <Label htmlFor="email">Email address <span className="text-primary-500">*</span></Label>
               <Input
                 id="email"
                 type="email"
@@ -154,7 +154,7 @@ export function LoginClient() {
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password <span className="text-pink-500">*</span></Label>
+                <Label htmlFor="password">Password <span className="text-primary-500">*</span></Label>
                 <Link
                   href="/forgot-password"
                   className="text-xs text-primary hover:underline font-medium"

@@ -28,7 +28,7 @@ interface CasesAreaChartProps {
 
 export function CasesAreaChart({
   data,
-  color = "#9333EA",
+  color = "#4d41df",
   height = 220,
 }: CasesAreaChartProps) {
   const formatted = data.map((d) => ({
@@ -45,16 +45,16 @@ export function CasesAreaChart({
             <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#E9D5FF" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#e3dfff" vertical={false} />
         <XAxis
           dataKey="displayDate"
-          tick={{ fontSize: 11, fill: "#B39DCA", fontFamily: "Nunito" }}
+          tick={{ fontSize: 11, fill: "#777587", fontFamily: "Nunito" }}
           tickLine={false}
           axisLine={false}
           interval="preserveStartEnd"
         />
         <YAxis
-          tick={{ fontSize: 11, fill: "#B39DCA", fontFamily: "Nunito" }}
+          tick={{ fontSize: 11, fill: "#777587", fontFamily: "Nunito" }}
           tickLine={false}
           axisLine={false}
           allowDecimals={false}
@@ -62,13 +62,13 @@ export function CasesAreaChart({
         <Tooltip
           contentStyle={{
             background: "#fff",
-            border: "1.5px solid #E9D5FF",
+            border: "1.5px solid #e3dfff",
             borderRadius: "12px",
             padding: "8px 12px",
-            boxShadow: "0 8px 24px rgba(147,51,234,0.12)",
+            boxShadow: "0 8px 24px rgba(77, 65, 223, 0.12)",
             fontSize: "13px",
             fontFamily: "Nunito, sans-serif",
-            color: "#3B0764",
+            color: "#1b1b1e",
           }}
           labelStyle={{ fontWeight: 700, marginBottom: 2 }}
           itemStyle={{ color: color }}
@@ -96,7 +96,7 @@ const STATUS_COLORS: Record<string, string> = {
   open: "#10B981",
   in_progress: "#3B82F6",
   pending: "#F59E0B",
-  closed: "#9333EA",
+  closed: "#4d41df",
   cancelled: "#EF4444",
 };
 
@@ -108,16 +108,16 @@ export function CasesStatusChart({ data, height = 180 }: { data: StatusBarItem[]
         margin={{ top: 4, right: 4, left: -24, bottom: 0 }}
         barSize={32}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#E9D5FF" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#e3dfff" vertical={false} />
         <XAxis
           dataKey="status"
-          tick={{ fontSize: 11, fill: "#B39DCA", fontFamily: "Nunito" }}
+          tick={{ fontSize: 11, fill: "#777587", fontFamily: "Nunito" }}
           tickLine={false}
           axisLine={false}
           tickFormatter={(v) => v.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
         />
         <YAxis
-          tick={{ fontSize: 11, fill: "#B39DCA", fontFamily: "Nunito" }}
+          tick={{ fontSize: 11, fill: "#777587", fontFamily: "Nunito" }}
           tickLine={false}
           axisLine={false}
           allowDecimals={false}
@@ -125,19 +125,19 @@ export function CasesStatusChart({ data, height = 180 }: { data: StatusBarItem[]
         <Tooltip
           contentStyle={{
             background: "#fff",
-            border: "1.5px solid #E9D5FF",
+            border: "1.5px solid #e3dfff",
             borderRadius: "12px",
             padding: "8px 12px",
             fontSize: "13px",
             fontFamily: "Nunito, sans-serif",
-            color: "#3B0764",
+            color: "#1b1b1e",
           }}
         />
         <Bar dataKey="count" radius={[6, 6, 0, 0]}>
           {data.map((entry) => (
             <Cell
               key={entry.status}
-              fill={STATUS_COLORS[entry.status] ?? "#9333EA"}
+              fill={STATUS_COLORS[entry.status] ?? "#4d41df"}
             />
           ))}
         </Bar>

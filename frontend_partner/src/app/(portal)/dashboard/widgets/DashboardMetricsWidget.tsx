@@ -54,7 +54,7 @@ export function DashboardMetricsWidget() {
       value: formatNumber(data.total_mothers_served, true),
       subtitle: `+${data.new_mothers_this_month} this month`,
       icon: Users,
-      iconBg: "bg-gradient-to-br from-pink-400 to-pink-600",
+      iconBg: "bg-gradient-to-br from-primary-400 to-primary-600",
       trend: { value: 8, label: "vs last month" },
       badge: "Mothers",
     },

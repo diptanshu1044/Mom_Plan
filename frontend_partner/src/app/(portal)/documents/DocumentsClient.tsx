@@ -34,7 +34,7 @@ const TYPE_COLORS: Record<DocumentType, string> = {
   consent: "bg-green-100 text-green-700",
   referral_letter: "bg-partner-100 text-partner-700",
   intake_form: "bg-orange-100 text-orange-700",
-  assessment: "bg-pink-100 text-pink-700",
+  assessment: "bg-primary-100 text-primary-700",
   other: "bg-gray-100 text-gray-700",
 };
 

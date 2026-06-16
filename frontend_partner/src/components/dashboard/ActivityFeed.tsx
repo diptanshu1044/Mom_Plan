@@ -24,7 +24,7 @@ const ICON_BG = {
   case: "bg-partner-100 text-partner-600",
   referral: "bg-blue-100 text-blue-600",
   document: "bg-green-100 text-green-600",
-  mother: "bg-pink-100 text-pink-600",
+  mother: "bg-primary-100 text-primary-600",
 };
 
 interface ActivityFeedProps {
