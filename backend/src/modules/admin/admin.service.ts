@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { joinFullName, userNameSelect } from '../../utils/name.utils';
 import { NotFoundError } from '../../utils/errors';
 import { sendEmail } from '../../config/email';
 import { UserRole, UserStatus, ApplicationStatus, ApplicationPriority } from '@prisma/client';
@@ -19,7 +20,9 @@ export class AdminService {
 
     if (filters.search) {
       whereClause.OR = [
-        { full_name: { contains: filters.search, mode: 'insensitive' } },
+        { first_name: { contains: filters.search, mode: 'insensitive' } },
+        { middle_name: { contains: filters.search, mode: 'insensitive' } },
+        { last_name: { contains: filters.search, mode: 'insensitive' } },
         { email: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
@@ -38,7 +41,7 @@ export class AdminService {
         select: {
           id: true,
           email: true,
-          full_name: true,
+          ...userNameSelect,
           phone: true,
           role: true,
           plan: true,
@@ -101,7 +104,7 @@ export class AdminService {
       select: {
         id: true,
         email: true,
-        full_name: true,
+        ...userNameSelect,
         status: true,
       },
     });
@@ -138,9 +141,9 @@ export class AdminService {
     return prisma.application.findMany({
       where: whereClause,
       include: {
-        user: { select: { full_name: true, email: true } },
+        user: { select: { ...userNameSelect, email: true } },
         program: { select: { name: true, agency: true } },
-        assigned_admin: { select: { full_name: true } },
+        assigned_admin: { select: userNameSelect },
       },
       orderBy: [{ priority: 'desc' }, { last_updated_at: 'desc' }],
     });
@@ -176,7 +179,7 @@ export class AdminService {
     const updated = await prisma.application.update({
       where: { id },
       data: updatePayload,
-      include: { program: true, user: true, assigned_admin: { select: { full_name: true } } },
+      include: { program: true, user: true, assigned_admin: { select: userNameSelect } },
     });
 
     // Audit log
@@ -210,7 +213,7 @@ export class AdminService {
         to: updated.user.email,
         subject: `MomPlan Application Update: ${programName}`,
         html: `<h1>Application Status Update</h1>
-        <p>Hello ${updated.user.full_name},</p>
+        <p>Hello ${joinFullName(updated.user.first_name, updated.user.middle_name, updated.user.last_name)},</p>
         <p>${statusMsg}</p>
         ${updated.notes ? `<p><strong>Admin Notes:</strong> ${updated.notes}</p>` : ''}
         <p>Please log in to your dashboard to complete any required tasks.</p>`,
@@ -318,7 +321,7 @@ export class AdminService {
   async listAuditLogs() {
     return prisma.auditLog.findMany({
       include: {
-        admin: { select: { full_name: true, email: true } },
+        admin: { select: { ...userNameSelect, email: true } },
       },
       orderBy: { created_at: 'desc' },
       take: 100,
@@ -328,7 +331,7 @@ export class AdminService {
   async listAllPdfs() {
     return prisma.generatedPdf.findMany({
       include: {
-        user: { select: { full_name: true, email: true } },
+        user: { select: { ...userNameSelect, email: true } },
         program: { select: { name: true, agency: true } },
       },
       orderBy: { generated_at: 'desc' },

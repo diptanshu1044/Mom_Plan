@@ -19,6 +19,7 @@ import {
   type BillingInterval,
   type OrgPlanId,
 } from './billing.plans';
+import { formatUserName } from '../../utils/name.utils';
 
 export type BillingRedirectUrls = {
   successUrl: string;
@@ -74,12 +75,19 @@ export class BillingService {
     });
   }
 
-  private async ensureStripeCustomer(user: { id: string; email: string; full_name: string; stripe_customer_id: string | null }) {
+  private async ensureStripeCustomer(user: {
+    id: string;
+    email: string;
+    first_name: string;
+    middle_name?: string | null;
+    last_name: string;
+    stripe_customer_id: string | null;
+  }) {
     if (user.stripe_customer_id) return user.stripe_customer_id;
 
     const customer = await stripe.customers.create({
       email: user.email,
-      name: user.full_name,
+      name: formatUserName(user),
       metadata: { userId: user.id },
     });
 
@@ -477,7 +485,7 @@ export class BillingService {
       to: user.email,
       subject: 'MomPlan Subscription Cancellation Scheduled',
       html: `<h1>Cancellation Confirmed</h1>
-      <p>Hello ${user.full_name}, your subscription has been set to cancel at the end of your current billing period.</p>
+      <p>Hello ${formatUserName(user)}, your subscription has been set to cancel at the end of your current billing period.</p>
       <p>You will continue to have full access until <strong>${periodEnd.toLocaleDateString()}</strong>. No further charges will be made.</p>
       <p>You can reactivate anytime before that date from your billing settings.</p>`,
     });
@@ -717,7 +725,7 @@ export class BillingService {
     const plan = (subscription.metadata?.plan as UserPlan) || user.plan;
 
     if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
-      await this.downgradeUser(user.id, user.email, user.full_name);
+      await this.downgradeUser(user.id, user.email, formatUserName(user));
       return;
     }
 
@@ -736,7 +744,7 @@ export class BillingService {
       data: { status: 'canceled' },
     });
 
-    await this.downgradeUser(user.id, user.email, user.full_name);
+    await this.downgradeUser(user.id, user.email, formatUserName(user));
   }
 
   private async handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
@@ -827,7 +835,7 @@ export class BillingService {
       to: user.email,
       subject: 'MomPlan Payment Failed',
       html: `<h1>Payment Failed</h1>
-      <p>Hello ${user.full_name}, we were unable to process your recent subscription payment.</p>
+      <p>Hello ${formatUserName(user)}, we were unable to process your recent subscription payment.</p>
       <p>Please update your payment method in your billing settings to keep your plan active.</p>`,
     });
   }

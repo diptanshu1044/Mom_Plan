@@ -16,6 +16,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { StatusBadge } from "@/components/ui/Badge";
 import { TopBar } from "@/components/layout/TopBar";
 import { formatRelativeDate, formatDate, slugToTitle } from "@/lib/utils";
+import { formatUserName, userInitials } from "@/lib/name";
 
 const PIE_COLORS = ["#6d47fc", "#8b72ff", "#ab9fff", "#06d6a0", "#fbbf24", "#fb7185"];
 
@@ -320,10 +321,10 @@ export default function DashboardPage() {
               {(recentUsers || []).map((u: any) => (
                 <li key={u.id} className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-brand-500/15 text-brand-400 flex items-center justify-center text-xs font-bold shrink-0">
-                    {u.full_name?.charAt(0)}
+                    {userInitials(u)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">{u.full_name}</div>
+                    <div className="text-sm font-medium text-white truncate">{formatUserName(u)}</div>
                     <div className="text-xs text-slate-500 truncate">{u.email}</div>
                   </div>
                   <StatusBadge status={u.status} />
@@ -363,7 +364,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-white truncate">
-                      {app.user?.full_name}
+                      {formatUserName(app.user)}
                     </div>
                     <div className="text-xs text-slate-500 truncate">{app.program?.name}</div>
                   </div>

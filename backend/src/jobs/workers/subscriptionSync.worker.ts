@@ -3,6 +3,7 @@ import { prisma } from '../../config/prisma';
 import { stripe } from '../../config/stripe';
 import { sendEmail } from '../../config/email';
 import { isMockStripeMode } from '../../modules/billing/billing.plans';
+import { formatUserName } from '../../utils/name.utils';
 
 export const runSubscriptionSyncTask = async () => {
   try {
@@ -54,7 +55,7 @@ export const runSubscriptionSyncTask = async () => {
             to: user.email,
             subject: 'MomPlan Subscription Update',
             html: `<h1>Subscription Deactivated</h1>
-            <p>Hello ${user.full_name},</p>
+            <p>Hello ${formatUserName(user)},</p>
             <p>We were unable to verify an active status for your subscription. Your account has been moved to the Community plan.</p>
             <p>You can review or update your payment credentials via your dashboard anytime.</p>`,
           });

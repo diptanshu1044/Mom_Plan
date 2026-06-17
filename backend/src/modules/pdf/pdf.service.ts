@@ -8,6 +8,7 @@ import { getQuarterForMonth } from '../programs/quarterDueDates.service';
 import { Quarter } from '../programs/quarterDueDates.types';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getPresignedDownloadUrl } from '../../config/s3';
+import { hasUserName, joinFullName, userNameSelect } from '../../utils/name.utils';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -76,7 +77,7 @@ export class PdfService {
     const missing_optional_documents: string[] = [];
 
     const checkField = (field: string): boolean => {
-      if (field === 'full_name') return !!user.full_name;
+      if (field === 'full_name') return hasUserName(user);
       if (!profile) return false;
       if (field === 'date_of_birth') return !!profile.date_of_birth;
       if (field === 'address') return !!(profile.street_address && profile.city && profile.state && profile.zip_code);
@@ -128,7 +129,7 @@ export class PdfService {
     }
 
     const is_valid = missing_required_fields.length === 0 && missing_required_documents.length === 0;
-    const can_generate = !!user.full_name;
+    const can_generate = hasUserName(user);
 
     return {
       is_valid,
@@ -161,6 +162,8 @@ export class PdfService {
     const profile = user.family_profile;
     const program = await prisma.benefitProgram.findUnique({ where: { id: programId } });
     if (!program) throw new Error('Benefit program not found.');
+
+    const displayName = joinFullName(user.first_name, user.middle_name, user.last_name);
 
     const eligibilityResult = await prisma.eligibilityResult.findUnique({
       where: { user_id_program_id: { user_id: userId, program_id: programId } },
@@ -293,7 +296,7 @@ Write the eligibility summary for this applicant's application packet.`;
       const boxY = 380;
       doc.roundedRect(50, boxY, 512, 130, 8).lineWidth(1).stroke('#E2E8F0');
       doc.font('Helvetica-Bold').fontSize(10).fillColor(darkColor).text('APPLICANT PORTFOLIO SUMMARY', 70, boxY + 15);
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(slateColor).text('Applicant Name:', 70, boxY + 35).font('Helvetica').fillColor(darkColor).text(user.full_name, 190, boxY + 35);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(slateColor).text('Applicant Name:', 70, boxY + 35).font('Helvetica').fillColor(darkColor).text(displayName, 190, boxY + 35);
       doc.font('Helvetica-Bold').fontSize(9).fillColor(slateColor).text('Submission Date:', 70, boxY + 55).font('Helvetica').fillColor(darkColor).text(this.formatDate(new Date()), 190, boxY + 55);
       doc.font('Helvetica-Bold').fontSize(9).fillColor(slateColor).text('Verification ID:', 70, boxY + 75).font('Helvetica').fillColor(darkColor).text(uuid, 190, boxY + 75);
 
@@ -325,7 +328,7 @@ Write the eligibility summary for this applicant's application packet.`;
 
       // ── Section 1 — Applicant Summary ─────────────────────────────────────
       drawSectionHeader('Section 1 — Applicant Summary');
-      drawRow('Full Name:', user.full_name);
+      drawRow('Full Name:', displayName);
       drawRow('Date of Birth:', this.formatDate(profile.date_of_birth));
       drawRow('Address:', `${profile.street_address || ''}, ${profile.city || ''}, ${profile.state || ''} ${profile.zip_code || ''}`);
       drawRow('Phone:', user.phone || 'N/A');
@@ -570,7 +573,7 @@ Write the eligibility summary for this applicant's application packet.`;
       doc.text('Applicant Signature', 50, sigY + 18);
       doc.text('Date', 400, sigY + 18);
       doc.moveDown(1.2);
-      doc.font('Helvetica-Bold').fontSize(8.5).text('Printed Name: ', { continued: true }).font('Helvetica').text(user.full_name);
+      doc.font('Helvetica-Bold').fontSize(8.5).text('Printed Name: ', { continued: true }).font('Helvetica').text(displayName);
       doc.moveDown(0.8);
       doc.fontSize(7.5).fillColor(slateColor).text(`Prepared on behalf of applicant by MomPlan Application System.`, { align: 'center' });
       doc.text(`This document was generated on ${this.formatDate(new Date())} and is valid for submission.`, { align: 'center' });
@@ -990,7 +993,7 @@ Write the eligibility summary for this applicant's application packet.`;
       return prisma.generatedPdf.findMany({
         where,
         include: {
-          user: { select: { full_name: true, email: true } },
+          user: { select: { ...userNameSelect, email: true } },
           program: { select: { name: true, agency: true } },
         },
         orderBy: { generated_at: 'desc' },

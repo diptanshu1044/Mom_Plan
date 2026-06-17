@@ -10,7 +10,8 @@ import {
 import { api } from "@/lib/api";
 import { TopBar } from "@/components/layout/TopBar";
 import { StatusBadge, PlanBadge, RoleBadge } from "@/components/ui/Badge";
-import { formatDate, getInitials } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import { formatUserName, userInitials } from "@/lib/name";
 
 export default function UsersPage() {
   const [page, setPage] = useState(1);
@@ -131,10 +132,10 @@ export default function UsersPage() {
                         <td>
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg bg-brand-500/15 text-brand-400 flex items-center justify-center text-sm font-bold shrink-0">
-                              {getInitials(user.full_name)}
+                              {userInitials(user)}
                             </div>
                             <div>
-                              <div className="font-semibold text-white text-sm">{user.full_name}</div>
+                              <div className="font-semibold text-white text-sm">{formatUserName(user)}</div>
                               <div className="text-xs text-slate-500">{user.email}</div>
                             </div>
                           </div>

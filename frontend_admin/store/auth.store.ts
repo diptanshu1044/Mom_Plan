@@ -5,7 +5,9 @@ import { api, clearInMemoryToken, setInMemoryToken } from "../lib/api";
 export interface AdminUser {
   id: string;
   email: string;
-  full_name: string;
+  first_name: string;
+  middle_name?: string | null;
+  last_name: string;
   role: "admin" | "counselor" | "user";
   plan: "free" | "family" | "navigator";
 }

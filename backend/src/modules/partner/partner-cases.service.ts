@@ -7,6 +7,7 @@ import {
   OrgAccessContext,
   isOrgAdmin,
 } from './partner-access';
+import { formatUserName, hasUserName } from '../../utils/name.utils';
 
 const PROGRAM_SHORT: Record<string, string> = {
   snap: 'SNAP',
@@ -83,13 +84,18 @@ function currentQuarter(): string {
 }
 
 async function resolveMotherName(mother: {
-  user?: { full_name: string; family_profile?: { first_name: string | null; last_name: string | null } | null } | null;
+  user?: {
+    first_name: string;
+    middle_name?: string | null;
+    last_name: string;
+    family_profile?: { first_name: string | null; last_name: string | null } | null;
+  } | null;
 }): Promise<string> {
   const fp = mother.user?.family_profile;
   if (fp?.first_name || fp?.last_name) {
     return [fp.first_name, fp.last_name].filter(Boolean).join(' ');
   }
-  if (mother.user?.full_name) return mother.user.full_name;
+  if (hasUserName(mother.user)) return formatUserName(mother.user);
   return 'Unknown Mother';
 }
 
@@ -207,7 +213,6 @@ export class PartnerCasesService {
     });
     if (!caseworker) throw new BadRequestError('Invalid caseworker');
 
-    const fullName = `${input.first_name.trim()} ${input.last_name.trim()}`;
     const email =
       input.email?.trim() ||
       `intake+${randomUUID().slice(0, 8)}@intake.momplan.internal`;
@@ -219,7 +224,8 @@ export class PartnerCasesService {
       const user = await tx.user.create({
         data: {
           email,
-          full_name: fullName,
+          first_name: input.first_name.trim(),
+          last_name: input.last_name.trim(),
           password_hash: '',
         },
       });

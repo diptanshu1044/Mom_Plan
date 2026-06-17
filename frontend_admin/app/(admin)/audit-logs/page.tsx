@@ -6,6 +6,7 @@ import { ScrollText, User, ExternalLink } from "lucide-react";
 import { api } from "@/lib/api";
 import { TopBar } from "@/components/layout/TopBar";
 import { formatDatetime, slugToTitle } from "@/lib/utils";
+import { formatUserName, userInitials } from "@/lib/name";
 
 export default function AuditLogsPage() {
   const { data: logs, isLoading } = useQuery({
@@ -52,10 +53,10 @@ export default function AuditLogsPage() {
                         <td>
                           <div className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-md bg-brand-500/15 text-brand-400 flex items-center justify-center text-[10px] font-bold shrink-0">
-                              {log.admin?.full_name?.charAt(0)}
+                              {userInitials(log.admin)}
                             </div>
                             <div>
-                              <div className="text-sm text-white">{log.admin?.full_name}</div>
+                              <div className="text-sm text-white">{formatUserName(log.admin)}</div>
                               <div className="text-xs text-slate-600">{log.admin?.email}</div>
                             </div>
                           </div>

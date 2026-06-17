@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { userNameSelect } from '../../utils/name.utils';
 import { s3Client } from '../../config/s3';
 import { env } from '../../config/env';
 import { PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -171,7 +172,7 @@ export class DocumentsService {
     if (role === 'admin' || role === 'counselor') {
       return prisma.document.findMany({
         include: {
-          user: { select: { full_name: true, email: true } },
+          user: { select: { ...userNameSelect, email: true } },
           application: { include: { program: { select: { name: true } } } },
         },
         orderBy: { uploaded_at: 'desc' },

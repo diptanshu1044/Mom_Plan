@@ -76,8 +76,16 @@ export default function SettingsPage() {
           </h3>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Full Name</label>
-              <input type="text" defaultValue={user?.full_name} className="input" readOnly />
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">First Name</label>
+              <input type="text" defaultValue={user?.first_name ?? ""} className="input" readOnly />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Middle Name</label>
+              <input type="text" defaultValue={user?.middle_name ?? ""} className="input" readOnly />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Last Name</label>
+              <input type="text" defaultValue={user?.last_name ?? ""} className="input" readOnly />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Email</label>

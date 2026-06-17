@@ -2,14 +2,17 @@ import { prisma } from '../../config/prisma';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors';
 import { sendEmail } from '../../config/email';
 import { UserRole } from '@prisma/client';
+import { formatUserName, userNameSelect } from '../../utils/name.utils';
+
+const userNameEmailSelect = { ...userNameSelect, email: true } as const;
 
 export class SessionsService {
   async listSessions(userId: string, role: UserRole) {
     if (role === 'admin') {
       return prisma.counselorSession.findMany({
         include: {
-          user: { select: { full_name: true, email: true } },
-          counselor: { select: { full_name: true, email: true } },
+          user: { select: userNameEmailSelect },
+          counselor: { select: userNameEmailSelect },
         },
         orderBy: { scheduled_at: 'asc' },
       });
@@ -19,7 +22,7 @@ export class SessionsService {
       return prisma.counselorSession.findMany({
         where: { counselor_id: userId },
         include: {
-          user: { select: { full_name: true, email: true } },
+          user: { select: userNameEmailSelect },
         },
         orderBy: { scheduled_at: 'asc' },
       });
@@ -29,7 +32,7 @@ export class SessionsService {
     return prisma.counselorSession.findMany({
       where: { user_id: userId },
       include: {
-        counselor: { select: { full_name: true, email: true } },
+        counselor: { select: userNameEmailSelect },
       },
       orderBy: { scheduled_at: 'asc' },
     });
@@ -73,7 +76,7 @@ export class SessionsService {
         meeting_url,
       },
       include: {
-        counselor: { select: { full_name: true, email: true } },
+        counselor: { select: userNameEmailSelect },
       },
     });
 
@@ -84,13 +87,16 @@ export class SessionsService {
       hour: '2-digit', minute: '2-digit', hour12: true,
     });
 
+    const userName = formatUserName(user);
+    const counselorName = formatUserName(session.counselor);
+
     // Create DB notification
     await prisma.notification.create({
       data: {
         user_id: userId,
         type: 'system',
         title: 'Counselor Session Confirmed',
-        message: `Your session with ${session.counselor.full_name} is scheduled for ${formattedDate} at ${formattedTime}.`,
+        message: `Your session with ${counselorName} is scheduled for ${formattedDate} at ${formattedTime}.`,
         action_url: meeting_url,
       },
     });
@@ -105,13 +111,13 @@ export class SessionsService {
             <h1 style="color: white; margin: 0; font-size: 24px;">Session Confirmed! 🎉</h1>
           </div>
           <div style="background: white; padding: 32px; border-radius: 0 0 12px 12px; border: 1px solid #E5E7EB; border-top: none;">
-            <p style="color: #374151;">Hello <strong>${user.full_name}</strong>,</p>
-            <p style="color: #374151;">Your one-on-one consultation with certified benefits advisor <strong>${session.counselor.full_name}</strong> has been confirmed.</p>
+            <p style="color: #374151;">Hello <strong>${userName}</strong>,</p>
+            <p style="color: #374151;">Your one-on-one consultation with certified benefits advisor <strong>${counselorName}</strong> has been confirmed.</p>
             <div style="background: #F3F4F6; border-radius: 8px; padding: 20px; margin: 24px 0;">
               <p style="margin: 0 0 8px 0; color: #6B7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Session Details</p>
               <p style="margin: 0 0 4px 0; color: #111827; font-weight: bold;">📅 ${formattedDate}</p>
               <p style="margin: 0 0 4px 0; color: #111827;">🕐 ${formattedTime} (${data.duration_minutes} minutes)</p>
-              <p style="margin: 0; color: #111827;">👩‍💼 Advisor: ${session.counselor.full_name}</p>
+              <p style="margin: 0; color: #111827;">👩‍💼 Advisor: ${counselorName}</p>
             </div>
             <div style="background: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 8px; padding: 20px; margin: 24px 0;">
               <p style="margin: 0 0 12px 0; color: #4338CA; font-weight: bold;">🎥 Join Your Video Session</p>
@@ -138,10 +144,10 @@ export class SessionsService {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #6D47FC;">New Session Booking</h2>
-          <p>Hello <strong>${session.counselor.full_name}</strong>,</p>
-          <p>You have a new session booked with <strong>${user.full_name}</strong>.</p>
+          <p>Hello <strong>${counselorName}</strong>,</p>
+          <p>You have a new session booked with <strong>${userName}</strong>.</p>
           <div style="background: #F3F4F6; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <p style="margin: 0 0 4px 0;"><strong>Client:</strong> ${user.full_name} (${user.email})</p>
+            <p style="margin: 0 0 4px 0;"><strong>Client:</strong> ${userName} (${user.email})</p>
             <p style="margin: 0 0 4px 0;"><strong>Date:</strong> ${formattedDate}</p>
             <p style="margin: 0 0 4px 0;"><strong>Time:</strong> ${formattedTime} (${data.duration_minutes} min)</p>
             ${data.notes ? `<p style="margin: 0;"><strong>Client Notes:</strong> ${data.notes}</p>` : ''}
@@ -193,20 +199,22 @@ export class SessionsService {
       const formattedDate = existing.scheduled_at.toLocaleDateString('en-US', {
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
       });
+      const counselorName = formatUserName(existing.counselor);
+      const userName = formatUserName(existing.user);
 
       await prisma.notification.create({
         data: {
           user_id: existing.user_id,
           type: 'system',
           title: 'Session Cancelled',
-          message: `Your session with ${existing.counselor.full_name} scheduled for ${formattedDate} has been cancelled.`,
+          message: `Your session with ${counselorName} scheduled for ${formattedDate} has been cancelled.`,
         },
       });
 
       await sendEmail({
         to: existing.user.email,
         subject: 'MomPlan: Session Cancelled',
-        html: `<p>Hello ${existing.user.full_name},</p><p>Your session with ${existing.counselor.full_name} on <strong>${formattedDate}</strong> has been cancelled.</p><p>You can book a new session from your MomPlan dashboard.</p>`,
+        html: `<p>Hello ${userName},</p><p>Your session with ${counselorName} on <strong>${formattedDate}</strong> has been cancelled.</p><p>You can book a new session from your MomPlan dashboard.</p>`,
       });
     }
 

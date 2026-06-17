@@ -458,11 +458,12 @@ async function seedPartnerOrg() {
 
     await prisma.user.upsert({
       where: { email: `${m.first.toLowerCase()}.demo@momplan.test` },
-      update: { full_name: `${m.first} ${m.last}` },
+      update: { first_name: m.first, last_name: m.last },
       create: {
         id: m.userId,
         email: `${m.first.toLowerCase()}.demo@momplan.test`,
-        full_name: `${m.first} ${m.last}`,
+        first_name: m.first,
+        last_name: m.last,
         password_hash: '',
       },
     });

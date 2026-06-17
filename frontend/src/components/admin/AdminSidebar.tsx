@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
+import { formatUserName, userInitials } from "@/lib/name";
 import { api } from "@/lib/api";
 
 const adminNav = [
@@ -78,10 +79,10 @@ export function AdminSidebar() {
       <div className="p-3 border-t border-slate-800">
         <div className="flex items-center gap-3 px-2 py-2 mb-1">
           <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-sm">
-            {user?.full_name?.charAt(0) || "A"}
+            {userInitials(user) || "A"}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-white truncate">{user?.full_name}</div>
+            <div className="text-sm font-medium text-white truncate">{formatUserName(user)}</div>
             <div className="flex items-center gap-1">
               <Shield className="w-3 h-3 text-primary-400" />
               <span className="text-xs text-primary-400">System Admin</span>

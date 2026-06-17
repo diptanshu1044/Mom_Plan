@@ -1,6 +1,7 @@
 import { env } from '../../config/env';
 import { prisma } from '../../config/prisma';
 import { sendEmail } from '../../config/email';
+import { formatUserName } from '../../utils/name.utils';
 
 export const runRenewalCheckTask = async () => {
   try {
@@ -51,7 +52,7 @@ export const runRenewalCheckTask = async () => {
         to: app.user.email,
         subject: `MomPlan Recertification Notice: ${programName}`,
         html: `<h1>Annual Benefit Renewal Required</h1>
-        <p>Hello ${app.user.full_name},</p>
+        <p>Hello ${formatUserName(app.user)},</p>
         <p>${msg}</p>
         <p>Government benefit agencies typically require updated income verification every 12 months to maintain active benefits.</p>
         <p>Please log into your dashboard to start the recertification flow and prevent potential coverage lapses.</p>`,

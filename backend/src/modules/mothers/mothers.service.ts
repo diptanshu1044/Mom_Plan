@@ -6,10 +6,13 @@ import {
   OrgAccessContext,
 } from '../partner/partner-access';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
+import { formatUserName, hasUserName } from '../../utils/name.utils';
 
 async function resolveMotherName(mother: {
   user?: {
-    full_name: string;
+    first_name: string;
+    middle_name?: string | null;
+    last_name: string;
     email: string;
     family_profile?: { first_name: string | null; last_name: string | null } | null;
   } | null;
@@ -18,7 +21,7 @@ async function resolveMotherName(mother: {
   if (fp?.first_name || fp?.last_name) {
     return [fp.first_name, fp.last_name].filter(Boolean).join(' ');
   }
-  if (mother.user?.full_name) return mother.user.full_name;
+  if (hasUserName(mother.user)) return formatUserName(mother.user);
   return 'Unknown Mother';
 }
 
@@ -31,7 +34,9 @@ function mapMotherRow(
     caseworker: { id: string; full_name: string } | null;
     user: {
       email: string;
-      full_name: string;
+      first_name: string;
+      middle_name?: string | null;
+      last_name: string;
       family_profile?: { first_name: string | null; last_name: string | null; email: string | null } | null;
     } | null;
   },

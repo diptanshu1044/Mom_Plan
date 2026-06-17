@@ -1,6 +1,7 @@
 import { env } from '../../config/env';
 import { prisma } from '../../config/prisma';
 import { sendEmail } from '../../config/email';
+import { formatUserName } from '../../utils/name.utils';
 
 export const runDeadlineReminderTask = async () => {
   try {
@@ -58,7 +59,7 @@ export const runDeadlineReminderTask = async () => {
           to: deadline.user.email,
           subject: `MomPlan Reminder: Deadline in ${interval.days} Day(s)`,
           html: `<h1>Upcoming Application Deadline</h1>
-          <p>Hello ${deadline.user.full_name},</p>
+          <p>Hello ${formatUserName(deadline.user)},</p>
           <p>${msg}</p>
           <p>Please log into your dashboard to complete your pending tasks before the deadline closes.</p>`,
         });

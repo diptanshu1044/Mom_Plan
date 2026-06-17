@@ -19,7 +19,8 @@ import {
   Shield,
   ChevronDown,
 } from "lucide-react";
-import { cn, getInitials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { formatUserName, userInitials } from "@/lib/name";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 
@@ -130,11 +131,11 @@ export function Sidebar() {
       <div className="p-3 border-t border-slate-800/60">
         <div className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-slate-800/40 transition-colors cursor-pointer group mb-1">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow">
-            {getInitials(user?.full_name)}
+            {userInitials(user)}
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-white truncate">
-              {user?.full_name || "Admin"}
+              {formatUserName(user) || "Admin"}
             </div>
             <div className="flex items-center gap-1">
               <Shield className="w-3 h-3 text-brand-400" />

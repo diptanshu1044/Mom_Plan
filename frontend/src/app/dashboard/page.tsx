@@ -21,6 +21,7 @@ import { StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { formatCurrency, formatRelativeDate, getConfidenceColor } from "@/lib/utils";
+import { userFirstName } from "@/lib/name";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -140,7 +141,7 @@ export default function DashboardPage() {
         className="mb-8"
       >
         <h1 className="font-display font-bold text-2xl lg:text-3xl text-on-surface mb-1">
-          {greeting()}, {user?.full_name?.split(" ")[0]} 👋
+          {greeting()}, {userFirstName(user) || "there"} 👋
         </h1>
         <p className="text-on-surface-variant text-sm">
           {new Date().toLocaleDateString("en-US", {

@@ -523,8 +523,6 @@ export default function EligibilityPage() {
         updateUser(freshUser);
 
         const fp = freshUser?.family_profile;
-        const [first, ...rest] = (freshUser?.full_name || "").split(" ");
-        const last = rest.join(" ");
 
         const dobStr = (() => {
           if (!fp?.date_of_birth) return "";
@@ -539,8 +537,8 @@ export default function EligibilityPage() {
         while (initialDobs.length < numChildren) initialDobs.push("");
 
         setFormData({
-          first_name: fp?.first_name || first || "",
-          last_name: fp?.last_name || last || "",
+          first_name: freshUser?.first_name || fp?.first_name || "",
+          last_name: freshUser?.last_name || fp?.last_name || "",
           date_of_birth: dobStr,
           ssn_last_four: normalizeSsnLastFour(fp?.ssn_last_four),
           phone: freshUser?.phone || fp?.phone || "",
@@ -587,8 +585,6 @@ export default function EligibilityPage() {
         // Fallback to Zustand state if API fetch fails
         if (user) {
           const fp = user.family_profile;
-          const [first, ...rest] = (user.full_name || "").split(" ");
-          const last = rest.join(" ");
           const dobStr = (() => {
             if (!fp?.date_of_birth) return "";
             try {
@@ -601,8 +597,8 @@ export default function EligibilityPage() {
           while (initialDobs.length < numChildren) initialDobs.push("");
           setFormData(prev => ({
             ...prev,
-            first_name: fp?.first_name || first || "",
-            last_name: fp?.last_name || last || "",
+            first_name: user.first_name || fp?.first_name || "",
+            last_name: user.last_name || fp?.last_name || "",
             date_of_birth: dobStr,
             phone: user.phone || fp?.phone || "",
             email: user.email || fp?.email || "",
@@ -688,7 +684,6 @@ export default function EligibilityPage() {
       });
 
       const profileRes = await api.put("/api/user/profile", {
-        full_name: `${dataToSubmit.first_name} ${dataToSubmit.last_name}`.trim() || undefined,
         first_name: dataToSubmit.first_name || null,
         last_name: dataToSubmit.last_name || null,
         phone: dataToSubmit.phone || undefined,

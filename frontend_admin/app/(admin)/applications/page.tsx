@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { TopBar } from "@/components/layout/TopBar";
 import { StatusBadge, PriorityBadge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
+import { formatUserName } from "@/lib/name";
 
 const STATUSES = [
   { value: "", label: "All Statuses" },
@@ -113,7 +114,7 @@ export default function ApplicationsPage() {
                   : (applications || []).map((app: any) => (
                       <motion.tr key={app.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                         <td>
-                          <div className="font-medium text-white text-sm">{app.user?.full_name}</div>
+                          <div className="font-medium text-white text-sm">{formatUserName(app.user)}</div>
                           <div className="text-xs text-slate-500">{app.user?.email}</div>
                         </td>
                         <td>

@@ -13,6 +13,7 @@ import { Input, Select } from "@/components/ui/Input";
 import { StatusBadge } from "@/components/ui/Badge";
 import { api } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
+import { formatUserName } from "@/lib/name";
 
 const bookSchema = z.object({
   counselor_id: z.string().min(1, "Please select a counselor"),
@@ -160,7 +161,7 @@ export default function SessionsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-sm text-on-surface">
-                      Session with {session.counselor?.full_name || "Your Advisor"}
+                      Session with {formatUserName(session.counselor) || "Your Advisor"}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-on-surface-variant mt-0.5 flex-wrap">
                       <span className="flex items-center gap-1">
@@ -220,7 +221,7 @@ export default function SessionsPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm text-on-surface">
-                      {session.counselor?.full_name || "Advisor"}
+                      {formatUserName(session.counselor) || "Advisor"}
                     </div>
                     <div className="text-xs text-on-surface-variant">
                       {formatDate(session.scheduled_at)} · {session.duration_minutes} min
@@ -317,7 +318,7 @@ export default function SessionsPage() {
                   error={errors.counselor_id?.message}
                   options={(counselors || []).map((c: any) => ({
                     value: c.id,
-                    label: c.full_name,
+                    label: formatUserName(c),
                   }))}
                   required
                   {...register("counselor_id")}

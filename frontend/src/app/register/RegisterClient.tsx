@@ -21,7 +21,9 @@ import { getApiErrorMessage } from "@/lib/errors";
 
 const registerSchema = z
   .object({
-    full_name: z.string().min(2, "Full name must be at least 2 characters"),
+    first_name: z.string().trim().min(1, "First name is required"),
+    middle_name: z.string().trim().optional(),
+    last_name: z.string().trim().min(1, "Last name is required"),
     email: z.string().email("Invalid email address"),
     phone: z
       .string()
@@ -89,7 +91,9 @@ function RegisterForm() {
     setError("");
     try {
       const response = await api.post("/api/auth/register", {
-        full_name: data.full_name,
+        first_name: data.first_name,
+        middle_name: data.middle_name || undefined,
+        last_name: data.last_name,
         email: data.email,
         password: data.password,
         phone: data.phone ? `+1${data.phone}` : undefined,
@@ -165,14 +169,37 @@ function RegisterForm() {
             )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="First Name"
+                  type="text"
+                  placeholder="Maria"
+                  leftIcon={<User className="w-4 h-4" />}
+                  error={errors.first_name?.message}
+                  autoComplete="given-name"
+                  required
+                  {...register("first_name")}
+                />
+
+                <Input
+                  label="Last Name"
+                  type="text"
+                  placeholder="Johnson"
+                  error={errors.last_name?.message}
+                  autoComplete="family-name"
+                  required
+                  {...register("last_name")}
+                />
+              </div>
+
               <Input
-                label="Full Name"
+                label="Middle Name"
                 type="text"
-                placeholder="Maria Johnson"
-                leftIcon={<User className="w-4 h-4" />}
-                error={errors.full_name?.message}
-                autoComplete="name"
-                {...register("full_name")}
+                placeholder="Anne"
+                hint="Optional"
+                autoComplete="additional-name"
+                error={errors.middle_name?.message}
+                {...register("middle_name")}
               />
 
               <Input

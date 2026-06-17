@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
+import { formatUserName, userInitials } from "@/lib/name";
 import { PlanBadge } from "@/components/ui/Badge";
 import { api } from "@/lib/api";
 
@@ -204,12 +205,12 @@ export function DashboardSidebar() {
           collapsed ? "justify-center" : "gap-3"
         )}>
           <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold text-sm shrink-0">
-            {user?.full_name?.charAt(0) || "M"}
+            {userInitials(user) || "M"}
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-on-surface truncate">
-                {user?.full_name || "User"}
+                {formatUserName(user) || "User"}
               </div>
               <div className="text-xs text-on-surface-variant truncate">{user?.email}</div>
             </div>

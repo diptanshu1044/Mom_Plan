@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { FileText, Download, User, Calendar, Database, Shield, Eye } from "lucide-react";
 import { api } from "@/lib/api";
 import { TopBar } from "@/components/layout/TopBar";
+import { formatUserName } from "@/lib/name";
 import { formatDate } from "@/lib/utils";
 
 export default function PdfsPage() {
@@ -129,7 +130,7 @@ export default function PdfsPage() {
                           <User className="w-4 h-4 text-slate-500 shrink-0" />
                           <div>
                             <div className="font-semibold text-white text-sm">
-                              {pdf.user?.full_name}
+                              {formatUserName(pdf.user)}
                             </div>
                             <div className="text-xs text-slate-500">{pdf.user?.email}</div>
                           </div>

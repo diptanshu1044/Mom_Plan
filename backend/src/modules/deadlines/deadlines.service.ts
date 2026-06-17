@@ -1,4 +1,5 @@
 import { prisma } from '../../config/prisma';
+import { userNameSelect } from '../../utils/name.utils';
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
 import { UserRole } from '@prisma/client';
 import {
@@ -195,7 +196,7 @@ export class DeadlinesService {
       return prisma.deadline.findMany({
         include: {
           application: { include: { program: { select: { name: true } } } },
-          user: { select: { full_name: true, email: true } },
+          user: { select: { ...userNameSelect, email: true } },
         },
         orderBy: { due_date: 'asc' },
       });

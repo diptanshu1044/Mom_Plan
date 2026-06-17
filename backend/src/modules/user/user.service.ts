@@ -1,6 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { MotherOrgEnrollmentService } from '../partner/mother-org-enrollment.service';
+import { joinFullName, userNameSelect } from '../../utils/name.utils';
 
 const motherOrgEnrollment = new MotherOrgEnrollmentService();
 
@@ -40,7 +41,7 @@ export class UserService {
       select: {
         id: true,
         email: true,
-        full_name: true,
+        ...userNameSelect,
         phone: true,
         role: true,
         plan: true,
@@ -72,7 +73,7 @@ export class UserService {
     data: any
   ) {
     const { 
-      full_name, phone, email, state, zip_code, partner_org_id,
+      first_name, middle_name, last_name, phone, email, state, zip_code, partner_org_id,
       org_type,
       household_size, num_children, children_ages, monthly_income,
       employment_status, housing_status, has_disability, is_pregnant,
@@ -83,7 +84,7 @@ export class UserService {
       marital_status, other_adults, income_sources, work_situation, employer_name,
       health_insurance, savings_assets, child_support_status,
       monthly_childcare_cost, childcare_preference, childcare_provider, legal_issues, urgency,
-      first_name, last_name, children_dobs,
+      children_dobs,
       // Address
       street_address, city,
       profile_picture,
@@ -91,7 +92,9 @@ export class UserService {
 
     // Update User basic info
     const userUpdate: any = {};
-    if (full_name !== undefined) userUpdate.full_name = full_name;
+    if (first_name !== undefined) userUpdate.first_name = first_name.trim();
+    if (middle_name !== undefined) userUpdate.middle_name = middle_name?.trim() || null;
+    if (last_name !== undefined) userUpdate.last_name = last_name.trim();
     if (phone !== undefined) userUpdate.phone = phone;
     if (state !== undefined) userUpdate.state = state;
     if (zip_code !== undefined) userUpdate.zip_code = zip_code;

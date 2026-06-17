@@ -30,6 +30,7 @@ import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
 import { ORG_TYPE_OPTIONS } from "@/lib/org-types";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
+import { formatUserName, userInitials } from "@/lib/name";
 
 /**
  * Safely converts a Prisma Decimal, number, or string to a string for form inputs.
@@ -133,7 +134,9 @@ const LEGAL_ISSUES_OPTIONS = [
 ];
 
 const profileSchema = z.object({
-  full_name: z.string().min(2, "Required"),
+  first_name: z.string().min(1, "Required"),
+  middle_name: z.string().optional(),
+  last_name: z.string().min(1, "Required"),
   email: z.string().email("Invalid email"),
   phone: z.string().optional(),
   state: z.string().optional(),
@@ -192,7 +195,9 @@ export default function ProfilePage() {
 
   const getFormDefaults = (currentUser: typeof user) => {
     return {
-      full_name: currentUser?.full_name || "",
+      first_name: currentUser?.first_name || "",
+      middle_name: currentUser?.middle_name || "",
+      last_name: currentUser?.last_name || "",
       email: currentUser?.email || "",
       phone: currentUser?.phone || "",
       state: currentUser?.state || "",
@@ -316,12 +321,12 @@ export default function ProfilePage() {
           <img src={user.profile_picture} alt="Profile" className="w-16 h-16 rounded-full object-cover border-2 border-primary-500/20" />
         ) : (
           <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center text-white font-display font-bold text-2xl shrink-0">
-            {user?.full_name?.charAt(0) || "M"}
+            {userInitials(user) || "M"}
           </div>
         )}
         <div>
           <div className="font-display font-bold text-lg text-on-surface mb-1">
-            {user?.full_name}
+            {formatUserName(user)}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-on-surface-variant">{user?.email}</span>
@@ -358,9 +363,19 @@ export default function ProfilePage() {
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label="Full Name"
-                  error={profileForm.formState.errors.full_name?.message}
-                  {...profileForm.register("full_name")}
+                  label="First Name"
+                  error={profileForm.formState.errors.first_name?.message}
+                  {...profileForm.register("first_name")}
+                />
+                <Input
+                  label="Middle Name"
+                  error={profileForm.formState.errors.middle_name?.message}
+                  {...profileForm.register("middle_name")}
+                />
+                <Input
+                  label="Last Name"
+                  error={profileForm.formState.errors.last_name?.message}
+                  {...profileForm.register("last_name")}
                 />
                 <Input
                   label="Email Address"

@@ -7,6 +7,7 @@ import { BadRequestError, UnauthorizedError, NotFoundError } from '../../utils/e
 import { sendEmail } from '../../config/email';
 import { UserRole, UserPlan } from '@prisma/client';
 import { MotherOrgEnrollmentService } from '../partner/mother-org-enrollment.service';
+import { joinFullName } from '../../utils/name.utils';
 
 const motherOrgEnrollment = new MotherOrgEnrollmentService();
 
@@ -22,7 +23,9 @@ interface AccessTokenPayload {
 interface AuthUserSummary {
   id: string;
   email: string;
-  full_name: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
   role: UserRole;
   plan: UserPlan;
 }
@@ -38,14 +41,18 @@ function generateOpaqueRefreshToken(): string {
 function toAuthUser(user: {
   id: string;
   email: string;
-  full_name: string;
+  first_name: string;
+  middle_name: string | null;
+  last_name: string;
   role: UserRole;
   plan: UserPlan;
 }): AuthUserSummary {
   return {
     id: user.id,
     email: user.email,
-    full_name: user.full_name,
+    first_name: user.first_name,
+    middle_name: user.middle_name,
+    last_name: user.last_name,
     role: user.role,
     plan: user.plan,
   };
@@ -91,7 +98,9 @@ export class AuthService {
   private async issueSession(user: {
     id: string;
     email: string;
-    full_name: string;
+    first_name: string;
+    middle_name: string | null;
+    last_name: string;
     role: UserRole;
     plan: UserPlan;
   }) {
@@ -113,7 +122,9 @@ export class AuthService {
   async register(data: {
     email: string;
     password: string;
-    full_name: string;
+    first_name: string;
+    middle_name?: string;
+    last_name: string;
     phone?: string;
     partner_org_id?: string;
     org_type?: string;
@@ -127,12 +138,17 @@ export class AuthService {
     }
 
     const password_hash = await bcrypt.hash(data.password, 10);
+    const first_name = data.first_name.trim();
+    const middle_name = data.middle_name?.trim() || null;
+    const last_name = data.last_name.trim();
 
     const user = await prisma.user.create({
       data: {
         email: data.email,
         password_hash,
-        full_name: data.full_name,
+        first_name,
+        middle_name,
+        last_name,
         phone: data.phone,
         org_type: data.org_type || null,
       },
@@ -145,7 +161,7 @@ export class AuthService {
     await sendEmail({
       to: user.email,
       subject: 'Welcome to MomPlan!',
-      html: `<h1>Welcome to MomPlan, ${user.full_name}!</h1><p>We are thrilled to help you discover and apply for the benefits your family deserves.</p>`,
+      html: `<h1>Welcome to MomPlan, ${joinFullName(user.first_name, user.middle_name, user.last_name)}!</h1><p>We are thrilled to help you discover and apply for the benefits your family deserves.</p>`,
     });
 
     return this.issueSession(user);

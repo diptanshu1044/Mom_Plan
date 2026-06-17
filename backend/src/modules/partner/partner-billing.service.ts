@@ -5,6 +5,7 @@ import {
   getPartnerBillingUrls,
   type BillingRedirectUrls,
 } from '../billing/billing.service';
+import { splitFullName } from '../../utils/name.utils';
 
 const billingService = new BillingService();
 const partnerUrls = getPartnerBillingUrls();
@@ -33,10 +34,13 @@ export class PartnerBillingService {
     let billingUser = await prisma.user.findUnique({ where: { email: admin.email } });
 
     if (!billingUser) {
+      const nameParts = splitFullName(admin.full_name);
       billingUser = await prisma.user.create({
         data: {
           email: admin.email,
-          full_name: admin.full_name,
+          first_name: nameParts.first_name,
+          middle_name: nameParts.middle_name,
+          last_name: nameParts.last_name,
           plan: 'community',
           partner_org_id: orgId,
         },
@@ -106,10 +110,13 @@ export async function createPartnerBillingUser(
   orgId: string,
   admin: { email: string; full_name: string }
 ): Promise<string> {
+  const nameParts = splitFullName(admin.full_name);
   const billingUser = await prisma.user.create({
     data: {
       email: admin.email,
-      full_name: admin.full_name,
+      first_name: nameParts.first_name,
+      middle_name: nameParts.middle_name,
+      last_name: nameParts.last_name,
       plan: 'community',
       partner_org_id: orgId,
     },

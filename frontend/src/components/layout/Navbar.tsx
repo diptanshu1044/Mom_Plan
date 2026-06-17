@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
+import { userInitials } from "@/lib/name";
 import { Menu, X, Heart, ChevronDown } from "lucide-react";
 
 const navLinks = [
@@ -89,7 +90,7 @@ export function Navbar() {
                   <ChevronDown className="w-3.5 h-3.5" />
                 </button>
                 <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center text-white text-sm font-bold">
-                  {user?.full_name?.charAt(0) || "M"}
+                  {userInitials(user) || "M"}
                 </div>
               </>
             ) : (

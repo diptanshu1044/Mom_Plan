@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { sendEmail } from '../../config/email';
+import { formatUserName } from '../../utils/name.utils';
 /**
  * Government Contact Ingestion & Caching Strategy
  * Supports scalable dynamic routing for email composition.
@@ -106,7 +107,8 @@ Your task is to draft a formal, professional email to a government agency repres
 Do not include any placeholder brackets like [Name] in your final output, use the provided data.
 Keep the email structured, clear, and focused on application submission.`;
 
-    const userPrompt = `Draft an application submission email for ${application.user.full_name} applying to ${program.name}.
+    const applicantName = formatUserName(application.user);
+    const userPrompt = `Draft an application submission email for ${applicantName} applying to ${program.name}.
 Agency: ${program.agency}
 Applicant Profile:
 - Household Size: ${application.user.family_profile.household_size}
@@ -123,7 +125,7 @@ The email should be ready to send as-is. End with "MomPlan Automations System" a
       console.error('Failed to generate AI email, falling back to template', err);
       // Fallback
       generatedBody = `Dear ${program.agency} Representative,\n\n`;
-      generatedBody += `Please find the application submission for ${application.user.full_name}.\n`;
+      generatedBody += `Please find the application submission for ${applicantName}.\n`;
       generatedBody += `Program: ${program.name}\n\n`;
       if (docsToAttach.length > 0) {
         generatedBody += `Attached are ${docsToAttach.length} supporting documents.\n`;
@@ -131,7 +133,7 @@ The email should be ready to send as-is. End with "MomPlan Automations System" a
       generatedBody += `\nThank you,\nMomPlan Automations System`;
     }
 
-    const subject = `Application Submission: ${program.name} - ${application.user.full_name}`;
+    const subject = `Application Submission: ${program.name} - ${applicantName}`;
 
     const generatedPdf = attachPdf
       ? await prisma.generatedPdf.findFirst({

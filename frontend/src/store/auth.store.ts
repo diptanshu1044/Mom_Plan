@@ -10,7 +10,9 @@ import {
 export interface AuthUser {
   id: string;
   email: string;
-  full_name: string;
+  first_name: string;
+  middle_name?: string | null;
+  last_name: string;
   role: "user" | "admin" | "counselor";
   plan: "community" | "partner" | "network";
   phone?: string;

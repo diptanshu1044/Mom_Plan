@@ -1,3 +1,4 @@
+import { joinFullName, userNameSelect } from '../../utils/name.utils';
 import { prisma } from '../../config/prisma';
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
 import { sendEmail } from '../../config/email';
@@ -45,7 +46,7 @@ export class ApplicationsService {
         include: {
           program: true,
           user: {
-            select: { full_name: true, email: true },
+            select: { ...userNameSelect, email: true },
           },
           ...pdfInclude,
         },
@@ -70,7 +71,7 @@ export class ApplicationsService {
         program: true,
         documents: true,
         deadlines: true,
-        user: { select: { full_name: true, email: true } },
+        user: { select: { ...userNameSelect, email: true } },
         generated_pdfs: {
           orderBy: { generated_at: 'desc' },
         },
@@ -209,7 +210,7 @@ export class ApplicationsService {
         to: updated.user.email,
         subject: `MomPlan Application Update: ${programName}`,
         html: `<h1>Application Status Update</h1>
-        <p>Hello ${updated.user.full_name},</p>
+        <p>Hello ${joinFullName(updated.user.first_name, updated.user.middle_name, updated.user.last_name)},</p>
         <p>${statusMsg}</p>
         ${updated.notes ? `<p><strong>Notes:</strong> ${updated.notes}</p>` : ''}
         <p>Log in to your dashboard to view complete details and any requested documents.</p>`,

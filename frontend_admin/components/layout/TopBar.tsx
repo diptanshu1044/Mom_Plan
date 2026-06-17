@@ -2,7 +2,7 @@
 
 import { Bell, Search, Command } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
-import { getInitials } from "@/lib/utils";
+import { userInitials } from "@/lib/name";
 
 interface TopBarProps {
   title: string;
@@ -39,7 +39,7 @@ export function TopBar({ title, subtitle }: TopBarProps) {
 
         {/* Avatar */}
         <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold text-xs shadow cursor-pointer">
-          {getInitials(user?.full_name)}
+          {userInitials(user)}
         </div>
       </div>
     </header>

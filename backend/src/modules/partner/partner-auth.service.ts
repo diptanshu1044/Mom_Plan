@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { BadRequestError, UnauthorizedError } from '../../utils/errors';
+import { splitFullName } from '../../utils/name.utils';
 
 // ---- Token helpers ----
 
@@ -168,10 +169,13 @@ export class PartnerAuthService {
         },
       });
 
+      const nameParts = splitFullName(adminUser.full_name);
       const billingUser = await tx.user.create({
         data: {
           email: adminUser.email,
-          full_name: adminUser.full_name,
+          first_name: nameParts.first_name,
+          middle_name: nameParts.middle_name,
+          last_name: nameParts.last_name,
           plan: 'community',
           partner_org_id: org.id,
         },

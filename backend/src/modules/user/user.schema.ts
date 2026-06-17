@@ -3,7 +3,9 @@ import { orgTypeSchema } from '../../constants/org-types';
 
 export const updateProfileSchema = z.object({
   body: z.object({
-    full_name: z.string().or(z.literal('')).optional(),
+    first_name: z.string().trim().min(1).optional(),
+    middle_name: z.string().trim().nullable().or(z.literal('')).optional(),
+    last_name: z.string().trim().min(1).optional(),
     phone: z.string().nullable().or(z.literal('')).optional(),
     email: z.string().email().or(z.literal('')).nullable().optional(),
     state: z.string().nullable().or(z.literal('')).optional(),
@@ -32,8 +34,6 @@ export const updateProfileSchema = z.object({
     immigration_status: z.string().nullable().or(z.literal('')).optional(),
     date_of_birth: z.string().nullable().or(z.literal('')).optional(), // ISO string or format
     ssn_last_four: z.string().max(4).nullable().or(z.literal('')).optional(),
-    first_name: z.string().nullable().or(z.literal('')).optional(),
-    last_name: z.string().nullable().or(z.literal('')).optional(),
     children_dobs: z.array(z.string()).optional(),
     preferred_language: z.string().nullable().or(z.literal('')).optional(),
     marital_status: z.string().nullable().or(z.literal('')).optional(),
