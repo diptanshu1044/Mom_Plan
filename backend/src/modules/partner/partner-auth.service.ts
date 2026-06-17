@@ -168,6 +168,20 @@ export class PartnerAuthService {
         },
       });
 
+      const billingUser = await tx.user.create({
+        data: {
+          email: adminUser.email,
+          full_name: adminUser.full_name,
+          plan: 'community',
+          partner_org_id: org.id,
+        },
+      });
+
+      await tx.partnerOrganization.update({
+        where: { id: org.id },
+        data: { billing_user_id: billingUser.id },
+      });
+
       return { org, adminUser };
     });
 

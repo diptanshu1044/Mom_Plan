@@ -17,6 +17,15 @@ export const upgradeBodySchema = z.object({
   }),
 });
 
+const orgPlanSchema = z.enum(['community', 'partner', 'network']);
+
+export const downgradeBodySchema = z.object({
+  body: z.object({
+    plan: orgPlanSchema,
+    interval: billingIntervalSchema.optional(),
+  }),
+});
+
 export const activateCommunityBodySchema = z.object({
   body: z.object({}).optional(),
 });

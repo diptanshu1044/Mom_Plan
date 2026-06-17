@@ -116,6 +116,7 @@ model User {
   billing_events         BillingEvent[]
   mother_profile         Mother?             @relation("MotherUser")
   partner_organization   PartnerOrganization? @relation("UserPartnerOrg", fields: [partner_org_id], references: [id], onDelete: SetNull)
+  billing_organization   PartnerOrganization? @relation("PartnerOrgBillingUser")
 
   @@index([partner_org_id])
   @@map("users")
@@ -749,9 +750,11 @@ model PartnerOrganization {
   notification_frequency   String?   @default("daily")
   case_numbering_prefix    String?   @default("CASE")
   onboarding_completed     Boolean   @default(false)
+  billing_user_id          String?   @unique @db.Uuid
   created_at               DateTime  @default(now()) @db.Timestamptz
 
   // Relations
+  billing_user       User?                @relation("PartnerOrgBillingUser", fields: [billing_user_id], references: [id], onDelete: SetNull)
   org_users          OrgUser[]            @relation("OrgUserOrganization")
   caseworker_metrics CaseworkerMetric[]   @relation("CaseworkerMetricOrg")
   metrics_snapshots  OrgMetricsSnapshot[] @relation("OrgMetricsSnapshotOrg")

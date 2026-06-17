@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, ArrowRight, Heart } from "lucide-react";
 import { usePartnerAuthStore } from "@/store/auth.store";
@@ -24,9 +24,20 @@ type FormData = z.infer<typeof schema>;
 
 export function LoginClient() {
   const [showPwd, setShowPwd] = useState(false);
-  const { login } = usePartnerAuthStore();
+  const { login, isAuthenticated } = usePartnerAuthStore();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const nextPath = searchParams.get("next");
+  const safeNext =
+    nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/dashboard";
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace(safeNext);
+    }
+  }, [isAuthenticated, router, safeNext]);
 
   const {
     register,
@@ -37,7 +48,7 @@ export function LoginClient() {
   const onSubmit = async (data: FormData) => {
     try {
       const user = await login(data.email, data.password);
-      router.push(user.must_change_password ? "/change-password" : "/dashboard");
+      router.push(user.must_change_password ? "/change-password" : safeNext);
     } catch {
       toast({
         variant: "destructive",

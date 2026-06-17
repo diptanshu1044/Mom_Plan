@@ -12,6 +12,7 @@ const envSchema = z.object({
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .optional(),
   FRONTEND_URL: z.string().default('http://localhost:3000'),
+  PARTNER_PORTAL_URL: z.string().default('http://localhost:3002'),
   ADMIN_FRONTEND_URL: z.string().default('http://localhost:3001'),
   /** Comma-separated list of additional allowed CORS origins */
   CORS_ORIGINS: z.string().default(''),
@@ -89,6 +90,7 @@ export function parseCorsOrigins(...sources: string[]): string[] {
 
 export const allowedOrigins = parseCorsOrigins(
   env.FRONTEND_URL,
+  env.PARTNER_PORTAL_URL,
   env.ADMIN_FRONTEND_URL,
   env.CORS_ORIGINS,
 );

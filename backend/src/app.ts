@@ -28,6 +28,7 @@ import partnerCasesRoutes from './modules/partner/partner-cases.routes';
 import partnerDashboardRoutes from './modules/partner/partner-dashboard.routes';
 import partnerAlertsRoutes from './modules/partner/partner-alerts.routes';
 import partnerOrganizationsRoutes from './modules/partner/partner-organizations.routes';
+import partnerBillingRoutes from './modules/partner/partner-billing.routes';
 import teamRoutes from './modules/team/team.routes';
 import mothersRoutes from './modules/mothers/mothers.routes';
 
@@ -89,6 +90,7 @@ app.use('/api/partner/cases',        partnerCasesRoutes);
 app.use('/api/partner/dashboard',    partnerDashboardRoutes);
 app.use('/api/partner/alerts',       partnerAlertsRoutes);
 app.use('/api/partner-organizations', partnerOrganizationsRoutes);
+app.use('/api/partner/billing',         partnerBillingRoutes);
 app.use('/api/team/members',         teamRoutes);
 app.use('/api/mothers',              mothersRoutes);
 

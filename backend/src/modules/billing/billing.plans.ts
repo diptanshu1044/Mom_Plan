@@ -105,6 +105,10 @@ export function isUpgrade(fromPlan: UserPlan, toPlan: UserPlan): boolean {
   return PLAN_HIERARCHY[fromPlan as OrgPlanId] < PLAN_HIERARCHY[toPlan as OrgPlanId];
 }
 
+export function isDowngrade(fromPlan: UserPlan, toPlan: UserPlan): boolean {
+  return PLAN_HIERARCHY[fromPlan as OrgPlanId] > PLAN_HIERARCHY[toPlan as OrgPlanId];
+}
+
 export function parseBillingInterval(value: string | undefined): BillingInterval {
   return value === 'monthly' ? 'monthly' : 'yearly';
 }

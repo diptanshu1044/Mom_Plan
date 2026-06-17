@@ -30,9 +30,11 @@ export default function PortalLayout({
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
-      router.replace("/login");
+      const next = `${pathname}${window.location.search}`;
+      const params = new URLSearchParams({ next });
+      router.replace(`/login?${params.toString()}`);
     }
-  }, [isHydrated, isAuthenticated, router]);
+  }, [isHydrated, isAuthenticated, router, pathname]);
 
   if (!isHydrated) {
     return (

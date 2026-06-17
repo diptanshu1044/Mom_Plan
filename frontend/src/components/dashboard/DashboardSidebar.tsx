@@ -9,7 +9,6 @@ import {
   ClipboardList,
   FileText,
   Bell,
-  Settings,
   LogOut,
   Heart,
   Menu,
@@ -67,11 +66,6 @@ const navItems = [
     href: "/dashboard/profile",
     icon: User,
     label: "Profile",
-  },
-  {
-    href: "/dashboard/settings",
-    icon: Settings,
-    label: "Settings",
   },
 ];
 

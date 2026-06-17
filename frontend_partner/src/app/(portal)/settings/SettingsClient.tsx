@@ -1,11 +1,13 @@
 "use client";
 
+import { Suspense } from "react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { User, Building2, Bell, Shield, Save, Check } from "lucide-react";
+import { User, Building2, Bell, Shield, Save, Check, CreditCard } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { usePartnerAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/ui/use-toast";
@@ -16,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BillingSettings } from "@/components/billing/BillingSettings";
 import { initials } from "@/lib/utils";
 
 const profileSchema = z.object({
@@ -57,6 +60,8 @@ function SettingSection({
 }
 
 export function SettingsClient() {
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get("tab") === "billing" ? "billing" : "profile";
   const { user, organization, updateUser } = usePartnerAuthStore();
   const { toast } = useToast();
   const [savedProfile, setSavedProfile] = useState(false);
@@ -109,13 +114,14 @@ export function SettingsClient() {
   const tabs = [
     { value: "profile", label: "Profile", icon: User },
     { value: "organization", label: "Organization", icon: Building2 },
+    { value: "billing", label: "Billing", icon: CreditCard },
     { value: "notifications", label: "Notifications", icon: Bell },
     { value: "security", label: "Security", icon: Shield },
   ];
 
   return (
     <div className="flex-1 p-8">
-      <Tabs defaultValue="profile">
+      <Tabs defaultValue={defaultTab}>
         <TabsList className="mb-8">
           {tabs.map((t) => (
             <TabsTrigger key={t.value} value={t.value} className="flex items-center gap-1.5">
@@ -216,6 +222,13 @@ export function SettingsClient() {
               </SettingSection>
             </motion.div>
           </div>
+        </TabsContent>
+
+        {/* Billing tab */}
+        <TabsContent value="billing">
+          <Suspense fallback={<div className="h-40 animate-pulse rounded-2xl bg-primary-subtle" />}>
+            <BillingSettings />
+          </Suspense>
         </TabsContent>
 
         {/* Notifications tab */}

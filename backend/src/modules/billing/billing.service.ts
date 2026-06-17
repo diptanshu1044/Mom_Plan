@@ -1,7 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { stripe } from '../../config/stripe';
 import { env } from '../../config/env';
-import { NotFoundError, BadRequestError } from '../../utils/errors';
+import { NotFoundError, BadRequestError, ForbiddenError } from '../../utils/errors';
 import { sendEmail } from '../../config/email';
 import { SubscriptionStatus, UserPlan } from '@prisma/client';
 import Stripe from 'stripe';
@@ -11,6 +11,7 @@ import {
   getAmountCents,
   getPlanConfig,
   getStripePriceId,
+  isDowngrade,
   isMockStripeMode,
   isUpgrade,
   parseBillingInterval,
@@ -19,8 +20,29 @@ import {
   type OrgPlanId,
 } from './billing.plans';
 
-const SUCCESS_URL = `${env.FRONTEND_URL}/dashboard/billing/success?session_id={CHECKOUT_SESSION_ID}`;
-const CANCEL_URL = `${env.FRONTEND_URL}/dashboard/settings?checkout=cancelled`;
+export type BillingRedirectUrls = {
+  successUrl: string;
+  cancelUrl: string;
+  portalReturnUrl: string;
+};
+
+export function getMotherBillingUrls(): BillingRedirectUrls {
+  return {
+    successUrl: `${env.FRONTEND_URL}/dashboard/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${env.FRONTEND_URL}/dashboard/settings?checkout=cancelled`,
+    portalReturnUrl: `${env.FRONTEND_URL}/dashboard/settings`,
+  };
+}
+
+export function getPartnerBillingUrls(): BillingRedirectUrls {
+  return {
+    successUrl: `${env.PARTNER_PORTAL_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl: `${env.PARTNER_PORTAL_URL}/settings?tab=billing&checkout=cancelled`,
+    portalReturnUrl: `${env.PARTNER_PORTAL_URL}/settings?tab=billing`,
+  };
+}
+
+const DEFAULT_URLS = getMotherBillingUrls();
 
 function mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
   const mapping: Record<string, SubscriptionStatus> = {
@@ -214,7 +236,12 @@ export class BillingService {
     return subscription;
   }
 
-  async createCheckoutSession(userId: string, plan: string, intervalInput?: string) {
+  async createCheckoutSession(
+    userId: string,
+    plan: string,
+    intervalInput?: string,
+    urls: BillingRedirectUrls = DEFAULT_URLS
+  ) {
     const user = await this.getUserOrThrow(userId);
     const planConfig = assertBillablePlan(plan);
     const interval = parseBillingInterval(intervalInput);
@@ -240,7 +267,7 @@ export class BillingService {
       });
 
       return {
-        url: `${env.FRONTEND_URL}/dashboard/billing/success?mock=true&plan=${plan}&interval=${interval}`,
+        url: `${urls.successUrl.replace('{CHECKOUT_SESSION_ID}', 'mock')}&mock=true&plan=${plan}&interval=${interval}`,
       };
     }
 
@@ -255,8 +282,8 @@ export class BillingService {
       payment_method_types: ['card'],
       line_items: [{ price: stripePriceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: SUCCESS_URL,
-      cancel_url: CANCEL_URL,
+      success_url: urls.successUrl,
+      cancel_url: urls.cancelUrl,
       metadata: { userId: user.id, plan, interval },
       subscription_data: {
         metadata: { userId: user.id, plan, interval },
@@ -270,7 +297,12 @@ export class BillingService {
     return { url: session.url };
   }
 
-  async upgradeSubscription(userId: string, targetPlan: string, intervalInput?: string) {
+  async upgradeSubscription(
+    userId: string,
+    targetPlan: string,
+    intervalInput?: string,
+    urls: BillingRedirectUrls = DEFAULT_URLS
+  ) {
     const user = await this.getUserOrThrow(userId);
     assertBillablePlan(targetPlan);
     const target = toUserPlan(targetPlan);
@@ -299,7 +331,7 @@ export class BillingService {
     }
 
     if (!activeSub?.stripe_subscription_id || !user.stripe_customer_id) {
-      const checkout = await this.createCheckoutSession(userId, targetPlan, interval);
+      const checkout = await this.createCheckoutSession(userId, targetPlan, interval, urls);
       return { checkoutUrl: checkout.url, upgraded: false };
     }
 
@@ -324,45 +356,141 @@ export class BillingService {
     return { plan: target, upgraded: true };
   }
 
-  async cancelSubscription(userId: string) {
+  /** Dev-only: immediately move to a lower plan for local testing */
+  async downgradeSubscription(userId: string, targetPlan: string, intervalInput?: string) {
+    if (env.NODE_ENV !== 'development') {
+      throw new ForbiddenError('Plan downgrades are only available in development');
+    }
+
     const user = await this.getUserOrThrow(userId);
+    const target = toUserPlan(targetPlan);
+
+    if (!isDowngrade(user.plan, target)) {
+      throw new BadRequestError('Target plan must be lower than your current plan');
+    }
+
+    if (target === 'community') {
+      await this.activateCommunityPlan(userId);
+      return { plan: 'community' as const, downgraded: true };
+    }
+
+    const interval = parseBillingInterval(intervalInput);
+    const planId = targetPlan as OrgPlanId;
+    const amountCents = getAmountCents(planId, interval);
     const activeSub = await this.getActiveSubscription(userId);
 
-    if (!activeSub || user.plan === 'community') {
+    await this.activateSubscription({
+      userId,
+      plan: target,
+      stripeCustomerId: user.stripe_customer_id ?? `cus_mock_${userId}`,
+      stripeSubscriptionId: activeSub?.stripe_subscription_id ?? `sub_mock_${Date.now()}`,
+      billingInterval: interval,
+      amountCents: isMockStripeMode() ? amountCents : 0,
+      skipEmail: true,
+    });
+
+    return { plan: target, downgraded: true };
+  }
+
+  private async resolveStripeSubscription(
+    userId: string,
+    user: {
+      id: string;
+      plan: UserPlan;
+      stripe_customer_id: string | null;
+      stripe_subscription_id: string | null;
+    }
+  ) {
+    if (user.plan === 'community') {
       throw new BadRequestError('No active paid subscription to cancel');
     }
 
+    let activeSub = await this.getActiveSubscription(userId);
+    let stripeSubscriptionId =
+      activeSub?.stripe_subscription_id ?? user.stripe_subscription_id ?? null;
+
+    if (!stripeSubscriptionId && user.stripe_customer_id && !isMockStripeMode()) {
+      const subs = await stripe.subscriptions.list({
+        customer: user.stripe_customer_id,
+        status: 'all',
+        limit: 10,
+      });
+      const live = subs.data.find((s) =>
+        ['active', 'trialing', 'past_due'].includes(s.status)
+      );
+      if (live) {
+        stripeSubscriptionId = live.id;
+        await this.syncSubscriptionFromStripe(live, userId);
+        activeSub = await this.getActiveSubscription(userId);
+      }
+    }
+
+    if (!activeSub && !stripeSubscriptionId) {
+      throw new BadRequestError('No active paid subscription to cancel');
+    }
+
+    if (!stripeSubscriptionId) {
+      throw new BadRequestError('Subscription record is missing Stripe ID');
+    }
+
+    return { activeSub, stripeSubscriptionId };
+  }
+
+  async cancelSubscription(userId: string) {
+    const user = await this.getUserOrThrow(userId);
+    const { activeSub, stripeSubscriptionId } = await this.resolveStripeSubscription(userId, user);
+
     if (isMockStripeMode()) {
+      if (!activeSub) {
+        throw new BadRequestError('No active subscription record found');
+      }
       await prisma.subscription.update({
         where: { id: activeSub.id },
         data: { cancel_at_period_end: true },
       });
-      return { cancelAtPeriodEnd: true, currentPeriodEnd: activeSub.current_period_end };
+      return {
+        cancelAtPeriodEnd: true,
+        currentPeriodEnd: activeSub.current_period_end,
+        accessUntil: activeSub.current_period_end,
+      };
     }
 
-    if (!activeSub.stripe_subscription_id) {
-      throw new BadRequestError('Subscription record is missing Stripe ID');
-    }
-
-    const updated = await stripe.subscriptions.update(activeSub.stripe_subscription_id, {
+    const updated = await stripe.subscriptions.update(stripeSubscriptionId, {
       cancel_at_period_end: true,
     });
 
-    await prisma.subscription.update({
-      where: { id: activeSub.id },
-      data: {
-        cancel_at_period_end: true,
-        current_period_end: new Date(updated.current_period_end * 1000),
-      },
+    const periodEnd = new Date(updated.current_period_end * 1000);
+
+    if (activeSub) {
+      await prisma.subscription.update({
+        where: { id: activeSub.id },
+        data: {
+          cancel_at_period_end: true,
+          current_period_end: periodEnd,
+        },
+      });
+    } else {
+      await this.syncSubscriptionFromStripe(updated, userId);
+    }
+
+    await sendEmail({
+      to: user.email,
+      subject: 'MomPlan Subscription Cancellation Scheduled',
+      html: `<h1>Cancellation Confirmed</h1>
+      <p>Hello ${user.full_name}, your subscription has been set to cancel at the end of your current billing period.</p>
+      <p>You will continue to have full access until <strong>${periodEnd.toLocaleDateString()}</strong>. No further charges will be made.</p>
+      <p>You can reactivate anytime before that date from your billing settings.</p>`,
     });
 
     return {
       cancelAtPeriodEnd: true,
-      currentPeriodEnd: new Date(updated.current_period_end * 1000),
+      currentPeriodEnd: periodEnd,
+      accessUntil: periodEnd,
     };
   }
 
   async reactivateSubscription(userId: string) {
+    const user = await this.getUserOrThrow(userId);
     const activeSub = await this.getActiveSubscription(userId);
 
     if (!activeSub?.cancel_at_period_end) {
@@ -377,23 +505,28 @@ export class BillingService {
       return { reactivated: true, cancelAtPeriodEnd: false };
     }
 
-    if (!activeSub.stripe_subscription_id) {
+    const stripeSubscriptionId =
+      activeSub.stripe_subscription_id ?? user.stripe_subscription_id;
+    if (!stripeSubscriptionId) {
       throw new BadRequestError('Subscription record is missing Stripe ID');
     }
 
-    await stripe.subscriptions.update(activeSub.stripe_subscription_id, {
+    const updated = await stripe.subscriptions.update(stripeSubscriptionId, {
       cancel_at_period_end: false,
     });
 
     await prisma.subscription.update({
       where: { id: activeSub.id },
-      data: { cancel_at_period_end: false },
+      data: {
+        cancel_at_period_end: false,
+        current_period_end: new Date(updated.current_period_end * 1000),
+      },
     });
 
     return { reactivated: true, cancelAtPeriodEnd: false };
   }
 
-  async createPortalSession(userId: string) {
+  async createPortalSession(userId: string, urls: BillingRedirectUrls = DEFAULT_URLS) {
     const user = await this.getUserOrThrow(userId);
 
     if (!user.stripe_customer_id) {
@@ -401,12 +534,12 @@ export class BillingService {
     }
 
     if (isMockStripeMode()) {
-      return { url: `${env.FRONTEND_URL}/dashboard/settings?simulated_portal=true` };
+      return { url: `${urls.portalReturnUrl}&simulated_portal=true` };
     }
 
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: user.stripe_customer_id,
-      return_url: `${env.FRONTEND_URL}/dashboard/settings`,
+      return_url: urls.portalReturnUrl,
     });
 
     return { url: portalSession.url };
@@ -700,6 +833,14 @@ export class BillingService {
   }
 
   private async downgradeUser(userId: string, email: string, fullName: string) {
+    await prisma.subscription.updateMany({
+      where: {
+        user_id: userId,
+        status: { in: ['active', 'past_due', 'trialing'] },
+      },
+      data: { status: 'canceled', cancel_at_period_end: false },
+    });
+
     await prisma.user.update({
       where: { id: userId },
       data: { plan: 'community', stripe_subscription_id: null },

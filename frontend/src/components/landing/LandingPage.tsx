@@ -856,9 +856,11 @@ export default function LandingPage() {
             className="text-center mb-16"
           >
             <h2 className="font-display font-bold text-4xl lg:text-5xl text-on-surface mb-4">
-              Choose Your Support Level
+              Plans for Partner Organizations
             </h2>
-            <p className="text-lg text-on-surface-variant">No hidden fees. Cancel anytime.</p>
+            <p className="text-lg text-on-surface-variant">
+              Caseworker tools and org dashboards — sign in to your partner account to subscribe.
+            </p>
             <div className="mt-8">
               <BillingIntervalToggle value={billingInterval} onChange={setBillingInterval} />
             </div>
