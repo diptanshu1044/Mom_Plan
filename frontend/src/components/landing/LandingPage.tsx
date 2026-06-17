@@ -32,7 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/Card";
 import { PricingCta } from "@/components/landing/PricingCta";
-import { HeroCarousel } from "@/components/landing/HeroCarousel";
+import { HeroCarousel, CAROUSEL_HEIGHT } from "@/components/landing/HeroCarousel";
 import { BillingIntervalToggle } from "@/components/billing/BillingIntervalToggle";
 import {
   formatPlanBillingNote,
@@ -363,7 +363,10 @@ export default function LandingPage() {
       <HeroCarousel />
 
       {/* ── Hero ── */}
-      <section className="relative flex min-h-[calc(100vh-240px)] items-center justify-center pb-16 pt-12 sm:min-h-[calc(100vh-320px)] md:min-h-[calc(100vh-400px)] lg:min-h-[calc(100vh-460px)]">
+      <section
+        className="relative flex items-center justify-center pb-16 pt-12"
+        style={{ minHeight: `calc(100vh - ${CAROUSEL_HEIGHT})` }}
+      >
         {/* Background */}
         <div className="absolute inset-0 bg-gradient-hero" />
         <div className="absolute top-20 right-0 w-[600px] h-[600px] bg-primary-100/40 rounded-full blur-[120px] -translate-y-1/4 translate-x-1/4 pointer-events-none" />
@@ -388,7 +391,7 @@ export default function LandingPage() {
             initial="hidden"
             animate="visible"
             custom={1}
-            className="font-display font-bold text-5xl sm:text-6xl lg:text-7xl text-on-surface leading-tight mb-6 max-w-4xl mx-auto"
+            className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-on-surface leading-tight mb-6 max-w-4xl mx-auto"
           >
             Find Every Benefit
             <br />

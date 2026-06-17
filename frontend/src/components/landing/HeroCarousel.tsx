@@ -26,6 +26,9 @@ const SLIDES = [
 
 const AUTO_PLAY_MS = 5000;
 
+/** Matches source photos (3:2) while capping height on large screens. */
+export const CAROUSEL_HEIGHT = "clamp(260px, 66.67vw, 580px)";
+
 export function HeroCarousel() {
   const [index, setIndex] = useState(0);
 
@@ -43,7 +46,10 @@ export function HeroCarousel() {
       aria-roledescription="carousel"
       aria-label="Featured images"
     >
-      <div className="relative h-[240px] w-full overflow-hidden bg-surface-container-low sm:h-[320px] md:h-[400px] lg:h-[460px]">
+      <div
+        className="relative w-full overflow-hidden bg-surface-container-low"
+        style={{ height: CAROUSEL_HEIGHT }}
+      >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={index}
@@ -53,11 +59,22 @@ export function HeroCarousel() {
             transition={{ duration: 0.55, ease: "easeOut" }}
             className="absolute inset-0"
           >
+            {/* Blurred ambient fill — full-bleed look without empty side bars */}
+            <Image
+              src={SLIDES[index].src}
+              alt=""
+              aria-hidden
+              fill
+              className="scale-110 object-cover object-top blur-2xl saturate-125 brightness-90"
+              priority={index === 0}
+              sizes="100vw"
+            />
+            {/* Sharp foreground — entire photo visible */}
             <Image
               src={SLIDES[index].src}
               alt={SLIDES[index].alt}
               fill
-              className="object-cover"
+              className="object-contain object-center"
               priority={index === 0}
               sizes="100vw"
             />
