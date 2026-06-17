@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+export const listDocumentsChecklistQuerySchema = z.object({
+  query: z.object({
+    state: z.string().optional(),
+    level: z.enum(['All levels', 'Federal', 'State']).optional(),
+    search: z.string().optional(),
+  }),
+});
+
 export const listProgramsQuerySchema = z.object({
   query: z.object({
     state: z.string().optional(),

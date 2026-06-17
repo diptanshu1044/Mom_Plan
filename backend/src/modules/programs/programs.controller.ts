@@ -18,6 +18,20 @@ export class ProgramsController {
     }
   }
 
+  async listDocumentsChecklist(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const filters = {
+        state: req.query.state as string | undefined,
+        level: req.query.level as string | undefined,
+        search: req.query.search as string | undefined,
+      };
+      const data = await programsService.listDocumentsChecklist(filters);
+      res.status(200).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getProgramById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const program = await programsService.getProgramById(req.params.id);

@@ -4,6 +4,7 @@ import { authenticate, authorizeRoles } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import {
   listProgramsQuerySchema,
+  listDocumentsChecklistQuerySchema,
   programIdParamSchema,
   createProgramSchema,
   updateProgramSchema,
@@ -17,6 +18,7 @@ const programsController = withControllerLog(new ProgramsController(), 'programs
 
 // Publicly readable endpoints (filterable)
 router.get('/', validate(listProgramsQuerySchema), programsController.listPrograms);
+router.get('/documents-checklist', validate(listDocumentsChecklistQuerySchema), programsController.listDocumentsChecklist);
 router.get('/:id', validate(programIdParamSchema), programsController.getProgramById);
 
 // Admin-only mutation endpoints
