@@ -91,6 +91,71 @@ let cachedChecklist: { programs: ChecklistProgramItem[]; availableStates: string
 let checklistCacheTimestamp = 0;
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache TTL
 
+const CATEGORY_TYPE_ALIASES: Record<string, string[]> = {
+  food: ['food', 'nutrition'],
+  cash: ['cash'],
+  housing: ['housing'],
+  childcare: ['childcare'],
+  healthcare: ['healthcare', 'health'],
+  education: ['education'],
+  utilities: ['utilities', 'energy'],
+};
+
+function matchesCategoryFilter(program: { program_type: string; tags: string[] }, category: string): boolean {
+  const target = category.toLowerCase();
+  const aliases = CATEGORY_TYPE_ALIASES[target] || [target];
+  const programType = (program.program_type || '').toLowerCase();
+  const typeMatch = aliases.some((alias) => programType.includes(alias));
+  const tagMatch = (program.tags || []).some((tag) => tag.toLowerCase() === target);
+  return typeMatch || tagMatch;
+}
+
+function formatBenefitLabel(program: {
+  estimated_monthly_value_min: number | null;
+  estimated_monthly_value_max: number | null;
+}): string | null {
+  const min = program.estimated_monthly_value_min;
+  const max = program.estimated_monthly_value_max;
+  if (min == null || max == null) return null;
+  if (min === max) return `$${min}/mo`;
+  return `$${min}–$${max}/mo`;
+}
+
+function mapProgramForBrowse(program: {
+  id: string;
+  name: string;
+  agency: string;
+  program_type: string;
+  federal_or_state: string | null;
+  state_code: string | null;
+  description: string | null;
+  estimated_monthly_value_min: number | null;
+  estimated_monthly_value_max: number | null;
+  application_url: string | null;
+  agency_website: string | null;
+  contact_email: string | null;
+  tags: string[];
+  eligibility_criteria: unknown;
+}) {
+  return {
+    id: program.id,
+    name: program.name,
+    agency: program.agency,
+    program_type: program.program_type,
+    federal_or_state: program.federal_or_state,
+    state_code: program.state_code,
+    estimated_monthly_value_min: program.estimated_monthly_value_min,
+    estimated_monthly_value_max: program.estimated_monthly_value_max,
+    description: program.description || '',
+    benefit: formatBenefitLabel(program),
+    website: program.agency_website || '',
+    application_url: program.application_url || '',
+    contact_email: program.contact_email,
+    tags: program.tags,
+    eligibility_criteria: program.eligibility_criteria,
+  };
+}
+
 export function clearProgramsCache() {
   cachedPrograms = null;
   cacheTimestamp = 0;
@@ -99,7 +164,14 @@ export function clearProgramsCache() {
 }
 
 export class ProgramsService {
-  async listPrograms(filters: { state?: string; type?: string }) {
+  async listPrograms(filters: {
+    state?: string;
+    type?: string;
+    search?: string;
+    level?: string;
+    page?: number;
+    limit?: number;
+  } = {}) {
     const now = Date.now();
     if (!cachedPrograms || now - cacheTimestamp > CACHE_TTL) {
       cachedPrograms = await prisma.benefitProgram.findMany({
@@ -112,25 +184,78 @@ export class ProgramsService {
     }
 
     let filtered = cachedPrograms;
+    const selectedState = filters.state && filters.state !== 'All' ? filters.state.toUpperCase() : 'All';
+    const selectedLevel = filters.level || 'All levels';
 
-    if (filters.state && filters.state !== 'All') {
-      const targetState = filters.state.toLowerCase();
-      filtered = filtered.filter(p => {
-        const fedOrState = (p.federal_or_state || '').toLowerCase();
-        const stateCode = (p.state_code || '').toLowerCase();
-        return fedOrState === 'federal' || fedOrState.includes('federal') || stateCode === targetState;
+    if (selectedState !== 'All') {
+      filtered = filtered.filter((p) => {
+        const isFederal = isFederalProgram(p.federal_or_state);
+        return isFederal || (p.state_code || '').toUpperCase() === selectedState;
+      });
+    }
+
+    if (selectedLevel !== 'All levels') {
+      filtered = filtered.filter((p) => {
+        const isFederal = isFederalProgram(p.federal_or_state);
+        if (selectedLevel === 'Federal') return isFederal;
+        if (selectedLevel === 'State') return !isFederal;
+        return true;
       });
     }
 
     if (filters.type && filters.type !== 'All') {
-      const targetType = filters.type.toLowerCase();
-      filtered = filtered.filter(p => {
-        const programType = (p.program_type || '').toLowerCase();
-        return programType === targetType;
+      filtered = filtered.filter((p) => matchesCategoryFilter(p, filters.type!));
+    }
+
+    const query = (filters.search || '').trim().toLowerCase();
+    if (query) {
+      filtered = filtered.filter((p) => {
+        const name = (p.name || '').toLowerCase();
+        const description = (p.description || '').toLowerCase();
+        const agency = (p.agency || '').toLowerCase();
+        const alsoKnownAs = (p.also_known_as || '').toLowerCase();
+        return (
+          name.includes(query) ||
+          description.includes(query) ||
+          agency.includes(query) ||
+          alsoKnownAs.includes(query)
+        );
       });
     }
 
-    return filtered;
+    const availableStates = [
+      ...new Set(
+        cachedPrograms
+          .map((program) => program.state_code)
+          .filter((code): code is string => Boolean(code))
+          .map((code) => code.toUpperCase())
+      ),
+    ].sort();
+
+    const total = filtered.length;
+    const paginate = filters.limit !== undefined;
+    const page = filters.page || 1;
+    const limit = filters.limit ?? total;
+    const totalPages = paginate ? Math.max(1, Math.ceil(total / limit)) : 1;
+    const safePage = paginate ? Math.min(page, totalPages) : 1;
+    const skip = paginate ? (safePage - 1) * limit : 0;
+    const programs = filtered.slice(skip, paginate ? skip + limit : undefined).map(mapProgramForBrowse);
+
+    return {
+      programs,
+      availableStates,
+      total,
+      ...(paginate
+        ? {
+            pagination: {
+              page: safePage,
+              limit,
+              total,
+              totalPages,
+            },
+          }
+        : {}),
+    };
   }
 
   async listDocumentsChecklist(filters: { state?: string; level?: string; search?: string } = {}) {

@@ -56,7 +56,7 @@ export default function ProgramsPage() {
 
   const { data: programs, isLoading } = useQuery({
     queryKey: ["admin-programs"],
-    queryFn: () => api.get("/api/programs").then((r) => r.data.data || r.data),
+    queryFn: () => api.get("/api/programs").then((r) => r.data.data?.programs ?? r.data.data ?? r.data),
   });
 
   const { data: quarterDueDates } = useQuery({

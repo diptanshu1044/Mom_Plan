@@ -12,6 +12,10 @@ export const listProgramsQuerySchema = z.object({
   query: z.object({
     state: z.string().optional(),
     type: z.string().optional(),
+    search: z.string().optional(),
+    level: z.enum(['All levels', 'Federal', 'State']).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
   }),
 });
 
