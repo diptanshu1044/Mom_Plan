@@ -7,16 +7,17 @@ import {
   memberIdParamsSchema,
   updateMemberStatusSchema,
 } from './team.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const ctrl = new TeamController();
+const ctrl = withControllerLog(new TeamController(), 'team');
 
 router.use(authenticateOrgUser, requireOrgRole('admin'));
 
-router.get('/', ctrl.listMembers.bind(ctrl));
-router.post('/bulk-create', validate(bulkCreateMembersSchema), ctrl.bulkCreate.bind(ctrl));
-router.delete('/:id', validate(memberIdParamsSchema), ctrl.deleteMember.bind(ctrl));
-router.post('/:id/reset-password', validate(memberIdParamsSchema), ctrl.resetPassword.bind(ctrl));
-router.patch('/:id/status', validate(updateMemberStatusSchema), ctrl.updateStatus.bind(ctrl));
+router.get('/', ctrl.listMembers);
+router.post('/bulk-create', validate(bulkCreateMembersSchema), ctrl.bulkCreate);
+router.delete('/:id', validate(memberIdParamsSchema), ctrl.deleteMember);
+router.post('/:id/reset-password', validate(memberIdParamsSchema), ctrl.resetPassword);
+router.patch('/:id/status', validate(updateMemberStatusSchema), ctrl.updateStatus);
 
 export default router;

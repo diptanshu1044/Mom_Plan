@@ -9,9 +9,10 @@ import {
   updateApplicationSchema,
   applyApplicationSchema,
 } from './applications.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const applicationsController = new ApplicationsController();
+const applicationsController = withControllerLog(new ApplicationsController(), 'applications');
 
 router.use(authenticate);
 

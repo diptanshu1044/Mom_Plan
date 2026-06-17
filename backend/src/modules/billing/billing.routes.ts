@@ -3,9 +3,10 @@ import { BillingController } from './billing.controller';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { checkoutBodySchema, upgradeBodySchema } from './billing.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const billingController = new BillingController();
+const billingController = withControllerLog(new BillingController(), 'billing');
 
 // Protected authenticated routes (mounted after express.json() in app.ts)
 router.use(authenticate);

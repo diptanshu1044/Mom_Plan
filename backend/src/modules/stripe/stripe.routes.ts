@@ -3,9 +3,10 @@ import { StripeController } from './stripe.controller';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { createCheckoutSessionSchema } from './stripe.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const stripeController = new StripeController();
+const stripeController = withControllerLog(new StripeController(), 'stripe');
 
 // Create Checkout Session for subscribing to a plan
 router.post(

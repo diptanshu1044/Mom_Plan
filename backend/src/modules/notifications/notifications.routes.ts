@@ -3,9 +3,10 @@ import { NotificationsController } from './notifications.controller';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { notificationIdParamSchema } from './notifications.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const notificationsController = new NotificationsController();
+const notificationsController = withControllerLog(new NotificationsController(), 'notifications');
 
 router.use(authenticate);
 

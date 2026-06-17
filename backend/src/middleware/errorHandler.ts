@@ -3,26 +3,10 @@ import { Prisma } from '@prisma/client';
 import { AppError } from '../utils/errors';
 import { ZodError } from 'zod';
 import { safeLogger } from './sanitize';
-import { logger } from '../config/logger';
+import { getRequestLog, requestContext } from '../utils/controllerLog';
 
 const GENERIC_SERVER_MESSAGE = 'Something went wrong. Please try again later.';
 const GENERIC_UNAVAILABLE_MESSAGE = 'Service temporarily unavailable. Please try again.';
-
-function getLog(req: Request) {
-  return req.log ?? logger;
-}
-
-function requestContext(req: Request) {
-  return {
-    method: req.method,
-    path: req.path,
-    url: req.originalUrl,
-    requestId: req.id,
-    userId: req.user?.id,
-    orgUserId: req.orgUser?.orgUserId,
-    orgId: req.orgUser?.orgId,
-  };
-}
 
 export const errorHandler = (
   err: Error,
@@ -31,7 +15,7 @@ export const errorHandler = (
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   next: NextFunction
 ) => {
-  const log = getLog(req);
+  const log = getRequestLog(req);
   const ctx = requestContext(req);
 
   // Determine if it is a client-side error (4xx) or an internal server error (500+)

@@ -10,9 +10,10 @@ import {
   quarterDueDatesQuerySchema,
   backfillQuarterDueDatesSchema,
 } from './programs.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const programsController = new ProgramsController();
+const programsController = withControllerLog(new ProgramsController(), 'programs');
 
 // Publicly readable endpoints (filterable)
 router.get('/', validate(listProgramsQuerySchema), programsController.listPrograms);

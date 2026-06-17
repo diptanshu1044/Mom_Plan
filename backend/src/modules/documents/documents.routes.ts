@@ -4,9 +4,10 @@ import { DocumentsController } from './documents.controller';
 import { authenticate, authorizeRoles } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { documentIdParamSchema, renameDocumentSchema } from './documents.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const documentsController = new DocumentsController();
+const documentsController = withControllerLog(new DocumentsController(), 'documents');
 
 // Use memory storage to buffer files up to 10MB safely without writing to local temp paths
 const upload = multer({

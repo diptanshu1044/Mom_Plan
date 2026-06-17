@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { ApplicationsService } from './applications.service';
 import { UnauthorizedError } from '../../utils/errors';
+import { safeLogger } from '../../middleware/sanitize';
+import { requestContext } from '../../utils/controllerLog';
 
 const applicationsService = new ApplicationsService();
 
@@ -90,7 +92,14 @@ export class ApplicationsController {
       );
 
       // Execute background task without BullMQ, pass custom subject/body/to and attach_pdf if edited, along with document_ids
-      automationService.processApplication(req.params.id, req.user.id, body, subject, to, attach_pdf, document_ids).catch(console.error);
+      automationService
+        .processApplication(req.params.id, req.user.id, body, subject, to, attach_pdf, document_ids)
+        .catch((err: unknown) => {
+          safeLogger.error(
+            { ...requestContext(req), applicationId: req.params.id, err },
+            'applications.applyApplication background processing failed'
+          );
+        });
 
       res.status(200).json({ success: true, message: 'Application queued for processing', data: application });
     } catch (error) {

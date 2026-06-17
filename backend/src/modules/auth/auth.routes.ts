@@ -11,9 +11,10 @@ import {
   resetPasswordSchema,
   changePasswordSchema,
 } from './auth.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const authController = new AuthController();
+const authController = withControllerLog(new AuthController(), 'auth');
 
 router.post('/register', authLimiter, validate(registerSchema), authController.register);
 router.post('/login', authLimiter, validate(loginSchema), authController.login);

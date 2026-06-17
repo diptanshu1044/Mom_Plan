@@ -9,14 +9,15 @@ import {
   partnerChangePasswordSchema,
 } from './partner-auth.schema';
 import { authenticateOrgUser } from './partner-auth.middleware';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const ctrl = new PartnerAuthController();
+const ctrl = withControllerLog(new PartnerAuthController(), 'partner.auth');
 
-router.post('/register', authLimiter, validate(partnerRegisterSchema), ctrl.register.bind(ctrl));
-router.post('/login',    authLimiter, validate(partnerLoginSchema),    ctrl.login.bind(ctrl));
-router.post('/logout',   ctrl.logout.bind(ctrl));
-router.post('/refresh',  validate(partnerRefreshSchema),               ctrl.refresh.bind(ctrl));
-router.post('/change-password', authenticateOrgUser, validate(partnerChangePasswordSchema), ctrl.changePassword.bind(ctrl));
+router.post('/register', authLimiter, validate(partnerRegisterSchema), ctrl.register);
+router.post('/login',    authLimiter, validate(partnerLoginSchema),    ctrl.login);
+router.post('/logout',   ctrl.logout);
+router.post('/refresh',  validate(partnerRefreshSchema),               ctrl.refresh);
+router.post('/change-password', authenticateOrgUser, validate(partnerChangePasswordSchema), ctrl.changePassword);
 
 export default router;

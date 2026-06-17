@@ -9,9 +9,10 @@ import {
   listAdminApplicationsQuerySchema,
   updateAdminApplicationSchema,
 } from './admin.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const adminController = new AdminController();
+const adminController = withControllerLog(new AdminController(), 'admin');
 
 router.use(authenticate);
 router.use(authorizeRoles('admin'));

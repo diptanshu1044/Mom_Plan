@@ -7,9 +7,10 @@ import {
   createDeadlineSchema,
   dashboardQuerySchema,
 } from './deadlines.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const deadlinesController = new DeadlinesController();
+const deadlinesController = withControllerLog(new DeadlinesController(), 'deadlines');
 
 router.use(authenticate);
 

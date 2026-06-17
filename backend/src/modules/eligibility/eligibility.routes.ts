@@ -3,9 +3,10 @@ import { EligibilityController } from './eligibility.controller';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { getResultParamSchema, getResultsQuerySchema } from './eligibility.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const eligibilityController = new EligibilityController();
+const eligibilityController = withControllerLog(new EligibilityController(), 'eligibility');
 
 router.use(authenticate);
 

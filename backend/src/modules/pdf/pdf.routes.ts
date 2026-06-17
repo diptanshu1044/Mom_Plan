@@ -3,9 +3,10 @@ import { PdfController } from './pdf.controller';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { generatePdfSchema, validatePdfSchema, pdfIdParamSchema, listPdfsQuerySchema, pdfStreamQuerySchema } from './pdf.schema';
+import { withControllerLog } from '../../utils/controllerLog';
 
 const router = Router();
-const pdfController = new PdfController();
+const pdfController = withControllerLog(new PdfController(), 'pdf');
 
 router.use(authenticate);
 
