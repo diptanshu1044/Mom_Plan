@@ -34,7 +34,9 @@ export function PartnerOrgSelect({ value, onChange, error, required }: PartnerOr
         Partner Organization {required && <span className="text-red-500">*</span>}
       </label>
       <p className="text-xs text-on-surface-variant mb-2">
-        Choose the community organization that will support your benefits applications.
+        {required
+          ? "Choose the community organization that will support your benefits applications."
+          : "Optional — choose a community organization to support your benefits applications."}
       </p>
 
       {isLoading ? (

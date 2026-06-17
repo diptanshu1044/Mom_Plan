@@ -6,9 +6,14 @@ export const registerSchema = z.object({
     email: z.string().email(),
     password: z.string().min(8),
     full_name: z.string().min(1),
-    phone: z.string().optional(),
-    partner_org_id: z.string().uuid('Please select a partner organization'),
-    org_type: orgTypeSchema,
+    phone: z
+      .string()
+      .optional()
+      .refine((val) => !val || /^\+1\d{10}$/.test(val), {
+        message: 'Enter a valid US phone number',
+      }),
+    partner_org_id: z.string().uuid('Please select a valid partner organization').optional(),
+    org_type: orgTypeSchema.nullable().or(z.literal('')).optional(),
   }),
 });
 

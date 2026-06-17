@@ -115,8 +115,8 @@ export class AuthService {
     password: string;
     full_name: string;
     phone?: string;
-    partner_org_id: string;
-    org_type: string;
+    partner_org_id?: string;
+    org_type?: string;
   }) {
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
@@ -134,11 +134,13 @@ export class AuthService {
         password_hash,
         full_name: data.full_name,
         phone: data.phone,
-        org_type: data.org_type,
+        org_type: data.org_type || null,
       },
     });
 
-    await motherOrgEnrollment.enrollUserInPartnerOrg(user.id, data.partner_org_id);
+    if (data.partner_org_id) {
+      await motherOrgEnrollment.enrollUserInPartnerOrg(user.id, data.partner_org_id);
+    }
 
     await sendEmail({
       to: user.email,

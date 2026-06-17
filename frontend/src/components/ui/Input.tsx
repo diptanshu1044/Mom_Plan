@@ -10,10 +10,11 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   rightIcon?: React.ReactNode;
   hint?: string;
   numericOnly?: boolean;
+  prefix?: string;
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, leftIcon, rightIcon, hint, id, numericOnly, ...props }, ref) => {
+  ({ className, label, error, leftIcon, rightIcon, hint, id, numericOnly, prefix, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, "-");
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -78,8 +79,19 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {props.required && <span className="text-red-500 ml-1">*</span>}
           </label>
         )}
-        <div className="relative">
-          {leftIcon && (
+        <div className={cn("relative", prefix && "flex")}>
+          {prefix && (
+            <div
+              aria-hidden
+              className={cn(
+                "flex shrink-0 items-center rounded-l-lg border border-r-0 bg-surface-container px-3 py-3 text-sm text-on-surface-variant select-none",
+                error ? "border-red-400" : "border-outline-variant/60"
+              )}
+            >
+              {prefix}
+            </div>
+          )}
+          {leftIcon && !prefix && (
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
               {leftIcon}
             </div>
@@ -91,12 +103,13 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             onPaste={handlePaste}
             onChange={handleChange}
             className={cn(
-              "w-full rounded-lg border bg-white px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/60 transition-all duration-200",
+              "w-full border bg-white px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/60 transition-all duration-200",
+              prefix ? "rounded-r-lg rounded-l-none" : "rounded-lg",
               "focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400",
               error
                 ? "border-red-400 focus:ring-red-200"
                 : "border-outline-variant/60 hover:border-outline-variant",
-              leftIcon && "pl-10",
+              leftIcon && !prefix && "pl-10",
               rightIcon && "pr-10",
               className
             )}
@@ -130,10 +143,11 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
   options: { value: string; label: string }[];
   placeholder?: string;
+  allowEmpty?: boolean;
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, options, placeholder, id, ...props }, ref) => {
+  ({ className, label, error, options, placeholder, allowEmpty, id, ...props }, ref) => {
     const selectId = id || label?.toLowerCase().replace(/\s+/g, "-");
 
     return (
@@ -159,7 +173,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             {...props}
           >
             {placeholder && (
-              <option value="" disabled>
+              <option value="" disabled={!allowEmpty}>
                 {placeholder}
               </option>
             )}
