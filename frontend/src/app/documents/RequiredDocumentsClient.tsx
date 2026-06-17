@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -8,6 +8,8 @@ import {
   ExternalLink,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   MapPin,
   FileText,
   Star,
@@ -61,18 +63,62 @@ const US_STATES = [
 const STATE_LABEL_BY_CODE = Object.fromEntries(US_STATES.map((s) => [s.value, s.label]));
 
 const LEVEL_TABS = ["All levels", "Federal", "State"];
+const PAGE_SIZE = 10;
 
-function buildChecklistParams(state: string, level: string, search: string) {
+function buildChecklistParams(state: string, level: string, search: string, page: number) {
   const params = new URLSearchParams();
   if (state !== "All") params.set("state", state);
   if (level !== "All levels") params.set("level", level);
   if (search.trim()) params.set("search", search.trim());
+  params.set("page", String(page));
+  params.set("limit", String(PAGE_SIZE));
   return params;
+}
+
+function buildPageNumbers(currentPage: number, totalPages: number): number[] {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const pages = new Set<number>([1, totalPages]);
+  for (let page = currentPage - 1; page <= currentPage + 1; page += 1) {
+    if (page >= 1 && page <= totalPages) pages.add(page);
+  }
+  return [...pages].sort((a, b) => a - b);
+}
+
+type PaginationItem =
+  | { type: "page"; page: number }
+  | { type: "ellipsis"; gapId: string };
+
+function buildPaginationItems(currentPage: number, totalPages: number): PaginationItem[] {
+  const pages = buildPageNumbers(currentPage, totalPages);
+  const items: PaginationItem[] = [];
+
+  pages.forEach((page, index) => {
+    const prevPage = pages[index - 1];
+    if (prevPage !== undefined && page - prevPage > 1) {
+      items.push({ type: "ellipsis", gapId: `gap-${prevPage}-${page}` });
+    }
+    items.push({ type: "page", page });
+  });
+
+  return items;
+}
+
+function formatResultsRange(page: number, limit: number, total: number): string {
+  if (total === 0) return "No schemes found";
+  const start = (page - 1) * limit + 1;
+  const end = Math.min(page * limit, total);
+  return `Showing ${start}–${end} of ${total} scheme${total === 1 ? "" : "s"}`;
 }
 
 export default function RequiredDocumentsPage() {
   const [displayedPrograms, setDisplayedPrograms] = useState<ChecklistProgram[]>([]);
   const [availableStateCodes, setAvailableStateCodes] = useState<string[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [filterLoading, setFilterLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -80,8 +126,13 @@ export default function RequiredDocumentsPage() {
   const [selectedState, setSelectedState] = useState("All");
   const [selectedLevel, setSelectedLevel] = useState("All levels");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [pageInput, setPageInput] = useState("");
+  const [openJumpGap, setOpenJumpGap] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const hasLoadedOnceRef = useRef(false);
+  const pageJumpInputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const filtersKeyRef = useRef("");
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -89,6 +140,19 @@ export default function RequiredDocumentsPage() {
   }, [search]);
 
   useEffect(() => {
+    const filtersKey = `${selectedState}|${selectedLevel}|${debouncedSearch}`;
+    const filtersChanged = filtersKeyRef.current !== filtersKey;
+
+    if (filtersChanged) {
+      filtersKeyRef.current = filtersKey;
+      setOpenJumpGap(null);
+      setPageInput("");
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+        return;
+      }
+    }
+
     const requestId = ++requestIdRef.current;
     let cancelled = false;
     const isInitialLoad = !hasLoadedOnceRef.current;
@@ -101,17 +165,22 @@ export default function RequiredDocumentsPage() {
       }
 
       try {
-        const params = buildChecklistParams(selectedState, selectedLevel, debouncedSearch);
+        const params = buildChecklistParams(selectedState, selectedLevel, debouncedSearch, currentPage);
         const query = params.toString();
         const response = await api.get(
-          `/api/programs/documents-checklist${query ? `?${query}` : ""}`
+          `/api/programs/documents-checklist?${query}`
         );
 
         if (cancelled || requestId !== requestIdRef.current) return;
 
         if (response.data.success) {
-          const { programs, availableStates } = response.data.data;
-          setDisplayedPrograms(programs);
+          const { programs, availableStates, total: count, pagination } = response.data.data;
+          setDisplayedPrograms(programs ?? []);
+          setTotal(count ?? 0);
+          setTotalPages(pagination?.totalPages ?? 1);
+          if (pagination?.page && pagination.page !== currentPage) {
+            setCurrentPage(pagination.page);
+          }
           hasLoadedOnceRef.current = true;
           if (availableStates?.length) {
             setAvailableStateCodes(availableStates);
@@ -131,11 +200,61 @@ export default function RequiredDocumentsPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedState, selectedLevel, debouncedSearch]);
+  }, [selectedState, selectedLevel, debouncedSearch, currentPage]);
+
+  useEffect(() => {
+    if (openJumpGap) {
+      pageJumpInputRef.current?.focus();
+    }
+  }, [openJumpGap]);
 
   const availableStates = US_STATES.filter((state) => availableStateCodes.includes(state.value));
   const showInitialLoader = loading && displayedPrograms.length === 0;
   const showFilterOverlay = filterLoading && displayedPrograms.length > 0;
+  const paginationItems = buildPaginationItems(currentPage, totalPages);
+
+  const goToPage = (page: number) => {
+    if (page < 1 || page > totalPages || page === currentPage) return;
+    setOpenJumpGap(null);
+    setPageInput("");
+    setExpandedId(null);
+    setCurrentPage(page);
+    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const openPageJump = (gapId: string) => {
+    setOpenJumpGap(gapId);
+    setPageInput("");
+  };
+
+  const closePageJump = () => {
+    setOpenJumpGap(null);
+    setPageInput("");
+  };
+
+  const submitPageJump = () => {
+    const parsed = Number.parseInt(pageInput, 10);
+    if (!Number.isFinite(parsed)) {
+      closePageJump();
+      return;
+    }
+    const clamped = Math.min(Math.max(1, parsed), totalPages);
+    if (clamped === currentPage) {
+      closePageJump();
+      return;
+    }
+    goToPage(clamped);
+  };
+
+  const handlePageJumpKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitPageJump();
+    }
+    if (event.key === "Escape") {
+      closePageJump();
+    }
+  };
 
   return (
     <>
@@ -203,7 +322,7 @@ export default function RequiredDocumentsPage() {
               {showFilterOverlay && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {showFilterOverlay
                 ? "Updating results..."
-                : `Showing ${displayedPrograms.length} schemes`}
+                : formatResultsRange(currentPage, PAGE_SIZE, total)}
             </span>
           </div>
 
@@ -215,7 +334,7 @@ export default function RequiredDocumentsPage() {
             <span>Link</span>
           </div>
 
-          <div className="space-y-3 pb-20 relative">
+          <div ref={resultsRef} className="space-y-3 pb-20 relative">
             {showInitialLoader ? (
               <div className="flex items-center justify-center py-20 text-on-surface-variant">
                 <Loader2 className="w-6 h-6 animate-spin mr-2" />
@@ -446,6 +565,90 @@ export default function RequiredDocumentsPage() {
               </div>
             )}
           </div>
+
+          {!showInitialLoader && totalPages > 1 && (
+            <nav
+              className="mt-6 mb-24 flex items-center justify-center gap-2 flex-wrap"
+              aria-label="Documents checklist pagination"
+            >
+              <button
+                type="button"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1 || filterLoading}
+                className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-outline-variant/30 bg-white text-sm font-semibold text-on-surface disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </button>
+
+              <div className="flex items-center gap-1">
+                {paginationItems.map((item) => {
+                  if (item.type === "page") {
+                    return (
+                      <button
+                        key={`page-${item.page}`}
+                        type="button"
+                        onClick={() => goToPage(item.page)}
+                        disabled={filterLoading}
+                        aria-current={item.page === currentPage ? "page" : undefined}
+                        className={`min-w-10 h-10 rounded-xl text-sm font-semibold border transition-colors ${
+                          item.page === currentPage
+                            ? "bg-primary border-primary text-white shadow-primary"
+                            : "bg-white border-outline-variant/30 text-on-surface hover:bg-surface-container"
+                        }`}
+                      >
+                        {item.page}
+                      </button>
+                    );
+                  }
+
+                  if (openJumpGap === item.gapId) {
+                    return (
+                      <input
+                        key={item.gapId}
+                        ref={pageJumpInputRef}
+                        type="number"
+                        min={1}
+                        max={totalPages}
+                        value={pageInput}
+                        onChange={(e) => setPageInput(e.target.value)}
+                        onKeyDown={handlePageJumpKeyDown}
+                        onBlur={submitPageJump}
+                        disabled={filterLoading}
+                        aria-label="Enter page number"
+                        placeholder="Page"
+                        className="w-14 h-10 px-2 rounded-xl border border-primary bg-white text-sm text-on-surface text-center font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={item.gapId}
+                      type="button"
+                      onClick={() => openPageJump(item.gapId)}
+                      disabled={filterLoading}
+                      aria-label="Jump to page"
+                      title="Jump to page"
+                      className="min-w-10 h-10 rounded-xl text-sm font-semibold border border-outline-variant/30 bg-white text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                    >
+                      …
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages || filterLoading}
+                className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-outline-variant/30 bg-white text-sm font-semibold text-on-surface disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container transition-colors"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </nav>
+          )}
         </div>
 
         <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-outline-variant/20 px-4 py-3 flex items-center justify-between max-w-5xl mx-auto z-40">

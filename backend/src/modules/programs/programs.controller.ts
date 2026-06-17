@@ -28,6 +28,8 @@ export class ProgramsController {
         state: req.query.state as string | undefined,
         level: req.query.level as string | undefined,
         search: req.query.search as string | undefined,
+        page: req.query.page ? Number(req.query.page) : undefined,
+        limit: req.query.limit ? Number(req.query.limit) : undefined,
       };
       const data = await programsService.listDocumentsChecklist(filters);
       res.status(200).json({ success: true, data });

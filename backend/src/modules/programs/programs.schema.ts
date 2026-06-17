@@ -5,6 +5,8 @@ export const listDocumentsChecklistQuerySchema = z.object({
     state: z.string().optional(),
     level: z.enum(['All levels', 'Federal', 'State']).optional(),
     search: z.string().optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
   }),
 });
 

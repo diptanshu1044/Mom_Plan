@@ -258,13 +258,19 @@ export class ProgramsService {
     };
   }
 
-  async listDocumentsChecklist(filters: { state?: string; level?: string; search?: string } = {}) {
+  async listDocumentsChecklist(filters: {
+    state?: string;
+    level?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  } = {}) {
     const { programs: allPrograms, availableStates } = await this.getChecklistCache();
     const query = (filters.search || '').trim().toLowerCase();
     const selectedState = filters.state && filters.state !== 'All' ? filters.state.toUpperCase() : 'All';
     const selectedLevel = filters.level || 'All levels';
 
-    const programs = allPrograms.filter((program) => {
+    const filtered = allPrograms.filter((program) => {
       const matchState =
         selectedState === 'All' ||
         program.isFederal ||
@@ -283,7 +289,30 @@ export class ProgramsService {
       return matchState && matchLevel && matchSearch;
     });
 
-    return { programs, availableStates };
+    const total = filtered.length;
+    const paginate = filters.limit !== undefined;
+    const page = filters.page || 1;
+    const limit = filters.limit ?? total;
+    const totalPages = paginate ? Math.max(1, Math.ceil(total / limit)) : 1;
+    const safePage = paginate ? Math.min(page, totalPages) : 1;
+    const skip = paginate ? (safePage - 1) * limit : 0;
+    const programs = filtered.slice(skip, paginate ? skip + limit : undefined);
+
+    return {
+      programs,
+      availableStates,
+      total,
+      ...(paginate
+        ? {
+            pagination: {
+              page: safePage,
+              limit,
+              total,
+              totalPages,
+            },
+          }
+        : {}),
+    };
   }
 
   private async getChecklistCache() {
