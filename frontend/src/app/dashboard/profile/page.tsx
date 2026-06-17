@@ -27,7 +27,7 @@ import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { PlanBadge } from "@/components/ui/Badge";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
-import { ORG_TYPE_OPTIONS } from "@/lib/org-types";
+import { ORG_TYPE_OPTIONS, ORG_TYPES } from "@/lib/org-types";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { formatUserName, userInitials } from "@/lib/name";
@@ -142,8 +142,18 @@ const profileSchema = z.object({
   state: z.string().optional(),
   zip_code: z.string().optional(),
   profile_picture: z.string().optional(),
-  org_type: z.string().min(1, "Please select an organization type"),
-  partner_org_id: z.string().uuid("Please select a partner organization"),
+  org_type: z
+    .string()
+    .optional()
+    .refine((val) => !val || ORG_TYPES.includes(val as (typeof ORG_TYPES)[number]), {
+      message: "Please select a valid organization type",
+    }),
+  partner_org_id: z
+    .string()
+    .optional()
+    .refine((val) => !val || z.string().uuid().safeParse(val).success, {
+      message: "Please select a valid partner organization",
+    }),
 
   // Family profile base fields
   household_size: z.string().optional(),
@@ -263,6 +273,8 @@ export default function ProfilePage() {
     mutationFn: (data: ProfileForm) => {
       const payload = {
         ...data,
+        org_type: data.org_type || null,
+        partner_org_id: data.partner_org_id || null,
         household_size: data.household_size ? parseInt(data.household_size) : undefined,
         num_children: data.num_children ? parseInt(data.num_children) : undefined,
         monthly_income: data.monthly_income ? parseFloat(data.monthly_income) : undefined,
@@ -420,7 +432,6 @@ export default function ProfilePage() {
                   options={ORG_TYPE_OPTIONS}
                   placeholder="Select organization type…"
                   error={profileForm.formState.errors.org_type?.message}
-                  required
                   {...profileForm.register("org_type")}
                 />
                 <div className="sm:col-span-2">
@@ -430,7 +441,6 @@ export default function ProfilePage() {
                       profileForm.setValue("partner_org_id", id, { shouldValidate: true })
                     }
                     error={profileForm.formState.errors.partner_org_id?.message}
-                    required
                   />
                 </div>
                 <Select

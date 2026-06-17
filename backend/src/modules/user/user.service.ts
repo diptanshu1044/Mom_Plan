@@ -1,5 +1,5 @@
 import { prisma } from '../../config/prisma';
-import { BadRequestError, NotFoundError } from '../../utils/errors';
+import { NotFoundError } from '../../utils/errors';
 import { MotherOrgEnrollmentService } from '../partner/mother-org-enrollment.service';
 import { joinFullName, userNameSelect } from '../../utils/name.utils';
 
@@ -105,9 +105,10 @@ export class UserService {
 
     if (partner_org_id !== undefined) {
       if (!partner_org_id) {
-        throw new BadRequestError('Partner organization is required');
+        userUpdate.partner_org_id = null;
+      } else {
+        await motherOrgEnrollment.enrollUserInPartnerOrg(userId, partner_org_id);
       }
-      await motherOrgEnrollment.enrollUserInPartnerOrg(userId, partner_org_id);
     }
 
     if (Object.keys(userUpdate).length > 0) {

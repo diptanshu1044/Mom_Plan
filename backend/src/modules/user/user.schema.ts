@@ -11,7 +11,7 @@ export const updateProfileSchema = z.object({
     state: z.string().nullable().or(z.literal('')).optional(),
     zip_code: z.string().nullable().or(z.literal('')).optional(),
     profile_picture: z.string().nullable().or(z.literal('')).optional(),
-    partner_org_id: z.string().uuid().optional(),
+    partner_org_id: z.string().uuid().nullable().or(z.literal('')).optional(),
     org_type: orgTypeSchema.nullable().or(z.literal('')).optional(),
     // Family Profile fields allowed in main profile update for convenience
     household_size: z.number().int().min(1).optional(),
