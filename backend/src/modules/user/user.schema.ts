@@ -1,6 +1,64 @@
 import { z } from 'zod';
 import { orgTypeSchema } from '../../constants/org-types';
 
+function getAdultDobBounds(referenceDate = new Date()) {
+  const currentYear = referenceDate.getFullYear();
+  const maxDate = new Date(
+    currentYear - 16,
+    referenceDate.getMonth(),
+    referenceDate.getDate(),
+  );
+  const minDate = new Date(currentYear - 100, 0, 1);
+  return { minDate, maxDate };
+}
+
+function parseIsoDateLocal(iso: string): Date | null {
+  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+const dateOfBirthSchema = z
+  .string()
+  .nullable()
+  .or(z.literal(''))
+  .optional()
+  .superRefine((value, ctx) => {
+    if (!value) return;
+    const parsed = parseIsoDateLocal(value);
+    if (!parsed) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Date of birth must be a valid date (YYYY-MM-DD).',
+      });
+      return;
+    }
+    const { minDate, maxDate } = getAdultDobBounds();
+    if (parsed < minDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Date of birth cannot be more than 100 years ago.',
+      });
+    }
+    if (parsed > maxDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'You must be at least 16 years old.',
+      });
+    }
+  });
+
 export const updateProfileSchema = z.object({
   body: z.object({
     first_name: z.string().trim().min(1).optional(),
@@ -32,7 +90,7 @@ export const updateProfileSchema = z.object({
     domestic_violence: z.boolean().optional(),
     chronic_illness: z.boolean().optional(),
     immigration_status: z.string().nullable().or(z.literal('')).optional(),
-    date_of_birth: z.string().nullable().or(z.literal('')).optional(), // ISO string or format
+    date_of_birth: dateOfBirthSchema,
     ssn_last_four: z.string().max(4).nullable().or(z.literal('')).optional(),
     children_dobs: z.array(z.string()).optional(),
     preferred_language: z.string().nullable().or(z.literal('')).optional(),

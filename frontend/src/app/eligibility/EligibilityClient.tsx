@@ -30,8 +30,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
+import {
+  apiDateToIsoLocal,
+  getAdultDobBounds,
+  parseIsoDateLocal,
+  validateDateOfBirth,
+} from "@/lib/date-of-birth";
 
 /**
  * Safely converts a value that might be a Prisma Decimal object, number, or
@@ -328,137 +335,13 @@ function DollarInput({ placeholder, value, onChange }: { placeholder?: string; v
   );
 }
 
-function DateOfBirthDropdowns({
-  value,
-  onChange,
-  isChild = false,
-}: {
-  value: string;
-  onChange: (val: string) => void;
-  isChild?: boolean;
-}) {
-  let initialYear = "";
-  let initialMonth = "";
-  let initialDay = "";
-  if (value && value.includes("-")) {
-    const parts = value.split("-");
-    if (parts.length === 3) {
-      initialYear = parts[0];
-      initialMonth = parts[1];
-      initialDay = parts[2];
-    }
-  }
-
-  const [year, setYear] = useState(initialYear);
-  const [month, setMonth] = useState(initialMonth);
-  const [day, setDay] = useState(initialDay);
-
-  useEffect(() => {
-    if (value && value.includes("-")) {
-      const parts = value.split("-");
-      if (parts.length === 3) {
-        setYear(parts[0]);
-        setMonth(parts[1]);
-        setDay(parts[2]);
-      }
-    } else {
-      setYear("");
-      setMonth("");
-      setDay("");
-    }
-  }, [value]);
-
-  const handleSelect = (y: string, m: string, d: string) => {
-    setYear(y);
-    setMonth(m);
-    setDay(d);
-    if (y && m && d) {
-      onChange(`${y}-${m}-${d}`);
-    } else {
-      onChange("");
-    }
-  };
-
-  const currentYear = new Date().getFullYear();
-  const years = [];
-  if (isChild) {
-    for (let i = currentYear; i >= currentYear - 18; i--) {
-      years.push(String(i));
-    }
-  } else {
-    for (let i = currentYear; i >= currentYear - 100; i--) {
-      years.push(String(i));
-    }
-  }
-
-  const months = [
-    { val: "01", label: "January" },
-    { val: "02", label: "February" },
-    { val: "03", label: "March" },
-    { val: "04", label: "April" },
-    { val: "05", label: "May" },
-    { val: "06", label: "June" },
-    { val: "07", label: "July" },
-    { val: "08", label: "August" },
-    { val: "09", label: "September" },
-    { val: "10", label: "October" },
-    { val: "11", label: "November" },
-    { val: "12", label: "December" },
-  ];
-
-  const days = [];
-  for (let i = 1; i <= 31; i++) {
-    days.push(String(i).padStart(2, "0"));
-  }
-
-  return (
-    <div className="grid grid-cols-3 gap-2">
-      <select
-        value={month}
-        onChange={(e) => handleSelect(year, e.target.value, day)}
-        className="px-3 py-2.5 rounded-xl border border-outline-variant bg-white focus:border-primary-500 outline-none text-sm font-medium text-on-surface"
-      >
-        <option value="">Month</option>
-        {months.map((m) => (
-          <option key={m.val} value={m.val}>
-            {m.label}
-          </option>
-        ))}
-      </select>
-      <select
-        value={day}
-        onChange={(e) => handleSelect(year, month, e.target.value)}
-        className="px-3 py-2.5 rounded-xl border border-outline-variant bg-white focus:border-primary-500 outline-none text-sm font-medium text-on-surface"
-      >
-        <option value="">Day</option>
-        {days.map((d) => (
-          <option key={d} value={d}>
-            {parseInt(d)}
-          </option>
-        ))}
-      </select>
-      <select
-        value={year}
-        onChange={(e) => handleSelect(e.target.value, month, day)}
-        className="px-3 py-2.5 rounded-xl border border-outline-variant bg-white focus:border-primary-500 outline-none text-sm font-medium text-on-surface"
-      >
-        <option value="">Year</option>
-        {years.map((y) => (
-          <option key={y} value={y}>
-            {y}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 export default function EligibilityPage() {
   const [step, setStep] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
   const [scanComplete, setScanComplete] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [dobError, setDobError] = useState<string | null>(null);
   const [isFetchingProfile, setIsFetchingProfile] = useState(false);
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
@@ -524,16 +407,10 @@ export default function EligibilityPage() {
 
         const fp = freshUser?.family_profile;
 
-        const dobStr = (() => {
-          if (!fp?.date_of_birth) return "";
-          try {
-            const d = new Date(fp.date_of_birth);
-            return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
-          } catch { return ""; }
-        })();
+        const dobStr = apiDateToIsoLocal(fp?.date_of_birth);
 
         const numChildren = fp?.num_children || 0;
-        const initialDobs = [...(fp?.children_dobs || [])];
+        const initialDobs = [...(fp?.children_dobs || [])].map((dob) => apiDateToIsoLocal(dob));
         while (initialDobs.length < numChildren) initialDobs.push("");
 
         setFormData({
@@ -585,15 +462,9 @@ export default function EligibilityPage() {
         // Fallback to Zustand state if API fetch fails
         if (user) {
           const fp = user.family_profile;
-          const dobStr = (() => {
-            if (!fp?.date_of_birth) return "";
-            try {
-              const d = new Date(fp.date_of_birth);
-              return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
-            } catch { return ""; }
-          })();
+          const dobStr = apiDateToIsoLocal(fp?.date_of_birth);
           const numChildren = fp?.num_children || 0;
-          const initialDobs = [...(fp?.children_dobs || [])];
+          const initialDobs = [...(fp?.children_dobs || [])].map((dob) => apiDateToIsoLocal(dob));
           while (initialDobs.length < numChildren) initialDobs.push("");
           setFormData(prev => ({
             ...prev,
@@ -654,6 +525,26 @@ export default function EligibilityPage() {
     });
   };
 
+  const validateMotherDob = (): boolean => {
+    const bounds = getAdultDobBounds();
+    const result = validateDateOfBirth(
+      formData.date_of_birth ? parseIsoDateLocal(formData.date_of_birth) : null,
+      bounds,
+      { required: true }
+    );
+    if (!result.valid) {
+      setDobError(result.message);
+      return false;
+    }
+    setDobError(null);
+    return true;
+  };
+
+  const handleNextStep = () => {
+    if (step === 1 && !validateMotherDob()) return;
+    setStep((s) => s + 1);
+  };
+
   const setNumChildren = (n: number) => {
     const count = Math.max(0, n);
     setFormData((prev) => {
@@ -666,6 +557,19 @@ export default function EligibilityPage() {
   const runScan = async (overrideData?: typeof formData) => {
     const dataToSubmit = overrideData || formData;
     setError(null);
+
+    const bounds = getAdultDobBounds();
+    const dobResult = validateDateOfBirth(
+      dataToSubmit.date_of_birth ? parseIsoDateLocal(dataToSubmit.date_of_birth) : null,
+      bounds,
+      { required: true }
+    );
+    if (!dobResult.valid) {
+      setDobError(dobResult.message);
+      setStep(1);
+      return;
+    }
+    setDobError(null);
     if (!isAuthenticated) {
       if (typeof window !== "undefined") {
         localStorage.setItem("pending_eligibility_scan", JSON.stringify(dataToSubmit));
@@ -968,9 +872,12 @@ export default function EligibilityPage() {
 
                     <div>
                       <FieldLabel sub="Required for identity verification on all applications.">What's your date of birth? *</FieldLabel>
-                      <DateOfBirthDropdowns
+                      <DateOfBirthPicker
                         value={formData.date_of_birth}
                         onChange={(val) => set("date_of_birth", val)}
+                        required
+                        error={dobError ?? undefined}
+                        onValidationChange={setDobError}
                       />
                     </div>
 
@@ -1123,14 +1030,15 @@ export default function EligibilityPage() {
                           {Array.from({ length: formData.num_children }).map((_, i) => (
                             <div key={i} className="flex flex-col gap-2 p-3 rounded-xl border border-outline-variant/30 bg-surface-container-low">
                               <span className="text-xs font-bold text-on-surface-variant">Child {i + 1} Birthdate</span>
-                              <DateOfBirthDropdowns
+                              <DateOfBirthPicker
+                                variant="child"
+                                maxAge={18}
                                 value={formData.children_birthdates[i] || ""}
                                 onChange={(val) => {
                                   const dates = [...formData.children_birthdates];
                                   dates[i] = val;
                                   set("children_birthdates", dates);
                                 }}
-                                isChild={true}
                               />
                             </div>
                           ))}
@@ -1386,7 +1294,7 @@ export default function EligibilityPage() {
                 ) : <div />}
 
                 {step < SECTIONS.length ? (
-                  <button type="button" onClick={() => setStep(s => s + 1)}
+                  <button type="button" onClick={handleNextStep}
                     className="flex items-center gap-2 px-6 py-2.5 bg-gradient-primary text-white font-bold text-sm rounded-xl shadow-primary hover:shadow-primary-lg hover:-translate-y-0.5 transition-all">
                     Next <ArrowRight className="w-4 h-4" />
                   </button>
