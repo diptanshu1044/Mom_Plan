@@ -7,6 +7,10 @@ const envSchema = z.object({
   // ─── Core ──────────────────────────────────────────────────────────
   PORT: z.string().default('5000'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  /** Log level: trace | debug | info | warn | error | fatal | silent */
+  LOG_LEVEL: z
+    .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
+    .optional(),
   FRONTEND_URL: z.string().default('http://localhost:3000'),
   ADMIN_FRONTEND_URL: z.string().default('http://localhost:3001'),
   /** Comma-separated list of additional allowed CORS origins */

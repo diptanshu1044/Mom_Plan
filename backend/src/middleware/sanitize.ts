@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { logger } from '../config/logger';
 
 /**
  * Fields that must NEVER appear in API responses or logs.
@@ -83,25 +84,65 @@ export const responseSanitizer = (req: Request, res: Response, next: NextFunctio
 };
 
 /**
- * Audit-safe logger: wraps console.error so sensitive values are stripped
- * before any log line reaches stdout/stderr or external log aggregators.
+ * Audit-safe logger: strips sensitive values before they reach log aggregators.
+ * Wraps the shared Pino instance (pretty in dev, JSON in production).
  */
+function sanitizeLogArg(arg: unknown): unknown {
+  if (arg instanceof Error) {
+    return {
+      name: arg.name,
+      message: sanitizeLogMessage(arg.message),
+      stack: arg.stack,
+    };
+  }
+  if (typeof arg === 'string') return sanitizeLogMessage(arg);
+  if (arg !== null && typeof arg === 'object') {
+    return sanitizeObject(arg);
+  }
+  return arg;
+}
+
+function writeLog(
+  level: 'info' | 'warn' | 'error' | 'debug',
+  msgOrObj: unknown,
+  ...args: unknown[]
+): void {
+  if (
+    typeof msgOrObj === 'object' &&
+    msgOrObj !== null &&
+    !Array.isArray(msgOrObj) &&
+    typeof args[0] === 'string'
+  ) {
+    const bindings = sanitizeObject(msgOrObj) as Record<string, unknown>;
+    const msg = sanitizeLogMessage(args[0]);
+    const rest = args.slice(1).map(sanitizeLogArg);
+    if (rest.length > 0) {
+      logger[level]({ ...bindings, details: rest }, msg);
+    } else {
+      logger[level](bindings, msg);
+    }
+    return;
+  }
+
+  const msg = sanitizeLogMessage(String(msgOrObj));
+  const rest = args.map(sanitizeLogArg);
+  if (rest.length === 0) {
+    logger[level](msg);
+    return;
+  }
+  if (rest.length === 1 && typeof rest[0] === 'object' && rest[0] !== null && !Array.isArray(rest[0])) {
+    logger[level](rest[0] as Record<string, unknown>, msg);
+    return;
+  }
+  logger[level]({ details: rest }, msg);
+}
+
 export function createSafeLogger() {
   return {
-    info: (msg: string, ...args: unknown[]) => {
-      console.info('[INFO]', sanitizeLogMessage(String(msg)), ...args);
-    },
-    warn: (msg: string, ...args: unknown[]) => {
-      console.warn('[WARN]', sanitizeLogMessage(String(msg)), ...args);
-    },
-    error: (msg: string, ...args: unknown[]) => {
-      const sanitizedArgs = args.map((a) => {
-        if (a instanceof Error) return { name: a.name, message: sanitizeLogMessage(a.message) };
-        if (typeof a === 'string') return sanitizeLogMessage(a);
-        return a;
-      });
-      console.error('[ERROR]', sanitizeLogMessage(String(msg)), ...sanitizedArgs);
-    },
+    debug: (msgOrObj: unknown, ...args: unknown[]) => writeLog('debug', msgOrObj, ...args),
+    info: (msgOrObj: unknown, ...args: unknown[]) => writeLog('info', msgOrObj, ...args),
+    warn: (msgOrObj: unknown, ...args: unknown[]) => writeLog('warn', msgOrObj, ...args),
+    error: (msgOrObj: unknown, ...args: unknown[]) => writeLog('error', msgOrObj, ...args),
   };
 }
 

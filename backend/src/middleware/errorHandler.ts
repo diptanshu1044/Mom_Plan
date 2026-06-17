@@ -3,9 +3,26 @@ import { Prisma } from '@prisma/client';
 import { AppError } from '../utils/errors';
 import { ZodError } from 'zod';
 import { safeLogger } from './sanitize';
+import { logger } from '../config/logger';
 
 const GENERIC_SERVER_MESSAGE = 'Something went wrong. Please try again later.';
 const GENERIC_UNAVAILABLE_MESSAGE = 'Service temporarily unavailable. Please try again.';
+
+function getLog(req: Request) {
+  return req.log ?? logger;
+}
+
+function requestContext(req: Request) {
+  return {
+    method: req.method,
+    path: req.path,
+    url: req.originalUrl,
+    requestId: req.id,
+    userId: req.user?.id,
+    orgUserId: req.orgUser?.orgUserId,
+    orgId: req.orgUser?.orgId,
+  };
+}
 
 export const errorHandler = (
   err: Error,
@@ -14,6 +31,9 @@ export const errorHandler = (
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   next: NextFunction
 ) => {
+  const log = getLog(req);
+  const ctx = requestContext(req);
+
   // Determine if it is a client-side error (4xx) or an internal server error (500+)
   let isInternalError = true;
   let statusCode = 500;
@@ -30,9 +50,12 @@ export const errorHandler = (
   }
 
   if (isInternalError) {
-    safeLogger.error('Internal error caught by middleware:', err);
+    safeLogger.error({ ...ctx, err, statusCode }, 'Internal error caught by middleware');
   } else {
-    safeLogger.warn(`Client error (${statusCode}) caught by middleware: ${err.message}`);
+    log.warn(
+      { ...ctx, statusCode, errorName: err.name, errorMessage: err.message },
+      `Client error (${statusCode})`
+    );
   }
 
   if (err instanceof AppError) {
@@ -73,7 +96,7 @@ export const errorHandler = (
     err instanceof Prisma.PrismaClientValidationError ||
     err instanceof Prisma.PrismaClientInitializationError
   ) {
-    safeLogger.error('Database error caught by middleware:', err);
+    safeLogger.error({ ...ctx, err, statusCode: 503 }, 'Database error caught by middleware');
     return res.status(503).json({
       success: false,
       error: {
@@ -84,7 +107,7 @@ export const errorHandler = (
   }
 
   // Fallback — never expose raw stack traces or internal messages to clients
-  safeLogger.error('Unhandled error caught by middleware:', err);
+  safeLogger.error({ ...ctx, err, statusCode: 500 }, 'Unhandled error caught by middleware');
   return res.status(500).json({
     success: false,
     error: {

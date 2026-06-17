@@ -6,6 +6,7 @@ import { allowedOrigins } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
 import { responseSanitizer } from './middleware/sanitize';
+import { requestLogger } from './middleware/requestLogger';
 
 // Import Feature Routers
 import authRoutes from './modules/auth/auth.routes';
@@ -34,6 +35,9 @@ const app: Application = express();
 
 // Trust proxy for secure, accurate client IP rate-limiting behind Render/Vercel/reverse proxies
 app.set('trust proxy', 1);
+
+// HTTP request/response logging (pretty in dev, JSON in production)
+app.use(requestLogger);
 
 // Security Middleware
 app.use(helmet());

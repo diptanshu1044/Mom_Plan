@@ -1,21 +1,23 @@
 import app from './app';
 import { env, allowedOrigins } from './config/env';
 import { prisma } from './config/prisma';
+import { logger } from './config/logger';
 
 const startServer = async () => {
   // ─── 1. Database Connection ────────────────────────────────────────
   let dbConnected = false;
   try {
     await prisma.$connect();
-    console.log('✅ Connected to PostgreSQL database via Prisma ORM');
+    logger.info('Connected to PostgreSQL database via Prisma ORM');
     dbConnected = true;
   } catch (dbError: any) {
     if (env.NODE_ENV === 'development') {
-      console.warn('⚠️  PostgreSQL connection failed — server starting WITHOUT database.');
-      console.warn('   Ensure PostgreSQL is running and DATABASE_URL is correct in .env');
-      console.warn(`   Error: ${dbError.message}\n`);
+      logger.warn(
+        { err: dbError },
+        'PostgreSQL connection failed — server starting WITHOUT database. Ensure PostgreSQL is running and DATABASE_URL is correct in .env'
+      );
     } else {
-      console.error('❌ PostgreSQL connection failed in production — shutting down.', dbError);
+      logger.fatal({ err: dbError }, 'PostgreSQL connection failed in production — shutting down');
       process.exit(1);
     }
   }
@@ -25,37 +27,39 @@ const startServer = async () => {
     try {
       const { startBackgroundScheduler } = await import('./jobs/scheduler');
       await startBackgroundScheduler();
-      console.log('✅ Background task scheduler started');
+      logger.info('Background task scheduler started');
     } catch (jobError: any) {
-      console.warn('⚠️  Background tasks failed to start.');
-      console.warn(`   Error: ${jobError.message}\n`);
+      logger.warn({ err: jobError }, 'Background tasks failed to start');
     }
   }
 
   // ─── 3. HTTP Server ────────────────────────────────────────────────
   const server = app.listen(env.PORT, () => {
-    console.log(`\n🚀 MomPlan Backend running in ${env.NODE_ENV} mode on port ${env.PORT}`);
-    console.log(`🔗 CORS origins: ${allowedOrigins.join(', ')}`);
-    if (!dbConnected) {
-      console.log('⚠️  API health endpoint is up but database routes will fail until PostgreSQL is available.');
-    }
-    console.log('\nReady to accept requests.\n');
+    logger.info(
+      {
+        port: env.PORT,
+        nodeEnv: env.NODE_ENV,
+        corsOrigins: allowedOrigins,
+        dbConnected,
+      },
+      'MomPlan Backend ready to accept requests'
+    );
   });
 
   // ─── 4. Graceful Shutdown ──────────────────────────────────────────
   const shutdown = async (signal: string) => {
-    console.log(`\n🛑 Received ${signal} — shutting down gracefully...`);
+    logger.info({ signal }, 'Shutting down gracefully');
     server.close(async () => {
       if (dbConnected) {
         await prisma.$disconnect();
       }
-      console.log('👋 Server shutdown complete.');
+      logger.info('Server shutdown complete');
       process.exit(0);
     });
 
     // Force-kill after 10 seconds if shutdown hangs
     setTimeout(() => {
-      console.error('⏱️  Shutdown timeout — forcing exit.');
+      logger.error('Shutdown timeout — forcing exit');
       process.exit(1);
     }, 10_000);
   };
@@ -63,11 +67,11 @@ const startServer = async () => {
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('uncaughtException', (err) => {
-    console.error('💥 Uncaught exception:', err);
+    logger.fatal({ err }, 'Uncaught exception');
     shutdown('uncaughtException');
   });
   process.on('unhandledRejection', (reason) => {
-    console.error('💥 Unhandled promise rejection:', reason);
+    logger.fatal({ reason }, 'Unhandled promise rejection');
     shutdown('unhandledRejection');
   });
 };
