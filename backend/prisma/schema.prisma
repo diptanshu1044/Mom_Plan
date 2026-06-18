@@ -41,7 +41,6 @@ model User {
   generated_pdfs         GeneratedPdf[]
   mother_profile         Mother?              @relation("MotherUser")
   notifications          Notification[]
-  billing_organization   Organization? @relation("PartnerOrgBillingUser")
   payments               Payment[]
   pdf_generations        PdfGeneration[]
   family_profile         FamilyProfile?
@@ -49,7 +48,6 @@ model User {
   reminders              Reminder[]
   eligibility_results    EligibilityResult[]
   subscriptions          Subscription[]
-  organization           Organization? @relation("UserPartnerOrg", fields: [org_id], references: [id])
 
   @@index([org_id])
   @@map("users")
@@ -289,8 +287,8 @@ model EligibilityResult {
   created_at        DateTime?         @default(now()) @db.Timestamptz(6)
   updated_at        DateTime          @default(now()) @db.Timestamptz(6)
   ai_processed      Boolean           @default(false)
-  community_organization CommunityOrganization? @relation(fields: [org_id], references: [id])
-  program                BenefitProgram         @relation(fields: [program_id], references: [id], onDelete: Cascade)
+  organization Organization?  @relation(fields: [org_id], references: [id])
+  program      BenefitProgram @relation(fields: [program_id], references: [id], onDelete: Cascade)
   user                   User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, program_id])
@@ -485,8 +483,8 @@ model Appointment {
   notes            String?
   created_at       DateTime?     @default(now()) @db.Timestamptz(6)
   updated_at       DateTime      @default(now()) @db.Timestamptz(6)
-  community_organization CommunityOrganization? @relation(fields: [org_id], references: [id])
-  user                   User                   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [org_id], references: [id])
+  user         User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("appointments")
 }
@@ -522,7 +520,7 @@ model IncomeThreshold {
   @@map("income_thresholds")
 }
 
-model CommunityOrganization {
+model Organization {
   id                 String              @id @default(uuid()) @db.Uuid
   org_name           String
   category           String
@@ -561,10 +559,10 @@ model CommunityOrganization {
   services           OrgService[]
   results            EligibilityResult[]
 
-  @@index([dv_safety_mode], map: "idx_community_organizations_dv_safety_mode")
-  @@index([state], map: "idx_community_organizations_state")
-  @@index([org_type], map: "idx_community_organizations_org_type")
-  @@map("community_organizations")
+  @@index([dv_safety_mode], map: "idx_organizations_dv_safety_mode")
+  @@index([state], map: "idx_organizations_state")
+  @@index([org_type], map: "idx_organizations_org_type")
+  @@map("organizations")
 }
 
 model OrgService {
@@ -574,7 +572,7 @@ model OrgService {
   notes        String?
   created_at   DateTime?    @default(now()) @db.Timestamptz(6)
   updated_at   DateTime     @default(now()) @db.Timestamptz(6)
-  community_organization CommunityOrganization @relation(fields: [org_id], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [org_id], references: [id], onDelete: Cascade)
 
   @@map("org_services")
 }
@@ -611,44 +609,6 @@ model Reminder {
   @@map("reminders")
 }
 
-model Organization {
-  id                     String               @id @default(uuid()) @db.Uuid
-  name                   String
-  type                   OrganizationType?
-  address                String?
-  contact_email          String?
-  created_at             DateTime             @default(now()) @db.Timestamptz(6)
-  website                String?
-  description            String?
-  phone                  String?
-  city                   String?
-  state                  String?
-  zip                    String?
-  country                String?
-  employees              String?
-  founded                String?
-  tax_id                 String?
-  linkedin               String?
-  tagline                String?
-  services_offered       String?
-  service_area           String?
-  primary_language       String?              @default("English")
-  notification_frequency String?              @default("daily")
-  case_numbering_prefix  String?              @default("CASE")
-  onboarding_completed   Boolean              @default(false)
-  updated_at             DateTime             @default(now()) @db.Timestamptz(6)
-  billing_user_id        String?              @unique @db.Uuid
-  caseworker_metrics     CaseworkerMetric[]   @relation("CaseworkerMetricOrg")
-  metrics_snapshots      OrgMetricsSnapshot[] @relation("OrgMetricsSnapshotOrg")
-  org_users              OrgUser[]            @relation("OrgUserOrganization")
-  billing_user           User?                @relation("PartnerOrgBillingUser", fields: [billing_user_id], references: [id])
-  referrals_from         Referral[]           @relation("ReferralFromOrg")
-  referrals_to           Referral[]           @relation("ReferralToOrg")
-  member_users           User[]               @relation("UserPartnerOrg")
-
-  @@map("organizations")
-}
-
 model OrgUser {
   id                   String              @id @default(uuid()) @db.Uuid
   full_name            String
@@ -670,7 +630,6 @@ model OrgUser {
   flags                CaseFlag[]          @relation("CaseFlagFlaggedBy")
   mothers              Mother[]            @relation("MotherCaseworker")
   refresh_tokens       OrgRefreshToken[]   @relation("OrgRefreshTokenUser")
-  organization         Organization @relation("OrgUserOrganization", fields: [org_id], references: [id], onDelete: Cascade)
   referrals            Referral[]          @relation("ReferralReferredBy")
   status_changes       StatusHistory[]     @relation("StatusHistoryChangedBy")
 
@@ -769,8 +728,6 @@ model CaseworkerMetric {
   computed_at          DateTime            @default(now()) @db.Timestamptz(6)
   updated_at           DateTime            @default(now()) @db.Timestamptz(6)
   caseworker           OrgUser             @relation("CaseworkerMetricCaseworker", fields: [caseworker_id], references: [id], onDelete: Cascade)
-  organization         Organization @relation("CaseworkerMetricOrg", fields: [org_id], references: [id], onDelete: Cascade)
-
   @@index([caseworker_id])
   @@index([org_id])
   @@map("caseworker_metrics")
@@ -788,8 +745,6 @@ model OrgMetricsSnapshot {
   avg_intake_to_benefit_days Decimal?            @db.Decimal(8, 2)
   computed_at                DateTime            @default(now()) @db.Timestamptz(6)
   updated_at                 DateTime            @default(now()) @db.Timestamptz(6)
-  organization               Organization @relation("OrgMetricsSnapshotOrg", fields: [org_id], references: [id], onDelete: Cascade)
-
   @@index([org_id])
   @@map("org_metrics_snapshots")
 }
@@ -876,9 +831,7 @@ model Referral {
   created_at       DateTime            @default(now()) @db.Timestamptz(6)
   updated_at       DateTime            @default(now()) @db.Timestamptz(6)
   case             PartnerCase         @relation("ReferralCase", fields: [case_id], references: [id], onDelete: Cascade)
-  from_org         Organization @relation("ReferralFromOrg", fields: [from_org_id], references: [id])
-  referred_by_user OrgUser?     @relation("ReferralReferredBy", fields: [referred_by], references: [id])
-  to_org           Organization @relation("ReferralToOrg", fields: [to_org_id], references: [id])
+  referred_by_user OrgUser? @relation("ReferralReferredBy", fields: [referred_by], references: [id])
 
   @@index([case_id])
   @@index([from_org_id])
