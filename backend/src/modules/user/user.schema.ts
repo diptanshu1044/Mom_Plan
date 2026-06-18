@@ -110,6 +110,7 @@ export const updateProfileSchema = z.object({
     // Address fields
     street_address: z.string().nullable().or(z.literal('')).optional(),
     city: z.string().nullable().or(z.literal('')).optional(),
+    county: z.string().nullable().or(z.literal('')).optional(),
   }),
 });
 

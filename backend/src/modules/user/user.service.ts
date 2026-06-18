@@ -95,7 +95,7 @@ export class UserService {
       health_insurance, savings_assets, child_support_status,
       monthly_childcare_cost, childcare_preference, childcare_provider, legal_issues, urgency,
       children_dobs,
-      street_address, city,
+      street_address, city, county,
       profile_picture,
     } = data;
 
@@ -214,6 +214,7 @@ export class UserService {
                 urgency: urgency || 'not_urgent',
                 street_address: street_address || null,
                 city: city || null,
+                county: county || null,
                 state: state || null,
                 zip_code: zip_code || null,
                 first_name: first_name || null,

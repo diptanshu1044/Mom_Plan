@@ -43,6 +43,7 @@ export interface AuthUser {
     email?: string | null;
     street_address?: string | null;
     city?: string | null;
+    county?: string | null;
     state?: string | null;
     zip_code?: string | null;
     children_dobs?: string[];

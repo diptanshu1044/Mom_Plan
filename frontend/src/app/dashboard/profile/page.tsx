@@ -31,6 +31,7 @@ import { formatPhoneForApi, normalizeUsPhoneDigits } from "@/lib/phone";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { formatUserName, userInitials } from "@/lib/name";
+import { US_STATES } from "@/lib/us-states";
 
 /**
  * Safely converts a Prisma Decimal, number, or string to a string for form inputs.
@@ -145,6 +146,8 @@ const profileSchema = z.object({
       message: "Enter a valid 10-digit US phone number",
     }),
   state: z.string().optional(),
+  city: z.string().optional(),
+  county: z.string().optional(),
   zip_code: z.string().optional(),
   profile_picture: z.string().optional(),
   org_type: z.string().optional(),
@@ -208,8 +211,10 @@ export default function ProfilePage() {
       last_name: currentUser?.last_name || "",
       email: currentUser?.email || "",
       phone: normalizeUsPhoneDigits(currentUser?.phone || ""),
-      state: currentUser?.state || "",
-      zip_code: currentUser?.zip_code || "",
+      state: currentUser?.state || currentUser?.family_profile?.state || "",
+      city: currentUser?.family_profile?.city || "",
+      county: currentUser?.family_profile?.county || "",
+      zip_code: currentUser?.zip_code || currentUser?.family_profile?.zip_code || "",
       profile_picture: currentUser?.profile_picture || "",
       org_type: currentUser?.org_type || "",
       org_id: currentUser?.org_id || "",
@@ -259,6 +264,14 @@ export default function ProfilePage() {
   // Watch fields to dynamically show conditional inputs
   const watchHousingStatus = profileForm.watch("housing_status");
   const watchNeedsChildcare = profileForm.watch("needs_childcare");
+  const watchState = profileForm.watch("state", "");
+  const watchCity = profileForm.watch("city", "");
+  const watchCounty = profileForm.watch("county", "");
+
+  const clearPartnerOrgSelection = () => {
+    profileForm.setValue("org_id", "", { shouldValidate: true });
+    profileForm.setValue("org_type", "", { shouldValidate: true });
+  };
 
   const hasHydratedForm = useRef(false);
 
@@ -413,21 +426,61 @@ export default function ProfilePage() {
                   autoComplete="tel-national"
                   {...profileForm.register("phone")}
                 />
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    label="State"
-                    placeholder="GA"
-                    maxLength={2}
-                    {...profileForm.register("state")}
-                  />
-                  <Input
-                    label="Zip Code"
-                    placeholder="30303"
-                    maxLength={5}
-                    numericOnly={true}
-                    {...profileForm.register("zip_code")}
-                  />
+                <div>
+                  <label className="block text-sm font-medium text-on-surface mb-1.5">
+                    State
+                  </label>
+                  <select
+                    {...profileForm.register("state", {
+                      onChange: clearPartnerOrgSelection,
+                    })}
+                    className={`w-full px-3 py-2.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                      profileForm.formState.errors.state
+                        ? "border-red-400"
+                        : "border-outline-variant/60"
+                    }`}
+                    autoComplete="address-level1"
+                  >
+                    <option value="">Select your state…</option>
+                    {US_STATES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label} ({s.value})
+                      </option>
+                    ))}
+                  </select>
+                  {profileForm.formState.errors.state?.message && (
+                    <p className="text-xs text-red-600 mt-1">
+                      {profileForm.formState.errors.state.message}
+                    </p>
+                  )}
                 </div>
+                <Input
+                  label="Zip Code"
+                  placeholder="30303"
+                  maxLength={5}
+                  numericOnly={true}
+                  {...profileForm.register("zip_code")}
+                />
+                <Input
+                  label="City"
+                  type="text"
+                  placeholder="Atlanta"
+                  autoComplete="address-level2"
+                  error={profileForm.formState.errors.city?.message}
+                  {...profileForm.register("city", {
+                    onChange: clearPartnerOrgSelection,
+                  })}
+                />
+                <Input
+                  label="County"
+                  type="text"
+                  placeholder="Fulton"
+                  hint="The county where you live"
+                  error={profileForm.formState.errors.county?.message}
+                  {...profileForm.register("county", {
+                    onChange: clearPartnerOrgSelection,
+                  })}
+                />
                 <Input
                   label="Date of Birth"
                   type="date"
@@ -443,6 +496,12 @@ export default function ProfilePage() {
                       profileForm.setValue("org_type", type, { shouldValidate: true })
                     }
                     error={profileForm.formState.errors.org_id?.message}
+                    requireLocation
+                    locationFilters={{
+                      state: watchState,
+                      city: watchCity,
+                      county: watchCounty,
+                    }}
                   />
                 </div>
                 <Input

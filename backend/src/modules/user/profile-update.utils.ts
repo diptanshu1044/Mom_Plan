@@ -77,6 +77,7 @@ const FAMILY_FIELDS = [
   'children_dobs',
   'street_address',
   'city',
+  'county',
   'first_name',
   'last_name',
 ] as const;
