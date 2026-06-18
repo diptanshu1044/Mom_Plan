@@ -1,6 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../utils/errors';
-import { clearActiveProgramsCache, getActivePrograms } from './programs.cache';
+import { clearActiveProgramsCache, getActivePrograms, readProgramStateCode } from './programs.cache';
 import { quarterDueDatesService } from './quarterDueDates.service';
 import { getProgramRequirements, getDocumentLabel } from '../pdf/program-requirements.data';
 
@@ -215,9 +215,8 @@ export class ProgramsService {
     const availableStates = [
       ...new Set(
         cachedPrograms
-          .map((program) => program.state_code)
-          .filter((code): code is string => Boolean(code))
-          .map((code) => code.toUpperCase())
+          .map((program) => readProgramStateCode(program))
+          .filter(Boolean)
       ),
     ].sort();
 
@@ -360,9 +359,8 @@ export class ProgramsService {
       const availableStates = [
         ...new Set(
           checklistPrograms
-            .map((program) => program.stateCode)
-            .filter((code): code is string => Boolean(code))
-            .map((code) => code.toUpperCase())
+            .map((program) => readProgramStateCode({ state_code: program.stateCode }))
+            .filter(Boolean)
         ),
       ].sort();
 

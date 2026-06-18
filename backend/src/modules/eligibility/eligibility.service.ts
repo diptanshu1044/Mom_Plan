@@ -4,13 +4,14 @@ import { RulesEngine } from './rules.engine';
 import { FamilyProfile } from '@prisma/client';
 import {
   applyEligibilityFilters,
-  computeAvailableStates,
   computeSummary,
   EligibilityResultsFilters,
   EligibilityResultsResponse,
-  filterStateOptions,
+  getProgramStateCode,
+  mergeAvailableStateCodes,
   normalizeStateCode,
 } from './eligibility.filters';
+import { getDistinctActiveProgramStateCodes } from '../programs/programs.cache';
 import { getProgramsForEligibilityScan, EligibilityScanProgram } from '../programs/programs.eligibility';
 import {
   buildQuarterDueDatesByProgramAndYear,
@@ -241,14 +242,14 @@ export class EligibilityService {
 
     const filtersWithProfile: EligibilityResultsFilters = {
       ...filters,
-      profileState,
+      ...(filters?.state ? {} : { profileState }),
     };
 
     const programIds = results.map((result) => result.program_id);
 
-    const quarterRecords =
+    const [quarterRecords, programStateCodes] = await Promise.all([
       programIds.length > 0
-        ? await prisma.programQuarterDueDate.findMany({
+        ? prisma.programQuarterDueDate.findMany({
             where: { program_id: { in: programIds } },
             select: {
               program_id: true,
@@ -257,7 +258,9 @@ export class EligibilityService {
               due_dates_json: true,
             },
           })
-        : [];
+        : Promise.resolve([]),
+      getDistinctActiveProgramStateCodes(),
+    ]);
 
     const quarterDueDatesByProgramAndYear =
       buildQuarterDueDatesByProgramAndYear(quarterRecords);
@@ -274,15 +277,10 @@ export class EligibilityService {
       quarterDueDatesByProgramAndYear
     );
 
-    const profileScopedResults = applyEligibilityFilters(
-      results,
-      { profileState },
-      quarterDueDatesByProgramAndYear
-    );
-
-    const availableStates = filterStateOptions(
-      computeAvailableStates(profileScopedResults),
-      filters?.stateSearch ?? ''
+    const availableStates = mergeAvailableStateCodes(
+      programStateCodes,
+      results.map((result) => getProgramStateCode(result.program)),
+      profileState ? [profileState] : []
     );
 
     const summary = computeSummary(filtered);

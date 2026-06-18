@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -19,6 +19,7 @@ import {
   Calendar,
   ChevronDown,
   Loader2,
+  MapPin,
 } from "lucide-react";
 import { usePdfGeneration } from "@/hooks/usePdfGeneration";
 import DocumentReadinessModal from "@/components/pdf/DocumentReadinessModal";
@@ -28,6 +29,7 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
+import { filterStatesByCodes, mergeStateCodes, normalizeStateCodesFromApi, resolveStateCode } from "@/lib/us-states";
 import {
   buildYearFilterOptions,
   formatCurrency,
@@ -39,21 +41,25 @@ import {
   resolveQuarterYearForPdf,
 } from "@/lib/utils";
 
-const PROGRAM_SCOPE_OPTIONS = [
+const PROGRAM_TYPE_OPTIONS = [
   { value: "all", label: "All Programs" },
   { value: "federal", label: "Federal" },
   { value: "state", label: "State" },
-];
+] as const;
 
 const selectClassName =
   "w-full appearance-none rounded-lg border border-outline-variant/60 bg-white py-2.5 pl-3 pr-9 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-300 cursor-pointer";
 
 export default function BenefitsPage() {
-  const [programScope, setProgramScope] = useState<"all" | "federal" | "state">("all");
+  const [programType, setProgramType] = useState<"all" | "federal" | "state">("all");
+  const [selectedState, setSelectedState] = useState("All");
   const [yearFilter, setYearFilter] = useState("all");
   const [quarterFilter, setQuarterFilter] = useState<string>(() => getCurrentQuarterYear().quarter);
   const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState<any>(null);
+  const [availableStateCodes, setAvailableStateCodes] = useState<string[]>([]);
+  const hasAutoSelectedProfileState = useRef(false);
+  const profileStateRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -73,15 +79,21 @@ export default function BenefitsPage() {
     closePdfModal,
   } = usePdfGeneration();
 
-  const filterParams = useMemo(
-    () => ({
-      ...(programScope === "federal" ? { federal: "true" } : {}),
-      ...(programScope === "state" ? { state_only: "true" } : {}),
+  const filterParams = useMemo(() => {
+    const params: Record<string, string> = {
       ...(yearFilter !== "all" ? { year: yearFilter } : { year: "all" }),
       quarter: quarterFilter,
-    }),
-    [programScope, yearFilter, quarterFilter]
-  );
+    };
+
+    if (programType === "federal") params.federal = "true";
+    if (programType === "state") params.state_only = "true";
+
+    if (selectedState !== "All" && selectedState !== profileStateRef.current) {
+      params.state = selectedState;
+    }
+
+    return params;
+  }, [programType, selectedState, yearFilter, quarterFilter]);
 
   const pdfQuarterContext = useMemo(
     () => resolveQuarterYearForPdf(quarterFilter, yearFilter),
@@ -105,7 +117,42 @@ export default function BenefitsPage() {
     () => buildYearFilterOptions(availableYears),
     [availableYears]
   );
-  const profileState = data?.profileState ?? null;
+  const profileState = resolveStateCode(data?.profileState ?? null) ?? null;
+  const codesFromResults = useMemo(
+    () =>
+      results
+        .map(
+          (result: { program?: { state_code?: string | null; state?: string | null } }) =>
+            resolveStateCode(result.program?.state_code ?? result.program?.state ?? undefined)
+        )
+        .filter((code: string | undefined): code is string => Boolean(code)),
+    [results]
+  );
+  const availableStates = useMemo(
+    () =>
+      filterStatesByCodes(
+        mergeStateCodes(availableStateCodes, codesFromResults, profileState ? [profileState] : [])
+      ),
+    [availableStateCodes, codesFromResults, profileState]
+  );
+
+  useEffect(() => {
+    const codes = normalizeStateCodesFromApi(data?.availableStates);
+    if (codes.length > 0) {
+      setAvailableStateCodes(codes);
+    }
+  }, [data?.availableStates]);
+
+  useEffect(() => {
+    if (profileState) {
+      profileStateRef.current = profileState;
+      if (!hasAutoSelectedProfileState.current) {
+        setSelectedState(profileState);
+        hasAutoSelectedProfileState.current = true;
+      }
+    }
+  }, [profileState]);
+
   const scanMutation = useMutation({
     mutationFn: () => api.post("/api/eligibility/scan"),
     onSuccess: () => {
@@ -177,12 +224,6 @@ export default function BenefitsPage() {
         </motion.div>
       )}
 
-      {profileState && programScope === "all" && (
-        <p className="mb-4 text-sm text-on-surface-variant">
-          Showing federal and {profileState} state programs based on your profile.
-        </p>
-      )}
-
       {/* Filters */}
       <div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-6 relative">
         {isFetching && !isLoading && (
@@ -234,17 +275,17 @@ export default function BenefitsPage() {
         </div>
 
         <div className="flex-1 min-w-[10rem]">
-          <label htmlFor="program-scope-filter" className="block text-xs font-semibold text-on-surface-variant mb-1.5">
+          <label htmlFor="program-type-filter" className="block text-xs font-semibold text-on-surface-variant mb-1.5">
             Program Type
           </label>
           <div className="relative">
             <select
-              id="program-scope-filter"
-              value={programScope}
-              onChange={(e) => setProgramScope(e.target.value as "all" | "federal" | "state")}
+              id="program-type-filter"
+              value={programType}
+              onChange={(e) => setProgramType(e.target.value as "all" | "federal" | "state")}
               className={selectClassName}
             >
-              {PROGRAM_SCOPE_OPTIONS.map((option) => (
+              {PROGRAM_TYPE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -259,12 +300,19 @@ export default function BenefitsPage() {
             State
           </label>
           <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/60 pointer-events-none" />
             <select
               id="state-filter"
-              value=""
-              className={selectClassName}
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              className={`${selectClassName} pl-9`}
             >
-              <option value="">All States</option>
+              <option value="All">All states</option>
+              {availableStates.map((state) => (
+                <option key={state.value} value={state.value}>
+                  {state.label}
+                </option>
+              ))}
             </select>
             <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
           </div>

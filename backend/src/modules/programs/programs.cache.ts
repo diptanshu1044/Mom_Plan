@@ -40,3 +40,33 @@ export function clearActiveProgramsCache() {
   cachedActivePrograms = null;
   cacheTimestamp = 0;
 }
+
+type ProgramStateSource = {
+  state_code?: string | null;
+  state?: string | null;
+};
+
+export function readProgramStateCode(program: ProgramStateSource | null | undefined): string {
+  const raw = program?.state_code ?? program?.state;
+  return (raw ?? '').trim().toUpperCase();
+}
+
+/** Distinct state codes from active programs — reads DB column `state` via Prisma `state_code`. */
+export async function getDistinctActiveProgramStateCodes(): Promise<string[]> {
+  const rows = await prisma.benefitProgram.findMany({
+    where: {
+      is_active: true,
+      NOT: { state_code: null },
+    },
+    select: { state_code: true },
+    distinct: ['state_code'],
+    orderBy: { state_code: 'asc' },
+  });
+
+  return rows.map((row) => readProgramStateCode(row)).filter(Boolean);
+}
+
+/** Distinct state codes from an in-memory program list. */
+export function getAvailableStateCodesFromPrograms(programs: ProgramStateSource[]): string[] {
+  return [...new Set(programs.map((program) => readProgramStateCode(program)).filter(Boolean))].sort();
+}

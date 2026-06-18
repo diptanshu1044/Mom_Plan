@@ -4,6 +4,7 @@ import {
   QuarterDueDatesByProgramAndYear,
 } from '../programs/quarterDueDates.service';
 import { Quarter, QUARTERS } from '../programs/quarterDueDates.types';
+import { readProgramStateCode } from '../programs/programs.cache';
 
 export interface EligibilityResultsFilters {
   profileState?: string;
@@ -21,15 +22,10 @@ export interface EligibilityResultsSummary {
   totalCount: number;
 }
 
-export interface AvailableStateOption {
-  code: string;
-  label: string;
-}
-
 export interface EligibilityResultsResponse {
   results: unknown[];
   summary: EligibilityResultsSummary;
-  availableStates: AvailableStateOption[];
+  availableStates: string[];
   availableYears: number[];
   profileState: string | null;
   /** True while at least one result is still awaiting AI explanation generation. */
@@ -57,10 +53,14 @@ const US_STATES = [
 ];
 
 const STATE_LABEL_BY_CODE = Object.fromEntries(US_STATES.map((state) => [state.value, state.label]));
+const STATE_CODE_BY_LABEL = Object.fromEntries(
+  US_STATES.map((state) => [state.label.toUpperCase(), state.value])
+);
 
 type ProgramLike = {
   federal_or_state?: string | null;
   state_code?: string | null;
+  state?: string | null;
 };
 
 type ResultLike = {
@@ -70,12 +70,16 @@ type ResultLike = {
 };
 
 export function getProgramStateCode(program: ProgramLike | null | undefined): string {
-  return (program?.state_code ?? '').trim().toUpperCase();
+  return readProgramStateCode(program);
 }
 
 export function normalizeStateCode(state: string | null | undefined): string | undefined {
-  const code = (state ?? '').trim().toUpperCase();
-  return code || undefined;
+  const trimmed = (state ?? '').trim();
+  if (!trimmed) return undefined;
+
+  const upper = trimmed.toUpperCase();
+  if (STATE_LABEL_BY_CODE[upper]) return upper;
+  return STATE_CODE_BY_LABEL[upper];
 }
 
 export function isFederalProgram(program: ProgramLike | null | undefined): boolean {
@@ -117,33 +121,8 @@ export function computeSummary(results: ResultLike[]): EligibilityResultsSummary
   };
 }
 
-export function computeAvailableStates(results: ResultLike[]): AvailableStateOption[] {
-  const codes = new Set<string>();
-
-  for (const result of results) {
-    const code = getProgramStateCode(result.program);
-    if (code) codes.add(code);
-  }
-
-  return [...codes]
-    .sort()
-    .map((code) => ({
-      code,
-      label: STATE_LABEL_BY_CODE[code] ?? code,
-    }));
-}
-
-export function filterStateOptions(
-  options: AvailableStateOption[],
-  query: string
-): AvailableStateOption[] {
-  if (!query.trim()) return options;
-
-  return options.filter(
-    (option) =>
-      stateMatchesQuery(option.code, query) ||
-      option.label.toLowerCase().includes(query.trim().toLowerCase())
-  );
+export function mergeAvailableStateCodes(...codeGroups: string[][]): string[] {
+  return [...new Set(codeGroups.flat().map((code) => code.trim().toUpperCase()).filter(Boolean))].sort();
 }
 
 export function applyEligibilityFilters<T extends ResultLike>(
@@ -155,7 +134,12 @@ export function applyEligibilityFilters<T extends ResultLike>(
 
   let filtered = results;
 
-  if (filters.profileState) {
+  if (filters.state) {
+    const targetState = filters.state.trim().toUpperCase();
+    filtered = filtered.filter((result) =>
+      isFederalProgram(result.program) || getProgramStateCode(result.program) === targetState
+    );
+  } else if (filters.profileState) {
     filtered = filtered.filter((result) =>
       matchesProfileStateScope(result.program, filters.profileState!)
     );
@@ -166,15 +150,10 @@ export function applyEligibilityFilters<T extends ResultLike>(
   }
 
   if (filters.stateOnly) {
-    filtered = filtered.filter((result) => !!getProgramStateCode(result.program));
+    filtered = filtered.filter((result) => !isFederalProgram(result.program));
   }
 
-  if (filters.state) {
-    const targetState = filters.state.trim().toUpperCase();
-    filtered = filtered.filter(
-      (result) => getProgramStateCode(result.program) === targetState
-    );
-  } else if (filters.stateSearch?.trim()) {
+  if (filters.stateSearch?.trim()) {
     const query = filters.stateSearch.trim();
     filtered = filtered.filter((result) =>
       stateMatchesQuery(getProgramStateCode(result.program), query)
