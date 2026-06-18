@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { ANTHROPIC_MODEL } from '../../config/anthropic';
 import { prisma } from '../../config/prisma';
 import { RulesEngine } from './rules.engine';
@@ -303,11 +304,15 @@ export class EligibilityService {
 
     // 5. Replace prior results in bulk (delete + createMany) — one transaction, two round trips
     const programById = new Map(programs.map((p) => [p.id, p]));
+    const resultIdsByProgramId = new Map<string, string>();
     const eligibilityRows = parsedResults
       .map((res) => {
         const program = programById.get(res.programId);
         if (!program) return null;
+        const id = randomUUID();
+        resultIdsByProgramId.set(program.id, id);
         return {
+          id,
           user_id: userId,
           program_id: program.id,
           status: res.status,
@@ -317,23 +322,17 @@ export class EligibilityService {
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);
 
-    const persistenceStart = Date.now();
     await prisma.$transaction(async (tx) => {
-      const deleteStart = Date.now();
       await tx.eligibilityResult.deleteMany({
         where: { user_id: userId },
       });
-      console.log('Eligibility result deleteMany took:', Date.now() - deleteStart, 'ms');
 
       if (eligibilityRows.length > 0) {
-        const createStart = Date.now();
         await tx.eligibilityResult.createMany({
           data: eligibilityRows,
         });
-        console.log('Eligibility result createMany took:', Date.now() - createStart, 'ms');
       }
     });
-    console.log('Eligibility result save took:', Date.now() - persistenceStart, 'ms');
 
     // 6. Save a scan-complete notification
     const qualified = parsedResults.filter(
@@ -351,8 +350,58 @@ export class EligibilityService {
       // Non-critical — swallow if notification creation fails
     });
 
-    const response = await this.getResults(userId);
-    return response.results;
+    const profileState =
+      normalizeStateCode(user.state) ?? normalizeStateCode(profile.state);
+
+    return this.buildScanResultsFromMemory(
+      parsedResults,
+      programs,
+      userId,
+      resultIdsByProgramId,
+      profileState
+    );
+  }
+
+  private buildScanResultsFromMemory(
+    parsedResults: Array<{
+      programId: string;
+      status: string;
+      confidence_score?: number;
+      reasoning?: string;
+    }>,
+    programs: EligibilityScanProgram[],
+    userId: string,
+    resultIdsByProgramId: Map<string, string>,
+    profileState?: string
+  ) {
+    const programById = new Map(programs.map((p) => [p.id, p]));
+    const checkedAt = new Date();
+
+    const results = parsedResults
+      .map((res) => {
+        const program = programById.get(res.programId);
+        if (!program) return null;
+
+        return {
+          id: resultIdsByProgramId.get(program.id) ?? randomUUID(),
+          user_id: userId,
+          program_id: program.id,
+          status: res.status,
+          confidence_score: res.confidence_score || 0,
+          reasoning: res.reasoning ?? '',
+          checked_at: checkedAt,
+          program,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+      .sort((a, b) => b.confidence_score - a.confidence_score);
+
+    const filtered = profileState
+      ? applyEligibilityFilters(results, { profileState })
+      : results;
+
+    const emptyQuarterMap: QuarterDueDatesByProgramAndYear = new Map();
+    return this.enrichResultsWithQuarterDueDates(filtered, emptyQuarterMap);
   }
 
   private async refineWithAi(
@@ -365,6 +414,7 @@ export class EligibilityService {
       .filter(needsAiRefinement)
       .sort((a, b) => b.score - a.score)
       .slice(0, MAX_AI_PROGRAMS);
+
     if (toRefine.length === 0) {
       return mergeAiWithRuleResults(ruleResults, new Map());
     }
@@ -406,6 +456,7 @@ export class EligibilityService {
       }
 
       const aiParsed = parseAiJsonArray(aiResponse) as AiEligibilityResult[];
+
       for (const result of aiParsed) {
         if (result.programId) aiByProgramId.set(result.programId, result);
       }
@@ -455,6 +506,7 @@ export class EligibilityService {
     };
 
     const programIds = results.map((result) => result.program_id);
+
     const quarterRecords =
       programIds.length > 0
         ? await prisma.programQuarterDueDate.findMany({
@@ -477,6 +529,7 @@ export class EligibilityService {
       filtersWithProfile,
       quarterDueDatesByProgramAndYear
     );
+
     const enrichedResults = this.enrichResultsWithQuarterDueDates(
       filtered,
       quarterDueDatesByProgramAndYear
@@ -487,14 +540,17 @@ export class EligibilityService {
       { profileState },
       quarterDueDatesByProgramAndYear
     );
+
     const availableStates = filterStateOptions(
       computeAvailableStates(profileScopedResults),
       filters?.stateSearch ?? ''
     );
 
+    const summary = computeSummary(filtered);
+
     return {
       results: enrichedResults,
-      summary: computeSummary(filtered),
+      summary,
       availableStates,
       availableYears,
       profileState: profileState ?? null,

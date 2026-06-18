@@ -2,20 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { normalizeStateCode } from '../eligibility/eligibility.filters';
 
-export const eligibilityScanSelect = {
-  id: true,
-  name: true,
-  state_code: true,
-  program_type: true,
-  estimated_monthly_value_min: true,
-  estimated_monthly_value_max: true,
-  eligibility_summary: true,
-  metadata: true,
-} satisfies Prisma.BenefitProgramSelect;
-
-export type EligibilityScanProgram = Prisma.BenefitProgramGetPayload<{
-  select: typeof eligibilityScanSelect;
-}>;
+export type EligibilityScanProgram = Prisma.BenefitProgramGetPayload<object>;
 
 /** Active programs scoped to the user's state plus federal programs (DB-filtered). */
 export async function getProgramsForEligibilityScan(
@@ -31,7 +18,6 @@ export async function getProgramsForEligibilityScan(
         { federal_or_state: { contains: 'federal', mode: 'insensitive' } },
       ],
     },
-    select: eligibilityScanSelect,
     orderBy: { name: 'asc' },
   });
 }
