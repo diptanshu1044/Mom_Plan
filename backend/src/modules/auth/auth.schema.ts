@@ -16,6 +16,9 @@ export const registerSchema = z.object({
       }),
     org_id: z.string().uuid('Please select a valid organization').optional(),
     org_type: orgTypeSchema.nullable().or(z.literal('')).optional(),
+    state: z.string().trim().min(2, 'State is required').max(2).optional(),
+    city: z.string().trim().min(1, 'City is required').optional(),
+    county: z.string().trim().min(1, 'County is required').optional(),
   }),
 });
 

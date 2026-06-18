@@ -2,6 +2,8 @@ import { prisma } from '../../config/prisma';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import {
   organizationPublicSelect,
+  OrganizationLocationFilters,
+  organizationServesLocation,
   toPublicOrganization,
 } from '../../utils/organization.utils';
 
@@ -67,14 +69,26 @@ async function defaultIntakeProgramId(): Promise<string> {
 }
 
 export class MotherOrgEnrollmentService {
-  async listOrganizations() {
+  async listOrganizations(filters?: OrganizationLocationFilters) {
+    const where: { active: boolean; state?: { equals: string; mode: 'insensitive' } } = {
+      active: true,
+    };
+
+    if (filters?.state?.trim()) {
+      where.state = { equals: filters.state.trim(), mode: 'insensitive' };
+    }
+
     const orgs = await prisma.organization.findMany({
-      where: { active: true },
+      where,
       select: organizationPublicSelect,
       orderBy: { org_name: 'asc' },
     });
 
-    return orgs.map(toPublicOrganization);
+    const filtered = filters?.county?.trim()
+      ? orgs.filter((org) => organizationServesLocation(org, filters))
+      : orgs;
+
+    return filtered.map(toPublicOrganization);
   }
 
   async enrollUserInPartnerOrg(userId: string, orgId: string) {

@@ -53,3 +53,34 @@ export function toPublicOrganizationSummary(org: {
     state: org.state,
   };
 }
+
+export function normalizeLocationLabel(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+export type OrganizationLocationFilters = {
+  state?: string;
+  city?: string;
+  county?: string;
+};
+
+/** Whether an org serves the given county (and optional state/city context). */
+export function organizationServesLocation(
+  org: OrganizationPublicRecord,
+  filters: OrganizationLocationFilters
+): boolean {
+  const county = filters.county?.trim();
+  if (!county) return true;
+
+  if (filters.state?.trim()) {
+    const orgState = org.state ? normalizeLocationLabel(org.state) : '';
+    const userState = normalizeLocationLabel(filters.state);
+    if (orgState && orgState !== userState) return false;
+  }
+
+  const normalizedCounty = normalizeLocationLabel(county);
+  return org.counties_served.some((served) => {
+    const normalized = normalizeLocationLabel(served);
+    return normalized === normalizedCounty || normalized === 'statewide';
+  });
+}

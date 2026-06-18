@@ -15,12 +15,39 @@ export interface PartnerOrgOption {
   service_area?: string | null;
 }
 
+export interface PartnerOrgLocationFilters {
+  state?: string;
+  city?: string;
+  county?: string;
+}
+
 interface PartnerOrgSelectProps {
   value: string;
   onChange: (orgId: string) => void;
   onOrgTypeChange?: (orgType: string) => void;
   error?: string;
   required?: boolean;
+  locationFilters?: PartnerOrgLocationFilters;
+  requireLocation?: boolean;
+}
+
+function buildOrganizationsUrl(filters?: PartnerOrgLocationFilters): string {
+  const params = new URLSearchParams();
+  if (filters?.state?.trim()) params.set("state", filters.state.trim());
+  if (filters?.city?.trim()) params.set("city", filters.city.trim());
+  if (filters?.county?.trim()) params.set("county", filters.county.trim());
+  const qs = params.toString();
+  return qs ? `/api/organizations?${qs}` : "/api/organizations";
+}
+
+function locationFiltersReady(
+  filters: PartnerOrgLocationFilters | undefined,
+  requireLocation: boolean
+): boolean {
+  if (!requireLocation) return true;
+  return Boolean(
+    filters?.state?.trim() && filters?.city?.trim() && filters?.county?.trim()
+  );
 }
 
 export function PartnerOrgSelect({
@@ -29,12 +56,19 @@ export function PartnerOrgSelect({
   onOrgTypeChange,
   error,
   required,
+  locationFilters,
+  requireLocation = false,
 }: PartnerOrgSelectProps) {
+  const canFetch = locationFiltersReady(locationFilters, requireLocation);
+
   const { data: orgs = [], isLoading } = useQuery({
-    queryKey: ["organizations"],
+    queryKey: ["organizations", locationFilters],
     queryFn: () =>
-      api.get("/api/organizations").then((r) => r.data.data as PartnerOrgOption[]),
+      api
+        .get(buildOrganizationsUrl(locationFilters))
+        .then((r) => r.data.data as PartnerOrgOption[]),
     staleTime: 5 * 60 * 1000,
+    enabled: canFetch,
   });
 
   const syncOrgType = (orgId: string) => {
@@ -47,6 +81,12 @@ export function PartnerOrgSelect({
     if (!value || orgs.length === 0) return;
     syncOrgType(value);
   }, [value, orgs]);
+
+  useEffect(() => {
+    if (!value || orgs.some((org) => org.id === value)) return;
+    onChange("");
+    onOrgTypeChange?.("");
+  }, [value, orgs, onChange, onOrgTypeChange]);
 
   const handleChange = (orgId: string) => {
     onChange(orgId);
@@ -64,14 +104,18 @@ export function PartnerOrgSelect({
           : "Optional — choose a community organization to support your benefits applications."}
       </p>
 
-      {isLoading ? (
+      {!canFetch ? (
+        <p className="text-sm text-on-surface-variant bg-surface-container rounded-lg px-3 py-2.5 border border-outline-variant/40">
+          Enter your state, city, and county above to see organizations in your area.
+        </p>
+      ) : isLoading ? (
         <div className="flex items-center gap-2 text-sm text-on-surface-variant py-3">
           <Loader2 className="w-4 h-4 animate-spin" />
           Loading organizations…
         </div>
       ) : orgs.length === 0 ? (
         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          No partner organizations are available yet. Please try again later.
+          No partner organizations serve your county yet. You can still create your account and check back later.
         </p>
       ) : (
         <div className="relative">

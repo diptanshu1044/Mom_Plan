@@ -8,9 +8,12 @@ const svc = new MotherOrgEnrollmentService();
 
 router.get(
   '/',
-  logHandler('partner.organizations', 'listOrganizations', async (_req, res, next) => {
+  logHandler('partner.organizations', 'listOrganizations', async (req, res, next) => {
     try {
-      const data = await svc.listOrganizations();
+      const state = typeof req.query.state === 'string' ? req.query.state : undefined;
+      const city = typeof req.query.city === 'string' ? req.query.city : undefined;
+      const county = typeof req.query.county === 'string' ? req.query.county : undefined;
+      const data = await svc.listOrganizations({ state, city, county });
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);

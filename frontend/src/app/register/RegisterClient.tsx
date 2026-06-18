@@ -17,6 +17,7 @@ import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/errors";
+import { US_STATES } from "@/lib/us-states";
 
 const registerSchema = z
   .object({
@@ -30,6 +31,9 @@ const registerSchema = z
       .refine((val) => !val || /^\d{10}$/.test(val), {
         message: "Enter a valid 10-digit US phone number",
       }),
+    state: z.string().trim().min(1, "State is required"),
+    city: z.string().trim().min(1, "City is required"),
+    county: z.string().trim().min(1, "County is required"),
     org_type: z.string().optional(),
     org_id: z
       .string()
@@ -81,6 +85,9 @@ function RegisterForm() {
 
   const password = watch("password", "");
   const strength = passwordStrength(password || "");
+  const state = watch("state", "");
+  const city = watch("city", "");
+  const county = watch("county", "");
 
   const onSubmit = async (data: RegisterFormData) => {
     setError("");
@@ -92,6 +99,9 @@ function RegisterForm() {
         email: data.email,
         password: data.password,
         phone: data.phone ? `+1${data.phone}` : undefined,
+        state: data.state,
+        city: data.city,
+        county: data.county,
         org_type: data.org_type || undefined,
         org_id: data.org_id || undefined,
       });
@@ -221,6 +231,66 @@ function RegisterForm() {
                 {...register("phone")}
               />
 
+              <div>
+                <label className="block text-sm font-medium text-on-surface mb-1.5">
+                  State <span className="text-red-500">*</span>
+                </label>
+                <select
+                  {...register("state", {
+                    onChange: () => {
+                      setValue("org_id", "");
+                      setValue("org_type", "");
+                    },
+                  })}
+                  className={`w-full px-3 py-2.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                    errors.state ? "border-red-400" : "border-outline-variant/60"
+                  }`}
+                  autoComplete="address-level1"
+                >
+                  <option value="">Select your state…</option>
+                  {US_STATES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label} ({s.value})
+                    </option>
+                  ))}
+                </select>
+                {errors.state?.message && (
+                  <p className="text-xs text-red-600 mt-1">{errors.state.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="City"
+                  type="text"
+                  placeholder="Atlanta"
+                  required
+                  autoComplete="address-level2"
+                  error={errors.city?.message}
+                  {...register("city", {
+                    onChange: () => {
+                      setValue("org_id", "");
+                      setValue("org_type", "");
+                    },
+                  })}
+                />
+
+                <Input
+                  label="County"
+                  type="text"
+                  placeholder="Fulton"
+                  required
+                  hint="The county where you live"
+                  error={errors.county?.message}
+                  {...register("county", {
+                    onChange: () => {
+                      setValue("org_id", "");
+                      setValue("org_type", "");
+                    },
+                  })}
+                />
+              </div>
+
               <Controller
                 name="org_id"
                 control={control}
@@ -232,6 +302,8 @@ function RegisterForm() {
                       setValue("org_type", type, { shouldValidate: true })
                     }
                     error={errors.org_id?.message}
+                    requireLocation
+                    locationFilters={{ state, city, county }}
                   />
                 )}
               />

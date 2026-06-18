@@ -128,6 +128,9 @@ export class AuthService {
     phone?: string;
     org_id?: string;
     org_type?: string;
+    state?: string;
+    city?: string;
+    county?: string;
   }) {
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
@@ -151,8 +154,25 @@ export class AuthService {
         last_name,
         phone: data.phone,
         org_type: data.org_type || null,
+        state: data.state?.trim() || null,
       },
     });
+
+    const city = data.city?.trim();
+    const county = data.county?.trim();
+    const state = data.state?.trim();
+    if (city || county || state) {
+      await prisma.familyProfile.create({
+        data: {
+          user_id: user.id,
+          first_name,
+          last_name,
+          city: city || null,
+          county: county || null,
+          state: state || null,
+        },
+      });
+    }
 
     if (data.org_id) {
       await motherOrgEnrollment.enrollUserInPartnerOrg(user.id, data.org_id);
