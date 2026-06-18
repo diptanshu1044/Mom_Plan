@@ -111,7 +111,7 @@ export function DocumentsClient() {
       ) : filtered.length === 0 ? (
         <div className="py-20 text-center">
           <span className="text-4xl block mb-3">📄</span>
-          <p className="text-text-soft">No documents found</p>
+          <p className="text-text-soft">No secure application documents yet</p>
           <Button className="mt-4" size="sm" variant="outline">
             <Upload className="w-3.5 h-3.5 mr-1.5" /> Upload your first document
           </Button>

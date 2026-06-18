@@ -4,6 +4,7 @@ import {
   motherOrgWhere,
   assertMotherAccess,
   OrgAccessContext,
+  secureSubmittedCaseWhere,
 } from '../partner/partner-access';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { formatUserName, hasUserName } from '../../utils/name.utils';
@@ -62,7 +63,17 @@ const motherInclude = {
 export class MothersService {
   async listMothers(ctx: OrgAccessContext, filters: { caseworker?: string; search?: string }) {
     const mothers = await prisma.mother.findMany({
-      where: motherListWhere(ctx, filters.caseworker),
+      where: {
+        ...motherListWhere(ctx, filters.caseworker),
+        cases: {
+          some: {
+            ...secureSubmittedCaseWhere(),
+            ...(ctx.role === 'admin'
+              ? { caseworker: { org_id: ctx.orgId } }
+              : { mother: { caseworker_id: ctx.orgUserId } }),
+          },
+        },
+      },
       include: motherInclude,
       orderBy: { created_at: 'desc' },
     });
@@ -87,14 +98,17 @@ export class MothersService {
       include: {
         ...motherInclude,
         cases: {
-          where: ctx.role === 'admin'
-            ? { caseworker: { org_id: ctx.orgId } }
-            : { mother: { caseworker_id: ctx.orgUserId } },
+          where: {
+            ...secureSubmittedCaseWhere(),
+            ...(ctx.role === 'admin'
+              ? { caseworker: { org_id: ctx.orgId } }
+              : { mother: { caseworker_id: ctx.orgUserId } }),
+          },
           include: {
             program: true,
             caseworker: { select: { id: true, full_name: true } },
           },
-          orderBy: { created_at: 'desc' },
+          orderBy: { secure_submitted_at: 'desc' },
         },
       },
     });

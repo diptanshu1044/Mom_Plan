@@ -222,7 +222,7 @@ export function CaseManagementClient() {
                   <tr key={i}><td colSpan={7} className="px-4 py-4"><div className="h-4 bg-partner-50 rounded animate-pulse" /></td></tr>
                 ))}
               {!isLoading && cases.length === 0 && (
-                <tr><td colSpan={7} className="py-16 text-center text-text-soft">No cases found</td></tr>
+                <tr><td colSpan={7} className="py-16 text-center text-text-soft">No submitted applications yet. Cases appear here after a mom sends a secure application email.</td></tr>
               )}
               {!isLoading &&
                 cases.map((c) => {

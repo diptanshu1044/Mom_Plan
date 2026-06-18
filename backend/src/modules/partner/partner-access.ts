@@ -59,6 +59,11 @@ export function caseListWhere(
   return { mother: motherWhere };
 }
 
+/** Only cases where the mom sent a secure application email package */
+export function secureSubmittedCaseWhere(): Prisma.PartnerCaseWhereInput {
+  return { secure_submitted_at: { not: null } };
+}
+
 export function assertMotherAccess(
   ctx: OrgAccessContext,
   mother: { caseworker_id: string | null }

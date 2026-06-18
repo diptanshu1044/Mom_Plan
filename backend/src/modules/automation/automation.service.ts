@@ -2,6 +2,10 @@ import { prisma } from '../../config/prisma';
 import { sendEmail } from '../../config/email';
 import { formatUserName } from '../../utils/name.utils';
 import { decimalToNumber } from '../../utils/decimal.utils';
+import {
+  resolveSubmissionGeneratedPdfId,
+  syncPartnerPortalOnSecureSubmission,
+} from '../partner/partner-submission.service';
 /**
  * Government Contact Ingestion & Caching Strategy
  * Supports scalable dynamic routing for email composition.
@@ -140,11 +144,18 @@ The email should be ready to send as-is. End with "MomPlan Automations System" a
     const generatedPdf = attachPdf
       ? await prisma.generatedPdf.findFirst({
           where: {
+            application_id: applicationId,
+            user_id: userId,
+          },
+          orderBy: { generated_at: 'desc' },
+        }) ??
+        (await prisma.generatedPdf.findFirst({
+          where: {
             user_id: userId,
             program_id: programId,
           },
           orderBy: { generated_at: 'desc' },
-        })
+        }))
       : null;
 
     return {
@@ -193,6 +204,21 @@ The email should be ready to send as-is. End with "MomPlan Automations System" a
     console.log(`[Worker] Processing Apply Now for application: ${applicationId}`);
 
     try {
+      const application = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { program_id: true },
+      });
+      if (!application?.program_id) {
+        throw new Error('Application does not have a valid benefit program');
+      }
+
+      const generatedPdfId = await resolveSubmissionGeneratedPdfId(
+        applicationId,
+        userId,
+        application.program_id,
+        attachPdf
+      );
+
       // 1. Compose email (this will fetch contact, prepare payload, and use AI to generate email)
       const emailData = await this.composeApplicationEmail(applicationId, userId, attachPdf, documentIds);
 
@@ -211,13 +237,30 @@ The email should be ready to send as-is. End with "MomPlan Automations System" a
         }))
       });
 
+      const resolvedDocumentIds =
+        documentIds ??
+        (
+          await prisma.document.findMany({
+            where: { application_id: applicationId, user_id: userId },
+            select: { id: true },
+          })
+        ).map((d) => d.id);
+
       // 3. Update application tracking status
       await prisma.application.update({
         where: { id: applicationId },
         data: { status: 'submitted', submitted_at: new Date() },
       });
 
-      // 4. Notify user
+      // 4. Sync partner portal with the exact submission package
+      await syncPartnerPortalOnSecureSubmission({
+        applicationId,
+        userId,
+        generatedPdfId,
+        documentIds: resolvedDocumentIds,
+      });
+
+      // 5. Notify user
       await prisma.notification.create({
         data: {
           user_id: userId,

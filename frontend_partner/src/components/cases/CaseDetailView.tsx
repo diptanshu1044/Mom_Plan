@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { Phone, Calendar, FileText, ChevronDown } from "lucide-react";
+import { Phone, Calendar, FileText, ChevronDown, Download } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -184,8 +184,11 @@ export function CaseDetailView({ caseData: c, caseId, headerActions }: CaseDetai
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-white rounded-xl border border-surface-border p-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-text-soft mb-3">
-              Documents
+              Submitted Application Documents
             </h3>
+            <p className="text-xs text-text-soft mb-3">
+              Documents attached to the mom&apos;s latest secure application email.
+            </p>
             <ul className="space-y-3">
               {c.documents.length === 0 && (
                 <li className="text-sm text-text-soft">No documents on file yet.</li>
@@ -193,16 +196,28 @@ export function CaseDetailView({ caseData: c, caseId, headerActions }: CaseDetai
               {c.documents.map((doc) => (
                 <li key={doc.id} className="flex items-center justify-between gap-2 text-sm">
                   <div>
-                    <div className="font-medium text-text-dark">{doc.name}</div>
+                    <div className="font-medium text-text-dark capitalize">{doc.name}</div>
                     <div className="text-xs text-text-soft">
                       {doc.status === "missing"
                         ? "Not received"
                         : `Received ${formatDate(doc.uploaded_at, "MMM d")}`}
                     </div>
                   </div>
-                  <Badge className={cn("text-[10px] font-bold uppercase", DOC_STATUS[doc.status])}>
-                    {doc.status === "on_file" ? "On file" : doc.status}
-                  </Badge>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {doc.file_url && (
+                      <a
+                        href={doc.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-primary font-semibold hover:underline"
+                      >
+                        <Download className="w-3 h-3" /> Download
+                      </a>
+                    )}
+                    <Badge className={cn("text-[10px] font-bold uppercase", DOC_STATUS[doc.status])}>
+                      {doc.status === "on_file" ? "On file" : doc.status}
+                    </Badge>
+                  </div>
                 </li>
               ))}
             </ul>

@@ -6,6 +6,7 @@ import {
   motherOrgWhere,
   OrgAccessContext,
   isOrgAdmin,
+  secureSubmittedCaseWhere,
 } from './partner-access';
 import { formatUserName, hasUserName } from '../../utils/name.utils';
 import { decimalToNumberOrNull } from '../../utils/decimal.utils';
@@ -303,6 +304,7 @@ export class PartnerCasesService {
     const cases = await prisma.partnerCase.findMany({
       where: {
         ...caseListWhere(ctx, caseworkerFilter),
+        ...secureSubmittedCaseWhere(),
         ...(filters.quarter ? { quarter: filters.quarter.toUpperCase() } : {}),
         ...(filters.status && filters.status !== 'all' ? { status: filters.status } : {}),
         ...(filters.program && filters.program !== 'all' ? { program_id: filters.program } : {}),
@@ -336,7 +338,7 @@ export class PartnerCasesService {
 
   async getCaseDetail(ctx: OrgAccessContext, caseId: string) {
     const c = await prisma.partnerCase.findFirst({
-      where: { id: caseId, ...caseListWhere(ctx) },
+      where: { id: caseId, ...caseListWhere(ctx), ...secureSubmittedCaseWhere() },
       include: {
         ...caseInclude,
         deadlines: { orderBy: { due_date: 'asc' } },
@@ -353,8 +355,9 @@ export class PartnerCasesService {
           id: caseId,
           mother: motherOrgWhere(ctx.orgId),
         },
-        select: { id: true },
+        select: { id: true, secure_submitted_at: true },
       });
+      if (inOrg && !inOrg.secure_submitted_at) throw new NotFoundError('Case not found');
       if (inOrg) throw new ForbiddenError('You do not have access to this case');
       throw new NotFoundError('Case not found');
     }
@@ -437,7 +440,8 @@ export class PartnerCasesService {
       },
       documents: c.documents.map((d) => ({
         id: d.id,
-        name: d.doc_type,
+        name: d.doc_type.replace(/_/g, ' '),
+        file_url: d.file_url,
         status:
           d.review_status === 'approved'
             ? 'on_file'
@@ -464,7 +468,7 @@ export class PartnerCasesService {
     const { start } = quarterDateRange(q, y);
 
     const cases = await prisma.partnerCase.findMany({
-      where: { ...caseListWhere(ctx), quarter: q },
+      where: { ...caseListWhere(ctx), ...secureSubmittedCaseWhere(), quarter: q },
       include: {
         deadlines: { where: { is_resolved: false } },
         documents: true,

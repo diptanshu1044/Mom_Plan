@@ -137,6 +137,7 @@ export interface CaseDetail extends CaseListItem {
   documents: {
     id: string;
     name: string;
+    file_url?: string;
     status: "missing" | "pending" | "on_file";
     uploaded_at: string;
     expiry_date: string | null;

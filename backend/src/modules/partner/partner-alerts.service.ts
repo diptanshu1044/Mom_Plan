@@ -3,6 +3,7 @@ import {
   caseListWhere,
   OrgAccessContext,
   isOrgAdmin,
+  secureSubmittedCaseWhere,
 } from './partner-access';
 import { formatUserName, hasUserName } from '../../utils/name.utils';
 
@@ -148,6 +149,7 @@ export class PartnerAlertsService {
         is_resolved: false,
         case: {
           ...caseListWhere(ctx, caseworkerFilter),
+          ...secureSubmittedCaseWhere(),
           ...(filters.quarter ? { quarter: filters.quarter.toUpperCase() } : {}),
           ...(filters.program && filters.program !== 'all' ? { program_id: filters.program } : {}),
         },
