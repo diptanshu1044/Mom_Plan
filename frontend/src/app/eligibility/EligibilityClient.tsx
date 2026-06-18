@@ -216,7 +216,7 @@ const URGENCY_OPTIONS = [
   { id: "not_urgent", label: "Not urgent — planning ahead", desc: "General information & templates" },
 ];
 
-const LANGUAGE_OPTIONS = ["English", "Spanish", "French", "Mandarin", "Vietnamese", "Arabic", "Haitian Creole", "Other"];
+const LANGUAGE_OPTIONS = ["English", "Spanish"];
 
 function PillButton({ active, onClick, children, className = "" }: {
   active: boolean; onClick: () => void; children: React.ReactNode; className?: string;
