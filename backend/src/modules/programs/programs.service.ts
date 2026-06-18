@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../utils/errors';
+import { clearActiveProgramsCache, getActivePrograms } from './programs.cache';
 import { quarterDueDatesService } from './quarterDueDates.service';
 import { getProgramRequirements, getDocumentLabel } from '../pdf/program-requirements.data';
 
@@ -85,8 +86,6 @@ interface ChecklistProgramItem {
   officialUrl: string;
 }
 
-let cachedPrograms: any[] | null = null;
-let cacheTimestamp = 0;
 let cachedChecklist: { programs: ChecklistProgramItem[]; availableStates: string[] } | null = null;
 let checklistCacheTimestamp = 0;
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache TTL
@@ -157,8 +156,7 @@ function mapProgramForBrowse(program: {
 }
 
 export function clearProgramsCache() {
-  cachedPrograms = null;
-  cacheTimestamp = 0;
+  clearActiveProgramsCache();
   cachedChecklist = null;
   checklistCacheTimestamp = 0;
 }
@@ -172,16 +170,7 @@ export class ProgramsService {
     page?: number;
     limit?: number;
   } = {}) {
-    const now = Date.now();
-    if (!cachedPrograms || now - cacheTimestamp > CACHE_TTL) {
-      cachedPrograms = await prisma.benefitProgram.findMany({
-        where: {
-          is_active: true,
-        },
-        orderBy: { name: 'asc' },
-      });
-      cacheTimestamp = now;
-    }
+    const cachedPrograms = await getActivePrograms();
 
     let filtered = cachedPrograms;
     const selectedState = filters.state && filters.state !== 'All' ? filters.state.toUpperCase() : 'All';

@@ -245,6 +245,7 @@ model FamilyProfile {
   childcare_provider     String?
   ssn_last_four          String?
   work_situation         String?
+  typical_work_hours     String[]  @default([])
   
   county                        String?
   postpartum_months_since_birth Int?
@@ -326,6 +327,9 @@ model BenefitProgram {
   // Partner Portal subsystem (separate; see Partner Portal models below)
   partner_cases               PartnerCase[]           @relation("PartnerCaseProgram")
 
+  @@index([is_active])
+  @@index([state_code])
+  @@index([federal_or_state])
   @@map("programs")
 }
 
