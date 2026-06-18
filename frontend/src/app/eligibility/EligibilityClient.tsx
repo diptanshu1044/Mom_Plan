@@ -47,7 +47,6 @@ import {
 import { isZipValidationEnabled, normalizeZipInput, validateZip } from "@/services/zipValidation";
 import { useZipValidation } from "@/hooks/useZipValidation";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
-import { ORG_TYPE_OPTIONS } from "@/lib/org-types";
 
 /**
  * Safely converts a value that might be a Prisma Decimal object, number, or
@@ -1181,22 +1180,16 @@ export default function EligibilityPage() {
                       <FieldLabel sub="Set automatically from your selected organization.">
                         What type of organization are you connected with?
                       </FieldLabel>
-                      <select
-                        value={formData.org_type}
-                        disabled
-                        className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-low cursor-not-allowed text-on-surface-variant outline-none text-sm transition-all font-medium"
-                      >
-                        <option value="">
-                          {formData.org_id
+                      <Input
+                        value={
+                          formData.org_type ||
+                          (formData.org_id
                             ? "Loading organization type…"
-                            : "Select an organization first…"}
-                        </option>
-                        {ORG_TYPE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
+                            : "Select an organization first…")
+                        }
+                        onChange={() => {}}
+                        disabled
+                      />
                     </div>
 
                     <div>

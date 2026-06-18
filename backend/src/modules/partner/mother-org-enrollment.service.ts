@@ -100,7 +100,7 @@ export class MotherOrgEnrollmentService {
         where: { id: userId },
         data: {
           org_id: orgId,
-          org_type: org.org_type || org.category || null,
+          org_type: org.category || org.org_type || null,
         },
       });
 

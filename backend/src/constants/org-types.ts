@@ -23,4 +23,5 @@ export function parseOrgType(value: string): OrganizationType | undefined {
   return labelToOrgType[value as OrgTypeLabel];
 }
 
-export const orgTypeSchema = z.enum(ORG_TYPES as unknown as [OrgTypeLabel, ...OrgTypeLabel[]]);
+/** Mother-facing org_type is a free-form string (often copied from the selected organization). */
+export const orgTypeSchema = z.string().trim().max(200);

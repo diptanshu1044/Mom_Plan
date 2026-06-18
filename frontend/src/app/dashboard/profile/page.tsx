@@ -27,7 +27,6 @@ import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { PlanBadge } from "@/components/ui/Badge";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
-import { ORG_TYPE_OPTIONS, ORG_TYPES } from "@/lib/org-types";
 import { formatPhoneForApi, normalizeUsPhoneDigits } from "@/lib/phone";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
@@ -148,12 +147,7 @@ const profileSchema = z.object({
   state: z.string().optional(),
   zip_code: z.string().optional(),
   profile_picture: z.string().optional(),
-  org_type: z
-    .string()
-    .optional()
-    .refine((val) => !val || ORG_TYPES.includes(val as (typeof ORG_TYPES)[number]), {
-      message: "Please select a valid organization type",
-    }),
+  org_type: z.string().optional(),
   org_id: z
     .string()
     .optional()
@@ -451,11 +445,10 @@ export default function ProfilePage() {
                     error={profileForm.formState.errors.org_id?.message}
                   />
                 </div>
-                <Select
+                <Input
                   label="Organization Type"
-                  options={ORG_TYPE_OPTIONS}
                   placeholder="Select an organization first…"
-                  allowEmpty
+                  readOnly
                   disabled
                   hint="Set automatically from your selected organization"
                   error={profileForm.formState.errors.org_type?.message}

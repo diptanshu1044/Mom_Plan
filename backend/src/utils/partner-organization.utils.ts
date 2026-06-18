@@ -1,10 +1,9 @@
-import { Organization, OrganizationType } from '@prisma/client';
-import { parseOrgType } from '../constants/org-types';
+import { Organization } from '@prisma/client';
 
 export type PartnerOrganization = {
   id: string;
   name: string;
-  type: OrganizationType | null;
+  type: string | null;
   website: string | null;
   description: string | null;
   phone: string | null;
@@ -32,7 +31,7 @@ export function toPartnerOrganization(org: Organization): PartnerOrganization {
   return {
     id: org.id,
     name: org.org_name,
-    type: org.org_type ? (parseOrgType(org.org_type) ?? null) : null,
+    type: org.category || org.org_type || null,
     website: org.website,
     description: org.description ?? org.purpose,
     phone: org.phone,

@@ -31,7 +31,7 @@ export function toPublicOrganization(org: OrganizationPublicRecord) {
   return {
     id: org.id,
     name: org.org_name,
-    type: org.org_type || org.category,
+    type: org.category || org.org_type,
     tagline: org.purpose,
     description: org.purpose,
     city: org.city,
