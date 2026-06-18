@@ -241,24 +241,30 @@ function PillButton({ active, onClick, children, className = "" }: {
   );
 }
 
-function YesNo({ value, onChange, yesLabel = "Yes", noLabel = "No" }: {
-  value: boolean | null; onChange: (v: boolean) => void; yesLabel?: string; noLabel?: string;
+function otherAdultsPossible(householdSize: number, numChildren: number) {
+  return householdSize - 1 - numChildren > 0;
+}
+
+function YesNo({ value, onChange, yesLabel = "Yes", noLabel = "No", disabled = false }: {
+  value: boolean | null; onChange: (v: boolean) => void; yesLabel?: string; noLabel?: string; disabled?: boolean;
 }) {
   return (
     <div className="flex gap-3">
       <button
         type="button"
+        disabled={disabled}
         onClick={() => onChange(true)}
         className={`flex-1 py-2.5 px-4 rounded-xl border font-bold text-sm transition-all ${
           value === true ? "bg-primary-50 border-primary-500 text-primary-700" : "bg-white border-outline-variant/50 text-on-surface-variant hover:bg-surface-container"
-        }`}
+        } ${disabled ? "cursor-not-allowed opacity-50 hover:bg-white" : ""}`}
       >{yesLabel}</button>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => onChange(false)}
         className={`flex-1 py-2.5 px-4 rounded-xl border font-bold text-sm transition-all ${
           value === false ? "bg-emerald-50 border-emerald-500 text-emerald-700" : "bg-white border-outline-variant/50 text-on-surface-variant hover:bg-surface-container"
-        }`}
+        } ${disabled ? "cursor-not-allowed opacity-50 hover:bg-white" : ""}`}
       >{noLabel}</button>
     </div>
   );
@@ -478,7 +484,8 @@ export default function EligibilityPage() {
 
         const dobStr = apiDateToIsoLocal(fp?.date_of_birth);
 
-        const numChildren = fp?.num_children || 0;
+        const householdSize = fp?.household_size || 1;
+        const numChildren = Math.min(fp?.num_children || 0, Math.max(0, householdSize - 1));
         const initialDobs = [...(fp?.children_dobs || [])].map((dob) => apiDateToIsoLocal(dob));
         while (initialDobs.length < numChildren) initialDobs.push("");
 
@@ -501,13 +508,13 @@ export default function EligibilityPage() {
           other_earners: fp?.other_household_income ? "family" : "none",
           savings_assets: fp?.savings_assets || "none",
           child_support_status: fp?.child_support_status || "no_arrangement",
-          household_size: fp?.household_size || 1,
+          household_size: householdSize,
           num_children: numChildren,
-          children_birthdates: initialDobs,
-          has_disability: fp?.has_disability ?? null,
+          children_birthdates: initialDobs.slice(0, numChildren),
+          has_disability: numChildren > 0 ? (fp?.has_disability ?? null) : null,
           is_pregnant: fp?.is_pregnant ?? null,
           marital_status: fp?.marital_status || "single",
-          other_adults: fp?.other_adults ?? null,
+          other_adults: otherAdultsPossible(householdSize, numChildren) ? (fp?.other_adults ?? null) : null,
           housing_status: fp?.housing_status || "renting",
           monthly_rent: parseDecimalToString(fp?.monthly_rent),
           monthly_utilities: parseDecimalToString(fp?.monthly_utilities),
@@ -534,7 +541,8 @@ export default function EligibilityPage() {
         if (user) {
           const fp = user.family_profile;
           const dobStr = apiDateToIsoLocal(fp?.date_of_birth);
-          const numChildren = fp?.num_children || 0;
+          const householdSize = fp?.household_size || 1;
+          const numChildren = Math.min(fp?.num_children || 0, Math.max(0, householdSize - 1));
           const initialDobs = [...(fp?.children_dobs || [])].map((dob) => apiDateToIsoLocal(dob));
           while (initialDobs.length < numChildren) initialDobs.push("");
           setFormData(prev => ({
@@ -550,9 +558,11 @@ export default function EligibilityPage() {
             monthly_rent: parseDecimalToString(fp?.monthly_rent),
             monthly_utilities: parseDecimalToString(fp?.monthly_utilities),
             monthly_childcare_cost: parseDecimalToString(fp?.monthly_childcare_cost),
-            household_size: fp?.household_size || 1,
+            household_size: householdSize,
             num_children: numChildren,
-            children_birthdates: initialDobs,
+            children_birthdates: initialDobs.slice(0, numChildren),
+            has_disability: numChildren > 0 ? (fp?.has_disability ?? null) : null,
+            other_adults: otherAdultsPossible(householdSize, numChildren) ? (fp?.other_adults ?? null) : null,
             org_type: user.org_type || "",
             partner_org_id: user.partner_org_id || "",
           }));
@@ -568,8 +578,15 @@ export default function EligibilityPage() {
         try {
           const parsed = JSON.parse(pendingScan);
           if (parsed) {
+            const householdSize = parsed.household_size || 1;
+            const numChildren = Math.min(parsed.num_children || 0, Math.max(0, householdSize - 1));
             setFormData({
               ...parsed,
+              household_size: householdSize,
+              num_children: numChildren,
+              children_birthdates: (parsed.children_birthdates || []).slice(0, numChildren),
+              has_disability: numChildren > 0 ? (parsed.has_disability ?? null) : null,
+              other_adults: otherAdultsPossible(householdSize, numChildren) ? (parsed.other_adults ?? null) : null,
               ssn_last_four: normalizeSsnLastFour(parsed.ssn_last_four),
               phone: normalizeUsPhoneDigits(parsed.phone),
             });
@@ -700,12 +717,36 @@ export default function EligibilityPage() {
     setStep((s) => s + 1);
   };
 
+  const maxNumChildren = Math.max(0, formData.household_size - 1);
+
+  const setHouseholdSize = (size: number) => {
+    const newSize = Math.max(1, size);
+    setFormData((prev) => {
+      const maxChildren = Math.max(0, newSize - 1);
+      const newNumChildren = Math.min(prev.num_children, maxChildren);
+      return {
+        ...prev,
+        household_size: newSize,
+        num_children: newNumChildren,
+        children_birthdates: prev.children_birthdates.slice(0, newNumChildren),
+        has_disability: newNumChildren === 0 ? null : prev.has_disability,
+        other_adults: otherAdultsPossible(newSize, newNumChildren) ? prev.other_adults : null,
+      };
+    });
+  };
+
   const setNumChildren = (n: number) => {
-    const count = Math.max(0, n);
+    const count = Math.min(Math.max(0, n), maxNumChildren);
     setFormData((prev) => {
       const dates = [...prev.children_birthdates];
       while (dates.length < count) dates.push("");
-      return { ...prev, num_children: count, children_birthdates: dates.slice(0, count) };
+      return {
+        ...prev,
+        num_children: count,
+        children_birthdates: dates.slice(0, count),
+        has_disability: count === 0 ? null : prev.has_disability,
+        other_adults: otherAdultsPossible(prev.household_size, count) ? prev.other_adults : null,
+      };
     });
   };
 
@@ -1297,14 +1338,15 @@ export default function EligibilityPage() {
                         <div className="font-bold text-sm text-on-surface">Including yourself, how many people live in your household? *</div>
                         <div className="text-xs text-on-surface-variant mt-0.5">Count everyone who lives with you and shares meals or expenses.</div>
                       </div>
-                      <Counter value={formData.household_size} onChange={(v) => set("household_size", Math.max(1, v))} min={1} />
+                      <Counter value={formData.household_size} onChange={setHouseholdSize} min={1} />
                     </div>
 
                     <div className="flex items-center justify-between p-4 rounded-2xl bg-surface-container-low border border-outline-variant/20">
                       <div>
                         <div className="font-bold text-sm text-on-surface">How many children under 18 live with you? *</div>
+                        <div className="text-xs text-on-surface-variant mt-0.5">At most one fewer than your household size (you count as one member).</div>
                       </div>
-                      <Counter value={formData.num_children} onChange={setNumChildren} min={0} />
+                      <Counter value={formData.num_children} onChange={setNumChildren} min={0} max={maxNumChildren} />
                     </div>
 
                     {formData.num_children > 0 && (
@@ -1334,7 +1376,11 @@ export default function EligibilityPage() {
                       <FieldLabel sub="Some programs offer higher benefit amounts for children with disabilities.">
                         Does any child in your home have a disability or special needs?
                       </FieldLabel>
-                      <YesNo value={formData.has_disability} onChange={(v) => set("has_disability", v)} />
+                      <YesNo
+                        value={formData.has_disability}
+                        onChange={(v) => set("has_disability", v)}
+                        disabled={formData.num_children === 0}
+                      />
                     </div>
 
                     <div>
@@ -1357,7 +1403,11 @@ export default function EligibilityPage() {
                       <FieldLabel sub="Other adults' income may affect eligibility for some programs.">
                         Are there any other adults (18+) living in your home?
                       </FieldLabel>
-                      <YesNo value={formData.other_adults} onChange={(v) => set("other_adults", v)} />
+                      <YesNo
+                        value={formData.other_adults}
+                        onChange={(v) => set("other_adults", v)}
+                        disabled={!otherAdultsPossible(formData.household_size, formData.num_children)}
+                      />
                     </div>
                   </>
                 )}
