@@ -49,6 +49,9 @@ const startServer = async () => {
   // ─── 4. Graceful Shutdown ──────────────────────────────────────────
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Shutting down gracefully');
+    if (typeof server.closeAllConnections === 'function') {
+      server.closeAllConnections();
+    }
     server.close(async () => {
       if (dbConnected) {
         await prisma.$disconnect();
@@ -65,7 +68,12 @@ const startServer = async () => {
   };
 
   process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  // tsx watch sends SIGTERM to restart; exit immediately in dev so the port is released.
+  if (env.NODE_ENV === 'development') {
+    process.on('SIGTERM', () => process.exit(0));
+  } else {
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+  }
   process.on('uncaughtException', (err) => {
     logger.fatal({ err }, 'Uncaught exception');
     shutdown('uncaughtException');
