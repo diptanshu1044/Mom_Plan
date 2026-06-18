@@ -6,6 +6,7 @@ import { Bell, CheckCheck, Clock, AlertCircle, Trash2, ExternalLink } from "luci
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
 import { formatRelativeDate } from "@/lib/utils";
 
 const notificationIcons: Record<string, any> = {
@@ -26,24 +27,24 @@ export default function NotificationsPage() {
   const queryClient = useQueryClient();
 
   const { data: notifications, isLoading } = useQuery({
-    queryKey: ["notifications"],
+    queryKey: queryKeys.notifications,
     queryFn: () => api.get("/api/notifications").then((r) => r.data.data),
     refetchInterval: 30_000, // poll every 30 seconds for new notifications
   });
 
   const markReadMutation = useMutation({
     mutationFn: (id: string) => api.put(`/api/notifications/${id}/read`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
   });
 
   const markAllReadMutation = useMutation({
     mutationFn: () => api.put("/api/notifications/read-all"),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/api/notifications/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications }),
   });
 
   const unread = notifications?.filter((n: any) => !n.is_read) || [];

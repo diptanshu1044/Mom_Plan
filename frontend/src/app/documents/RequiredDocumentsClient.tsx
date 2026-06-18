@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, type KeyboardEvent } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,6 +19,7 @@ import {
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
 import { filterStatesByCodes, STATE_LABEL_BY_CODE } from "@/lib/us-states";
 
 interface DocumentItem {
@@ -93,13 +95,8 @@ function formatResultsRange(page: number, limit: number, total: number): string 
 }
 
 export default function RequiredDocumentsPage() {
-  const [displayedPrograms, setDisplayedPrograms] = useState<ChecklistProgram[]>([]);
   const [availableStateCodes, setAvailableStateCodes] = useState<string[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [filterLoading, setFilterLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedState, setSelectedState] = useState("All");
@@ -107,8 +104,6 @@ export default function RequiredDocumentsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pageInput, setPageInput] = useState("");
   const [openJumpGap, setOpenJumpGap] = useState<string | null>(null);
-  const requestIdRef = useRef(0);
-  const hasLoadedOnceRef = useRef(false);
   const pageJumpInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const filtersKeyRef = useRef("");
@@ -120,66 +115,55 @@ export default function RequiredDocumentsPage() {
 
   useEffect(() => {
     const filtersKey = `${selectedState}|${selectedLevel}|${debouncedSearch}`;
-    const filtersChanged = filtersKeyRef.current !== filtersKey;
-
-    if (filtersChanged) {
+    if (filtersKeyRef.current !== filtersKey) {
       filtersKeyRef.current = filtersKey;
       setOpenJumpGap(null);
       setPageInput("");
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-        return;
-      }
+      setCurrentPage(1);
     }
+  }, [selectedState, selectedLevel, debouncedSearch]);
 
-    const requestId = ++requestIdRef.current;
-    let cancelled = false;
-    const isInitialLoad = !hasLoadedOnceRef.current;
-
-    async function fetchPrograms() {
-      if (isInitialLoad) {
-        setLoading(true);
-      } else {
-        setFilterLoading(true);
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: queryKeys.documentsChecklist(
+      selectedState,
+      selectedLevel,
+      debouncedSearch,
+      currentPage
+    ),
+    queryFn: async () => {
+      const params = buildChecklistParams(
+        selectedState,
+        selectedLevel,
+        debouncedSearch,
+        currentPage
+      );
+      const response = await api.get(`/api/programs/documents-checklist?${params.toString()}`);
+      if (!response.data.success) {
+        throw new Error("Failed to fetch documents checklist");
       }
+      return response.data.data as {
+        programs: ChecklistProgram[];
+        availableStates?: string[];
+        total: number;
+        pagination?: { totalPages: number; page: number };
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
 
-      try {
-        const params = buildChecklistParams(selectedState, selectedLevel, debouncedSearch, currentPage);
-        const query = params.toString();
-        const response = await api.get(
-          `/api/programs/documents-checklist?${query}`
-        );
-
-        if (cancelled || requestId !== requestIdRef.current) return;
-
-        if (response.data.success) {
-          const { programs, availableStates, total: count, pagination } = response.data.data;
-          setDisplayedPrograms(programs ?? []);
-          setTotal(count ?? 0);
-          setTotalPages(pagination?.totalPages ?? 1);
-          if (pagination?.page && pagination.page !== currentPage) {
-            setCurrentPage(pagination.page);
-          }
-          hasLoadedOnceRef.current = true;
-          if (availableStates?.length) {
-            setAvailableStateCodes(availableStates);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching documents checklist:", error);
-      } finally {
-        if (!cancelled && requestId === requestIdRef.current) {
-          setLoading(false);
-          setFilterLoading(false);
-        }
-      }
+  useEffect(() => {
+    if (data?.pagination?.page && data.pagination.page !== currentPage) {
+      setCurrentPage(data.pagination.page);
     }
+  }, [data?.pagination?.page, currentPage]);
 
-    fetchPrograms();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedState, selectedLevel, debouncedSearch, currentPage]);
+  useEffect(() => {
+    if (data?.availableStates?.length) {
+      setAvailableStateCodes(data.availableStates);
+    }
+  }, [data?.availableStates]);
 
   useEffect(() => {
     if (openJumpGap) {
@@ -187,9 +171,12 @@ export default function RequiredDocumentsPage() {
     }
   }, [openJumpGap]);
 
+  const displayedPrograms = data?.programs ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.pagination?.totalPages ?? 1;
   const availableStates = filterStatesByCodes(availableStateCodes);
-  const showInitialLoader = loading && displayedPrograms.length === 0;
-  const showFilterOverlay = filterLoading && displayedPrograms.length > 0;
+  const showInitialLoader = isLoading && displayedPrograms.length === 0;
+  const showFilterOverlay = isFetching && !isLoading && displayedPrograms.length > 0;
   const paginationItems = buildPaginationItems(currentPage, totalPages);
 
   const goToPage = (page: number) => {
@@ -534,7 +521,7 @@ export default function RequiredDocumentsPage() {
               </>
             )}
 
-            {!showInitialLoader && !filterLoading && displayedPrograms.length === 0 && (
+            {!showInitialLoader && !isFetching && displayedPrograms.length === 0 && (
               <div className="text-center py-20">
                 <div className="w-16 h-16 bg-surface-container rounded-full flex items-center justify-center mx-auto mb-4">
                   <Search className="w-8 h-8 text-on-surface-variant/30" />
@@ -553,7 +540,7 @@ export default function RequiredDocumentsPage() {
               <button
                 type="button"
                 onClick={() => goToPage(currentPage - 1)}
-                disabled={currentPage === 1 || filterLoading}
+                disabled={currentPage === 1 || isFetching}
                 className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-outline-variant/30 bg-white text-sm font-semibold text-on-surface disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -568,7 +555,7 @@ export default function RequiredDocumentsPage() {
                         key={`page-${item.page}`}
                         type="button"
                         onClick={() => goToPage(item.page)}
-                        disabled={filterLoading}
+                        disabled={isFetching}
                         aria-current={item.page === currentPage ? "page" : undefined}
                         className={`min-w-10 h-10 rounded-xl text-sm font-semibold border transition-colors ${
                           item.page === currentPage
@@ -593,7 +580,7 @@ export default function RequiredDocumentsPage() {
                         onChange={(e) => setPageInput(e.target.value)}
                         onKeyDown={handlePageJumpKeyDown}
                         onBlur={submitPageJump}
-                        disabled={filterLoading}
+                        disabled={isFetching}
                         aria-label="Enter page number"
                         placeholder="Page"
                         className="w-14 h-10 px-2 rounded-xl border border-primary bg-white text-sm text-on-surface text-center font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -606,7 +593,7 @@ export default function RequiredDocumentsPage() {
                       key={item.gapId}
                       type="button"
                       onClick={() => openPageJump(item.gapId)}
-                      disabled={filterLoading}
+                      disabled={isFetching}
                       aria-label="Jump to page"
                       title="Jump to page"
                       className="min-w-10 h-10 rounded-xl text-sm font-semibold border border-outline-variant/30 bg-white text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
@@ -620,7 +607,7 @@ export default function RequiredDocumentsPage() {
               <button
                 type="button"
                 onClick={() => goToPage(currentPage + 1)}
-                disabled={currentPage === totalPages || filterLoading}
+                disabled={currentPage === totalPages || isFetching}
                 className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-outline-variant/30 bg-white text-sm font-semibold text-on-surface disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container transition-colors"
               >
                 Next

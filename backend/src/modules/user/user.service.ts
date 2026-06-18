@@ -54,9 +54,9 @@ export class UserService {
         last_active_at: true,
         status: true,
         profile_picture: true,
-        partner_org_id: true,
+        org_id: true,
         org_type: true,
-        partner_organization: {
+        organization: {
           select: { id: true, name: true, city: true, state: true },
         },
         family_profile: true,
@@ -75,7 +75,7 @@ export class UserService {
     data: any
   ) {
     const {
-      first_name, middle_name, last_name, phone, email, state, zip_code, partner_org_id,
+      first_name, middle_name, last_name, phone, email, state, zip_code, org_id,
       org_type,
       household_size, num_children, children_ages, monthly_income,
       employment_status, housing_status, has_disability, is_pregnant,
@@ -94,7 +94,7 @@ export class UserService {
       where: { id: userId },
       include: {
         family_profile: true,
-        partner_organization: {
+        organization: {
           select: { id: true, name: true, city: true, state: true },
         },
       },
@@ -132,21 +132,21 @@ export class UserService {
 
     const userUpdate = buildUserProfilePatch(existingProfile, normalizedData);
     const familyUpdate = buildFamilyProfilePatch(existingProfile.family_profile, normalizedData);
-    let partnerOrganization = existingProfile.partner_organization;
+    let organization = existingProfile.organization;
 
-    if (partner_org_id !== undefined) {
-      if (!partner_org_id) {
-        if (existingProfile.partner_org_id !== null) {
-          userUpdate.partner_org_id = null;
+    if (org_id !== undefined) {
+      if (!org_id) {
+        if (existingProfile.org_id !== null) {
+          userUpdate.org_id = null;
           userUpdate.org_type = null;
-          partnerOrganization = null;
+          organization = null;
         }
-      } else if (partner_org_id !== existingProfile.partner_org_id) {
-        await motherOrgEnrollment.enrollUserInPartnerOrg(userId, partner_org_id);
-        userUpdate.partner_org_id = partner_org_id;
+      } else if (org_id !== existingProfile.org_id) {
+        await motherOrgEnrollment.enrollUserInPartnerOrg(userId, org_id);
+        userUpdate.org_id = org_id;
         userUpdate.org_type = org_type || null;
-        partnerOrganization = await prisma.partnerOrganization.findUnique({
-          where: { id: partner_org_id },
+        organization = await prisma.organization.findUnique({
+          where: { id: org_id },
           select: { id: true, name: true, city: true, state: true },
         });
       }
@@ -218,7 +218,7 @@ export class UserService {
     }
 
     const profile = serializeProfile(
-      mergeProfileResponse(existingProfile, userUpdate, familyUpdate, partnerOrganization)
+      mergeProfileResponse(existingProfile, userUpdate, familyUpdate, organization)
     );
 
     if (shouldRescanEligibility && profile.family_profile) {

@@ -154,7 +154,7 @@ const profileSchema = z.object({
     .refine((val) => !val || ORG_TYPES.includes(val as (typeof ORG_TYPES)[number]), {
       message: "Please select a valid organization type",
     }),
-  partner_org_id: z
+  org_id: z
     .string()
     .optional()
     .refine((val) => !val || z.string().uuid().safeParse(val).success, {
@@ -218,7 +218,7 @@ export default function ProfilePage() {
       zip_code: currentUser?.zip_code || "",
       profile_picture: currentUser?.profile_picture || "",
       org_type: currentUser?.org_type || "",
-      partner_org_id: currentUser?.partner_org_id || "",
+      org_id: currentUser?.org_id || "",
       household_size: String(currentUser?.family_profile?.household_size || ""),
       num_children: String(currentUser?.family_profile?.num_children || ""),
       monthly_income: String(currentUser?.family_profile?.monthly_income || ""),
@@ -281,7 +281,7 @@ export default function ProfilePage() {
         ...data,
         phone: data.phone ? formatPhoneForApi(data.phone) : undefined,
         org_type: data.org_type || null,
-        partner_org_id: data.partner_org_id || null,
+        org_id: data.org_id || null,
         household_size: data.household_size ? parseInt(data.household_size) : undefined,
         num_children: data.num_children ? parseInt(data.num_children) : undefined,
         monthly_income: data.monthly_income ? parseFloat(data.monthly_income) : undefined,
@@ -441,14 +441,14 @@ export default function ProfilePage() {
                 />
                 <div className="sm:col-span-2">
                   <PartnerOrgSelect
-                    value={profileForm.watch("partner_org_id") || ""}
+                    value={profileForm.watch("org_id") || ""}
                     onChange={(id) =>
-                      profileForm.setValue("partner_org_id", id, { shouldValidate: true })
+                      profileForm.setValue("org_id", id, { shouldValidate: true })
                     }
                     onOrgTypeChange={(type) =>
                       profileForm.setValue("org_type", type, { shouldValidate: true })
                     }
-                    error={profileForm.formState.errors.partner_org_id?.message}
+                    error={profileForm.formState.errors.org_id?.message}
                   />
                 </div>
                 <Select

@@ -143,7 +143,7 @@ export class PartnerAuthService {
 
     // Create org + admin in a transaction
     const { org, adminUser } = await prisma.$transaction(async (tx) => {
-      const org = await tx.partnerOrganization.create({
+      const org = await tx.organization.create({
         data: {
           name:          data.orgName,
           type:          orgType,
@@ -183,11 +183,11 @@ export class PartnerAuthService {
           middle_name: nameParts.middle_name,
           last_name: nameParts.last_name,
           plan: 'community',
-          partner_org_id: org.id,
+          org_id: org.id,
         },
       });
 
-      await tx.partnerOrganization.update({
+      await tx.organization.update({
         where: { id: org.id },
         data: { billing_user_id: billingUser.id },
       });

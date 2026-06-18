@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
 import { filterStatesByCodes } from '@/lib/us-states';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ExternalLink, Info, CheckCircle, X, Loader2, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -106,13 +108,8 @@ function formatBenefit(program: BenefitProgram): string {
 }
 
 export default function BrowsePrograms() {
-  const [programs, setPrograms] = useState<BenefitProgram[]>([]);
   const [availableStateCodes, setAvailableStateCodes] = useState<string[]>([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [filterLoading, setFilterLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -122,8 +119,6 @@ export default function BrowsePrograms() {
   const [pageInput, setPageInput] = useState('');
   const [openJumpGap, setOpenJumpGap] = useState<string | null>(null);
   const pageJumpInputRef = useRef<HTMLInputElement>(null);
-  const requestIdRef = useRef(0);
-  const hasLoadedOnceRef = useRef(false);
   const resultsRef = useRef<HTMLDivElement>(null);
   const filtersKeyRef = useRef('');
 
@@ -134,70 +129,57 @@ export default function BrowsePrograms() {
 
   useEffect(() => {
     const filtersKey = `${selectedState}|${selectedLevel}|${selectedCategory}|${debouncedSearch}`;
-    const filtersChanged = filtersKeyRef.current !== filtersKey;
-
-    if (filtersChanged) {
+    if (filtersKeyRef.current !== filtersKey) {
       filtersKeyRef.current = filtersKey;
       setOpenJumpGap(null);
       setPageInput('');
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-        return;
-      }
+      setCurrentPage(1);
     }
+  }, [selectedState, selectedLevel, selectedCategory, debouncedSearch]);
 
-    const requestId = ++requestIdRef.current;
-    let cancelled = false;
-    const isInitialLoad = !hasLoadedOnceRef.current;
-
-    async function fetchPrograms() {
-      if (isInitialLoad) {
-        setLoading(true);
-      } else {
-        setFilterLoading(true);
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: queryKeys.programs(
+      selectedState,
+      selectedLevel,
+      selectedCategory,
+      debouncedSearch,
+      currentPage
+    ),
+    queryFn: async () => {
+      const params = buildProgramsParams(
+        selectedState,
+        selectedLevel,
+        selectedCategory,
+        debouncedSearch,
+        currentPage
+      );
+      const response = await api.get(`/api/programs?${params.toString()}`);
+      if (!response.data.success) {
+        throw new Error('Failed to fetch programs');
       }
+      return response.data.data as {
+        programs: BenefitProgram[];
+        availableStates?: string[];
+        total: number;
+        pagination?: { totalPages: number; page: number };
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    placeholderData: keepPreviousData,
+  });
 
-      try {
-        const params = buildProgramsParams(
-          selectedState,
-          selectedLevel,
-          selectedCategory,
-          debouncedSearch,
-          currentPage
-        );
-        const query = params.toString();
-        const response = await api.get(`/api/programs?${query}`);
-
-        if (cancelled || requestId !== requestIdRef.current) return;
-
-        if (response.data.success) {
-          const { programs: fetchedPrograms, availableStates, total: count, pagination } = response.data.data;
-          setPrograms(fetchedPrograms ?? []);
-          setTotal(count ?? 0);
-          setTotalPages(pagination?.totalPages ?? 1);
-          if (pagination?.page && pagination.page !== currentPage) {
-            setCurrentPage(pagination.page);
-          }
-          hasLoadedOnceRef.current = true;
-          if (availableStates?.length) {
-            setAvailableStateCodes(availableStates);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching programs:', error);
-      } finally {
-        if (!cancelled && requestId === requestIdRef.current) {
-          setLoading(false);
-          setFilterLoading(false);
-        }
-      }
+  useEffect(() => {
+    if (data?.pagination?.page && data.pagination.page !== currentPage) {
+      setCurrentPage(data.pagination.page);
     }
+  }, [data?.pagination?.page, currentPage]);
 
-    fetchPrograms();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedState, selectedLevel, selectedCategory, debouncedSearch, currentPage]);
+  useEffect(() => {
+    if (data?.availableStates?.length) {
+      setAvailableStateCodes(data.availableStates);
+    }
+  }, [data?.availableStates]);
 
   useEffect(() => {
     if (openJumpGap) {
@@ -205,10 +187,14 @@ export default function BrowsePrograms() {
     }
   }, [openJumpGap]);
 
+  const programs = data?.programs ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = data?.pagination?.totalPages ?? 1;
   const availableStates = filterStatesByCodes(availableStateCodes);
-  const showInitialLoader = loading && programs.length === 0;
-  const showFilterOverlay = filterLoading && programs.length > 0;
+  const showInitialLoader = isLoading && programs.length === 0;
+  const showFilterOverlay = isFetching && !isLoading && programs.length > 0;
   const paginationItems = buildPaginationItems(currentPage, totalPages);
+  const filterLoading = isFetching;
 
   const goToPage = (page: number) => {
     if (page < 1 || page > totalPages || page === currentPage) return;

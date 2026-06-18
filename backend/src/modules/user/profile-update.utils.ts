@@ -3,7 +3,7 @@ import { normalizeStateCode } from '../eligibility/eligibility.filters';
 
 export type ProfileWithFamily = User & {
   family_profile: FamilyProfile | null;
-  partner_organization?: {
+  organization?: {
     id: string;
     name: string;
     city: string | null;
@@ -176,7 +176,7 @@ export function mergeProfileResponse(
   existing: ProfileWithFamily,
   userPatch: Record<string, unknown>,
   familyPatch: Record<string, unknown> | null,
-  partnerOrganization?: ProfileWithFamily['partner_organization']
+  organization?: ProfileWithFamily['organization']
 ): ProfileWithFamily {
   const family_profile = existing.family_profile
     ? ({ ...existing.family_profile, ...(familyPatch ?? {}) } as FamilyProfile)
@@ -188,7 +188,7 @@ export function mergeProfileResponse(
     ...existing,
     ...userPatch,
     family_profile,
-    partner_organization:
-      partnerOrganization !== undefined ? partnerOrganization : existing.partner_organization,
+    organization:
+      organization !== undefined ? organization : existing.organization,
   };
 }

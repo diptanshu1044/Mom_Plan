@@ -27,10 +27,10 @@ export class PartnerOrgService {
       case_numbering_prefix?: string;
     }
   ) {
-    const org = await prisma.partnerOrganization.findUnique({ where: { id: orgId } });
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
     if (!org) throw new NotFoundError('Organization not found');
 
-    const updated = await prisma.partnerOrganization.update({
+    const updated = await prisma.organization.update({
       where: { id: orgId },
       data: {
         ...(data.name          && { name:          data.name }),
@@ -58,7 +58,7 @@ export class PartnerOrgService {
   }
 
   async getOrganization(orgId: string) {
-    const org = await prisma.partnerOrganization.findUnique({ where: { id: orgId } });
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
     if (!org) throw new NotFoundError('Organization not found');
     return org;
   }

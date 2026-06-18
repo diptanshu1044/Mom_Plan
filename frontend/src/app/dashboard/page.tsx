@@ -20,6 +20,7 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
 import { formatCurrency, formatRelativeDate, getConfidenceColor } from "@/lib/utils";
 import { userFirstName } from "@/lib/name";
 
@@ -45,8 +46,6 @@ export default function DashboardPage() {
   const { data: eligibilityData, isLoading: loadingEligibility } = useQuery({
     queryKey: ["eligibility-results", {}],
     queryFn: () => api.get("/api/eligibility/results").then((r) => r.data.data),
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
   });
 
   const eligibilityResults = eligibilityData?.results ?? [];
@@ -54,22 +53,16 @@ export default function DashboardPage() {
   const { data: applications, isLoading: loadingApps } = useQuery({
     queryKey: ["applications"],
     queryFn: () => api.get("/api/applications").then((r) => r.data.data),
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
   });
 
   const { data: deadlines, isLoading: loadingDeadlines } = useQuery({
     queryKey: ["deadlines"],
     queryFn: () => api.get("/api/deadlines").then((r) => r.data.data),
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
   });
 
   const { data: notifications, isLoading: loadingNotifications } = useQuery({
-    queryKey: ["notifications"],
+    queryKey: queryKeys.notifications,
     queryFn: () => api.get("/api/notifications").then((r) => r.data.data),
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
   });
 
   const qualifiedPrograms = eligibilityResults.filter(

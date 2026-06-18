@@ -63,8 +63,8 @@ async function defaultIntakeProgramId(): Promise<string> {
 }
 
 export class MotherOrgEnrollmentService {
-  async listPartnerOrganizations() {
-    return prisma.partnerOrganization.findMany({
+  async listOrganizations() {
+    return prisma.organization.findMany({
       select: {
         id: true,
         name: true,
@@ -83,7 +83,7 @@ export class MotherOrgEnrollmentService {
   }
 
   async enrollUserInPartnerOrg(userId: string, orgId: string) {
-    const org = await prisma.partnerOrganization.findUnique({ where: { id: orgId } });
+    const org = await prisma.organization.findUnique({ where: { id: orgId } });
     if (!org) throw new NotFoundError('Partner organization not found');
 
     const user = await prisma.user.findUnique({
@@ -104,7 +104,7 @@ export class MotherOrgEnrollmentService {
       await tx.user.update({
         where: { id: userId },
         data: {
-          partner_org_id: orgId,
+          org_id: orgId,
           org_type: org.type || null,
         },
       });

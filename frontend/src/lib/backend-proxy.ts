@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 
 const REFRESH_COOKIE = "mp_rt";
 
+/** Public GET routes safe to cache at the edge (no user-specific data). */
+const CACHEABLE_GET_PREFIXES = ["programs", "organizations"];
+
+function getPublicCacheControl(pathname: string, method: string): string | null {
+  if (method !== "GET") return null;
+  const isCacheable = CACHEABLE_GET_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+  if (!isCacheable) return null;
+  return "public, s-maxage=120, stale-while-revalidate=300";
+}
+
 /** Headers to drop when proxying — fetch() already decompresses the body. */
 const STRIP_RESPONSE_HEADERS = new Set([
   "content-encoding",
@@ -94,6 +106,11 @@ export async function proxyToBackend(
     statusText: backendResponse.statusText,
     headers: responseHeaders,
   });
+
+  const cacheControl = getPublicCacheControl(pathname, request.method);
+  if (cacheControl) {
+    nextResponse.headers.set("Cache-Control", cacheControl);
+  }
 
   applyRefreshCookie(backendResponse, nextResponse);
   return nextResponse;

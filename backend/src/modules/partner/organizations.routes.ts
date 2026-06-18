@@ -8,9 +8,9 @@ const svc = new MotherOrgEnrollmentService();
 
 router.get(
   '/',
-  logHandler('partner.organizations', 'listPartnerOrganizations', async (_req, res, next) => {
+  logHandler('partner.organizations', 'listOrganizations', async (_req, res, next) => {
     try {
-      const data = await svc.listPartnerOrganizations();
+      const data = await svc.listOrganizations();
       res.status(200).json({ success: true, data });
     } catch (error) {
       next(error);

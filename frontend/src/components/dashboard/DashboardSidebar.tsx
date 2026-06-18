@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard,
@@ -24,6 +24,8 @@ import { useAuthStore } from "@/store/auth.store";
 import { formatUserName, userInitials } from "@/lib/name";
 import { PlanBadge } from "@/components/ui/Badge";
 import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
+import { useState } from "react";
 
 const navItems = [
   {
@@ -124,24 +126,17 @@ function NavItem({
 export function DashboardSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(0);
   const { user, logout } = useAuthStore();
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      try {
-        const res = await api.get("/api/notifications");
-        const unread = res.data.data.filter((n: any) => !n.is_read).length;
-        setNotificationCount(unread);
-      } catch {
-        // No-op
-      }
-    };
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30_000);
-    return () => clearInterval(interval);
-  }, []);
+  const { data: notifications } = useQuery({
+    queryKey: queryKeys.notifications,
+    queryFn: () => api.get("/api/notifications").then((r) => r.data.data),
+    refetchInterval: 30_000,
+  });
+
+  const notificationCount =
+    notifications?.filter((n: { is_read: boolean }) => !n.is_read).length ?? 0;
 
   const handleLogout = async () => {
     await logout();

@@ -37,7 +37,7 @@ const registerSchema = z
       .refine((val) => !val || ORG_TYPES.includes(val as (typeof ORG_TYPES)[number]), {
         message: "Please select a valid organization type",
       }),
-    partner_org_id: z
+    org_id: z
       .string()
       .optional()
       .refine((val) => !val || z.string().uuid().safeParse(val).success, {
@@ -99,7 +99,7 @@ function RegisterForm() {
         password: data.password,
         phone: data.phone ? `+1${data.phone}` : undefined,
         org_type: data.org_type || undefined,
-        partner_org_id: data.partner_org_id || undefined,
+        org_id: data.org_id || undefined,
       });
       const { user, accessToken } = response.data.data;
       setAuth(user, accessToken);
@@ -228,7 +228,7 @@ function RegisterForm() {
               />
 
               <Controller
-                name="partner_org_id"
+                name="org_id"
                 control={control}
                 render={({ field }) => (
                   <PartnerOrgSelect
@@ -237,7 +237,7 @@ function RegisterForm() {
                     onOrgTypeChange={(type) =>
                       setValue("org_type", type, { shouldValidate: true })
                     }
-                    error={errors.partner_org_id?.message}
+                    error={errors.org_id?.message}
                   />
                 )}
               />

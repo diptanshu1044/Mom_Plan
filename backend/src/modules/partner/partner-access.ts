@@ -15,7 +15,7 @@ export function motherOrgWhere(orgId: string): Prisma.MotherWhereInput {
   return {
     OR: [
       { caseworker: { org_id: orgId } },
-      { user: { partner_org_id: orgId } },
+      { user: { org_id: orgId } },
     ],
   };
 }

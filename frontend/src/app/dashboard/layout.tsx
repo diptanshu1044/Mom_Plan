@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth.store";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
-import { api } from "@/lib/api";
+import { useUserProfile } from "@/hooks/useUserProfile";
 
 export default function DashboardLayout({
   children,
@@ -13,26 +13,22 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, isHydrated, isInitializing, updateUser } = useAuthStore();
   const router = useRouter();
+  const profileEnabled = isHydrated && !isInitializing && isAuthenticated;
+  const { data: profile } = useUserProfile(profileEnabled);
 
   useEffect(() => {
     if (!isHydrated || isInitializing) return;
 
     if (!isAuthenticated) {
       router.replace("/login");
-      return;
     }
+  }, [isHydrated, isInitializing, isAuthenticated, router]);
 
-    api
-      .get("/api/user/profile")
-      .then((res) => {
-        if (res.data?.data) {
-          updateUser(res.data.data);
-        }
-      })
-      .catch(() => {
-        // Profile sync failures are handled by the API refresh interceptor
-      });
-  }, [isHydrated, isInitializing, isAuthenticated, router, updateUser]);
+  useEffect(() => {
+    if (profile) {
+      updateUser(profile);
+    }
+  }, [profile, updateUser]);
 
   if (!isHydrated || isInitializing || !isAuthenticated) {
     return (

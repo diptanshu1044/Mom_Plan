@@ -59,25 +59,30 @@ export function HeroCarousel() {
             transition={{ duration: 0.55, ease: "easeOut" }}
             className="absolute inset-0"
           >
-            {/* Blurred ambient fill — full-bleed look without empty side bars */}
-            <Image
-              src={SLIDES[index].src}
-              alt=""
-              aria-hidden
-              fill
-              className="scale-110 object-cover object-top blur-2xl saturate-125 brightness-90"
-              priority={index === 0}
-              sizes="100vw"
-            />
-            {/* Sharp foreground — entire photo visible */}
+            {/* Single optimized image — ambient blur via CSS filter on a duplicate layer */}
             <Image
               src={SLIDES[index].src}
               alt={SLIDES[index].alt}
               fill
+              quality={75}
               className="object-contain object-center"
               priority={index === 0}
-              sizes="100vw"
+              sizes="(max-width: 768px) 100vw, 1200px"
             />
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -z-10 scale-110 overflow-hidden"
+            >
+              <Image
+                src={SLIDES[index].src}
+                alt=""
+                fill
+                quality={40}
+                className="object-cover object-top blur-2xl saturate-125 brightness-90"
+                sizes="100vw"
+                loading={index === 0 ? "eager" : "lazy"}
+              />
+            </div>
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-black/5" />
           </motion.div>
         </AnimatePresence>

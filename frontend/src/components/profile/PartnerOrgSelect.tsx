@@ -31,9 +31,9 @@ export function PartnerOrgSelect({
   required,
 }: PartnerOrgSelectProps) {
   const { data: orgs = [], isLoading } = useQuery({
-    queryKey: ["partner-organizations"],
+    queryKey: ["organizations"],
     queryFn: () =>
-      api.get("/api/partner-organizations").then((r) => r.data.data as PartnerOrgOption[]),
+      api.get("/api/organizations").then((r) => r.data.data as PartnerOrgOption[]),
     staleTime: 5 * 60 * 1000,
   });
 

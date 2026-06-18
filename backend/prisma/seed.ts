@@ -396,7 +396,7 @@ async function seedPartnerOrg() {
 
   const password_hash = await bcrypt.hash('Admin1234!', 10);
 
-  await prisma.partnerOrganization.upsert({
+  await prisma.organization.upsert({
     where:  { id: DEMO_ORG_ID },
     update: { onboarding_completed: true },
     create: {

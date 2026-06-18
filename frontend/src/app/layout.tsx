@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/providers/Providers";
+import { inter, plusJakartaSans } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://momplan.ai"),
@@ -30,16 +31,12 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="bg-surface text-on-surface antialiased" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} ${plusJakartaSans.variable}`}
+      suppressHydrationWarning
+    >
+      <body className="bg-surface text-on-surface antialiased font-sans" suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

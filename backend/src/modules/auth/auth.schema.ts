@@ -14,7 +14,7 @@ export const registerSchema = z.object({
       .refine((val) => !val || /^\+1\d{10}$/.test(val), {
         message: 'Enter a valid US phone number',
       }),
-    partner_org_id: z.string().uuid('Please select a valid partner organization').optional(),
+    org_id: z.string().uuid('Please select a valid organization').optional(),
     org_type: orgTypeSchema.nullable().or(z.literal('')).optional(),
   }),
 });

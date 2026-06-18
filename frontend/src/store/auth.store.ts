@@ -20,8 +20,8 @@ export interface AuthUser {
   zip_code?: string;
   profile_picture?: string;
   org_type?: string | null;
-  partner_org_id?: string;
-  partner_organization?: {
+  org_id?: string;
+  organization?: {
     id: string;
     name: string;
     city?: string | null;

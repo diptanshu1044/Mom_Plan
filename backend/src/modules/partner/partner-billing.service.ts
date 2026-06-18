@@ -12,7 +12,7 @@ const partnerUrls = getPartnerBillingUrls();
 
 export class PartnerBillingService {
   async resolveBillingUserId(orgId: string): Promise<string> {
-    const org = await prisma.partnerOrganization.findUnique({
+    const org = await prisma.organization.findUnique({
       where: { id: orgId },
       include: {
         org_users: {
@@ -42,17 +42,17 @@ export class PartnerBillingService {
           middle_name: nameParts.middle_name,
           last_name: nameParts.last_name,
           plan: 'community',
-          partner_org_id: orgId,
+          org_id: orgId,
         },
       });
-    } else if (!billingUser.partner_org_id) {
+    } else if (!billingUser.org_id) {
       billingUser = await prisma.user.update({
         where: { id: billingUser.id },
-        data: { partner_org_id: orgId },
+        data: { org_id: orgId },
       });
     }
 
-    await prisma.partnerOrganization.update({
+    await prisma.organization.update({
       where: { id: orgId },
       data: { billing_user_id: billingUser.id },
     });
@@ -118,11 +118,11 @@ export async function createPartnerBillingUser(
       middle_name: nameParts.middle_name,
       last_name: nameParts.last_name,
       plan: 'community',
-      partner_org_id: orgId,
+      org_id: orgId,
     },
   });
 
-  await prisma.partnerOrganization.update({
+  await prisma.organization.update({
     where: { id: orgId },
     data: { billing_user_id: billingUser.id },
   });

@@ -385,14 +385,12 @@ function PhoneInput({ value, onChange, error }: { value: string; onChange: (v: s
   return (
     <div>
       <div className="flex">
-        <input
-          type="text"
-          value="+1"
-          disabled
-          tabIndex={-1}
+        <span
           aria-hidden
-          className="w-[3.25rem] shrink-0 cursor-not-allowed rounded-l-xl border border-r-0 border-outline-variant bg-surface-container px-3 py-3 text-sm font-medium text-on-surface-variant text-center"
-        />
+          className="flex w-11 shrink-0 items-center justify-center rounded-l-xl border border-r-0 border-outline-variant bg-surface-container px-2 py-3 text-sm font-medium text-on-surface-variant"
+        >
+          +1
+        </span>
         <input
           type="tel"
           inputMode="numeric"
@@ -477,7 +475,7 @@ export default function EligibilityPage() {
     urgency: "not_urgent",
     domestic_violence: null as boolean | null,
     org_type: "",
-    partner_org_id: "",
+    org_id: "",
   });
 
   // Fetch fresh profile data from the API on mount to bypass stale Zustand
@@ -546,7 +544,7 @@ export default function EligibilityPage() {
           urgency: fp?.urgency || "not_urgent",
           domestic_violence: fp?.domestic_violence ?? null,
           org_type: freshUser?.org_type || "",
-          partner_org_id: freshUser?.partner_org_id || "",
+          org_id: freshUser?.org_id || "",
         });
       })
       .catch(() => {
@@ -577,7 +575,7 @@ export default function EligibilityPage() {
             has_disability: numChildren > 0 ? (fp?.has_disability ?? null) : null,
             other_adults: otherAdultsPossible(householdSize, numChildren) ? (fp?.other_adults ?? null) : null,
             org_type: user.org_type || "",
-            partner_org_id: user.partner_org_id || "",
+            org_id: user.org_id || "",
           }));
         }
       })
@@ -882,7 +880,7 @@ export default function EligibilityPage() {
         legal_issues: dataToSubmit.legal_issues,
         urgency: dataToSubmit.urgency,
         org_type: dataToSubmit.org_type || null,
-        partner_org_id: dataToSubmit.partner_org_id || null,
+        org_id: dataToSubmit.org_id || null,
       });
       updateUser(profileRes.data.data);
 
@@ -1173,8 +1171,8 @@ export default function EligibilityPage() {
 
                     <div>
                       <PartnerOrgSelect
-                        value={formData.partner_org_id}
-                        onChange={(id) => set("partner_org_id", id)}
+                        value={formData.org_id}
+                        onChange={(id) => set("org_id", id)}
                         onOrgTypeChange={(type) => set("org_type", type)}
                       />
                     </div>
@@ -1189,7 +1187,7 @@ export default function EligibilityPage() {
                         className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-low cursor-not-allowed text-on-surface-variant outline-none text-sm transition-all font-medium"
                       >
                         <option value="">
-                          {formData.partner_org_id
+                          {formData.org_id
                             ? "Loading organization type…"
                             : "Select an organization first…"}
                         </option>
