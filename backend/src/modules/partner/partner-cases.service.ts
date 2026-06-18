@@ -6,7 +6,6 @@ import {
   motherOrgWhere,
   OrgAccessContext,
   isOrgAdmin,
-  secureSubmittedCaseWhere,
 } from './partner-access';
 import { formatUserName, hasUserName } from '../../utils/name.utils';
 import { decimalToNumberOrNull } from '../../utils/decimal.utils';
@@ -304,7 +303,6 @@ export class PartnerCasesService {
     const cases = await prisma.partnerCase.findMany({
       where: {
         ...caseListWhere(ctx, caseworkerFilter),
-        ...secureSubmittedCaseWhere(),
         ...(filters.quarter ? { quarter: filters.quarter.toUpperCase() } : {}),
         ...(filters.status && filters.status !== 'all' ? { status: filters.status } : {}),
         ...(filters.program && filters.program !== 'all' ? { program_id: filters.program } : {}),
@@ -338,7 +336,7 @@ export class PartnerCasesService {
 
   async getCaseDetail(ctx: OrgAccessContext, caseId: string) {
     const c = await prisma.partnerCase.findFirst({
-      where: { id: caseId, ...caseListWhere(ctx), ...secureSubmittedCaseWhere() },
+      where: { id: caseId, ...caseListWhere(ctx) },
       include: {
         ...caseInclude,
         deadlines: { orderBy: { due_date: 'asc' } },
@@ -355,9 +353,8 @@ export class PartnerCasesService {
           id: caseId,
           mother: motherOrgWhere(ctx.orgId),
         },
-        select: { id: true, secure_submitted_at: true },
+        select: { id: true },
       });
-      if (inOrg && !inOrg.secure_submitted_at) throw new NotFoundError('Case not found');
       if (inOrg) throw new ForbiddenError('You do not have access to this case');
       throw new NotFoundError('Case not found');
     }
@@ -468,7 +465,7 @@ export class PartnerCasesService {
     const { start } = quarterDateRange(q, y);
 
     const cases = await prisma.partnerCase.findMany({
-      where: { ...caseListWhere(ctx), ...secureSubmittedCaseWhere(), quarter: q },
+      where: { ...caseListWhere(ctx), quarter: q },
       include: {
         deadlines: { where: { is_resolved: false } },
         documents: true,

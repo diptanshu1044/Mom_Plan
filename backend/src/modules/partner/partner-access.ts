@@ -64,6 +64,16 @@ export function secureSubmittedCaseWhere(): Prisma.PartnerCaseWhereInput {
   return { secure_submitted_at: { not: null } };
 }
 
+/** Cases tied to an org via assigned caseworker or enrolled MomPlan user */
+export function orgCaseloadCaseWhere(orgId: string): Prisma.PartnerCaseWhereInput {
+  return {
+    OR: [
+      { caseworker: { org_id: orgId } },
+      { mother: { user: { org_id: orgId } } },
+    ],
+  };
+}
+
 export function assertMotherAccess(
   ctx: OrgAccessContext,
   mother: { caseworker_id: string | null }
