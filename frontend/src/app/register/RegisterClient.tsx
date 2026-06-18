@@ -79,6 +79,7 @@ function RegisterForm() {
     handleSubmit,
     control,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -226,15 +227,6 @@ function RegisterForm() {
                 {...register("phone")}
               />
 
-              <Select
-                label="Organization Type"
-                options={ORG_TYPE_OPTIONS}
-                placeholder="Select organization type… (optional)"
-                allowEmpty
-                error={errors.org_type?.message}
-                {...register("org_type")}
-              />
-
               <Controller
                 name="partner_org_id"
                 control={control}
@@ -242,9 +234,23 @@ function RegisterForm() {
                   <PartnerOrgSelect
                     value={field.value || ""}
                     onChange={field.onChange}
+                    onOrgTypeChange={(type) =>
+                      setValue("org_type", type, { shouldValidate: true })
+                    }
                     error={errors.partner_org_id?.message}
                   />
                 )}
+              />
+
+              <Select
+                label="Organization Type"
+                options={ORG_TYPE_OPTIONS}
+                placeholder="Select an organization first…"
+                allowEmpty
+                disabled
+                hint="Set automatically from your selected organization"
+                error={errors.org_type?.message}
+                {...register("org_type")}
               />
 
               <div>

@@ -31,6 +31,7 @@ import partnerOrganizationsRoutes from './modules/partner/partner-organizations.
 import partnerBillingRoutes from './modules/partner/partner-billing.routes';
 import teamRoutes from './modules/team/team.routes';
 import mothersRoutes from './modules/mothers/mothers.routes';
+import locationRoutes from './modules/location/location.routes';
 
 const app: Application = express();
 
@@ -93,6 +94,7 @@ app.use('/api/partner-organizations', partnerOrganizationsRoutes);
 app.use('/api/partner/billing',         partnerBillingRoutes);
 app.use('/api/team/members',         teamRoutes);
 app.use('/api/mothers',              mothersRoutes);
+app.use('/api/location',             locationRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

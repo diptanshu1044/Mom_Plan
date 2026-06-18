@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma';
-import { NotFoundError } from '../../utils/errors';
+import { BadRequestError, NotFoundError } from '../../utils/errors';
+import { zipValidationService, isZipValidationEnabled } from '../../services/zipValidation.service';
 import { MotherOrgEnrollmentService } from '../partner/mother-org-enrollment.service';
 import { joinFullName, userNameSelect } from '../../utils/name.utils';
 
@@ -90,6 +91,29 @@ export class UserService {
       profile_picture,
     } = data;
 
+    const touchesAddress = [zip_code, state, street_address, city].some((v) => v !== undefined);
+    if (touchesAddress && isZipValidationEnabled()) {
+      const existing = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { state: true, zip_code: true },
+      });
+
+      const effectiveZip = zip_code !== undefined ? zip_code : existing?.zip_code;
+      const effectiveState = state !== undefined ? state : existing?.state;
+
+      if (effectiveZip && effectiveState) {
+        const zipResult = await zipValidationService.validateZip(
+          String(effectiveZip),
+          String(effectiveState)
+        );
+        if (!zipResult.valid) {
+          throw new BadRequestError(zipResult.error || 'Invalid ZIP code.');
+        }
+      } else if (zip_code || street_address || city) {
+        throw new BadRequestError('ZIP code and state are required for address validation.');
+      }
+    }
+
     // Update User basic info
     const userUpdate: any = {};
     if (first_name !== undefined) userUpdate.first_name = first_name.trim();
@@ -106,6 +130,7 @@ export class UserService {
     if (partner_org_id !== undefined) {
       if (!partner_org_id) {
         userUpdate.partner_org_id = null;
+        userUpdate.org_type = null;
       } else {
         await motherOrgEnrollment.enrollUserInPartnerOrg(userId, partner_org_id);
       }

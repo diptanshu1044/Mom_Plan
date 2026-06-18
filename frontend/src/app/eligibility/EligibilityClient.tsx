@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,6 +44,10 @@ import {
   isValidUsPhoneDigits,
   normalizeUsPhoneDigits,
 } from "@/lib/phone";
+import { isZipValidationEnabled, normalizeZipInput, validateZip } from "@/services/zipValidation";
+import { useZipValidation } from "@/hooks/useZipValidation";
+import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
+import { ORG_TYPE_OPTIONS } from "@/lib/org-types";
 
 /**
  * Safely converts a value that might be a Prisma Decimal object, number, or
@@ -285,20 +289,30 @@ function FieldLabel({ children, sub }: { children: React.ReactNode; sub?: string
   );
 }
 
-function Input({ placeholder, value, onChange, type = "text", maxLength, inputMode }: {
+function Input({ placeholder, value, onChange, type = "text", maxLength, inputMode, readOnly, disabled, error }: {
   placeholder?: string; value: string; onChange: (v: string) => void;
   type?: string; maxLength?: number; inputMode?: any;
+  readOnly?: boolean; disabled?: boolean; error?: string;
 }) {
   return (
-    <input
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      maxLength={maxLength}
-      inputMode={inputMode}
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-sm transition-all font-medium text-on-surface placeholder:text-on-surface-variant/60"
-    />
+    <div>
+      <input
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        maxLength={maxLength}
+        inputMode={inputMode}
+        readOnly={readOnly}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className={`w-full px-4 py-3 rounded-xl border bg-white focus:ring-2 focus:ring-primary-100 outline-none text-sm transition-all font-medium text-on-surface placeholder:text-on-surface-variant/60 ${
+          error
+            ? "border-red-400 focus:border-red-400"
+            : "border-outline-variant focus:border-primary-500"
+        } ${readOnly || disabled ? "bg-surface-container-low cursor-not-allowed text-on-surface-variant" : ""}`}
+      />
+      {error && <p className="text-xs text-red-600 mt-1.5">{error}</p>}
+    </div>
   );
 }
 
@@ -386,6 +400,7 @@ export default function EligibilityPage() {
   const [error, setError] = useState<string | null>(null);
   const [dobError, setDobError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [zipError, setZipError] = useState<string | null>(null);
   const [isFetchingProfile, setIsFetchingProfile] = useState(false);
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
@@ -434,6 +449,8 @@ export default function EligibilityPage() {
     legal_issues: [] as string[],
     urgency: "not_urgent",
     domestic_violence: null as boolean | null,
+    org_type: "",
+    partner_org_id: "",
   });
 
   // Fetch fresh profile data from the API on mount to bypass stale Zustand
@@ -500,6 +517,8 @@ export default function EligibilityPage() {
           legal_issues: (fp?.legal_issues as string[]) || [],
           urgency: fp?.urgency || "not_urgent",
           domestic_violence: fp?.domestic_violence ?? null,
+          org_type: freshUser?.org_type || "",
+          partner_org_id: freshUser?.partner_org_id || "",
         });
       })
       .catch(() => {
@@ -526,6 +545,8 @@ export default function EligibilityPage() {
             household_size: fp?.household_size || 1,
             num_children: numChildren,
             children_birthdates: initialDobs,
+            org_type: user.org_type || "",
+            partner_org_id: user.partner_org_id || "",
           }));
         }
       })
@@ -559,6 +580,48 @@ export default function EligibilityPage() {
   const set = (field: string, value: any) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
 
+  const handleCityResolved = useCallback((city: string) => {
+    setFormData((prev) => (prev.city === city ? prev : { ...prev, city }));
+    setZipError(null);
+  }, []);
+
+  const handleCityCleared = useCallback(() => {
+    setFormData((prev) => (prev.city === "" ? prev : { ...prev, city: "" }));
+  }, []);
+
+  const zipValidation = useZipValidation({
+    zip: formData.zip_code,
+    state: formData.state,
+    onCityResolved: handleCityResolved,
+    onCityCleared: handleCityCleared,
+  });
+
+  const handleZipChange = (raw: string) => {
+    const normalized = normalizeZipInput(raw);
+    set("zip_code", normalized);
+    if (!normalized.trim()) {
+      setZipError(null);
+    }
+  };
+
+  const validateZipForStep = (): boolean => {
+    if (!isZipValidationEnabled()) return true;
+    if (!formData.zip_code.trim()) {
+      setZipError("Please enter a valid US ZIP code.");
+      return false;
+    }
+    if (zipValidation.isLoading) {
+      setZipError("Verifying ZIP code…");
+      return false;
+    }
+    if (!zipValidation.isVerified) {
+      setZipError(zipValidation.error || "Please enter a valid US ZIP code.");
+      return false;
+    }
+    setZipError(null);
+    return true;
+  };
+
   const toggleMulti = (field: "income_sources" | "legal_issues", id: string, exclusiveId?: string) => {
     setFormData((prev) => {
       let arr = [...(prev[field] as string[])];
@@ -588,6 +651,18 @@ export default function EligibilityPage() {
     return true;
   };
 
+  const validateStep1 = (): boolean => {
+    if (!validateMotherDob()) return false;
+    if (!validatePhone()) return false;
+    if (!validateZipForStep()) return false;
+    return true;
+  };
+
+  const goToStep = (target: number) => {
+    if (target > 1 && !validateStep1()) return;
+    setStep(target);
+  };
+
   const validatePhone = (digits = formData.phone): boolean => {
     if (!digits) {
       setPhoneError(null);
@@ -602,10 +677,7 @@ export default function EligibilityPage() {
   };
 
   const handleNextStep = () => {
-    if (step === 1) {
-      if (!validateMotherDob()) return;
-      if (!validatePhone()) return;
-    }
+    if (step === 1 && !validateStep1()) return;
     setStep((s) => s + 1);
   };
 
@@ -638,6 +710,23 @@ export default function EligibilityPage() {
       setStep(1);
       return;
     }
+    if (!dataToSubmit.zip_code.trim() || !dataToSubmit.state) {
+      setZipError("Please enter a valid US ZIP code.");
+      setStep(1);
+      return;
+    }
+    if (isZipValidationEnabled()) {
+      const zipResult = await validateZip(dataToSubmit.zip_code, dataToSubmit.state);
+      if (!zipResult.valid) {
+        setZipError(zipResult.error || "Please enter a valid US ZIP code.");
+        setStep(1);
+        return;
+      }
+      if (zipResult.city) {
+        dataToSubmit.city = zipResult.city;
+      }
+    }
+    setZipError(null);
     if (!isAuthenticated) {
       if (typeof window !== "undefined") {
         localStorage.setItem("pending_eligibility_scan", JSON.stringify(dataToSubmit));
@@ -680,7 +769,7 @@ export default function EligibilityPage() {
         domestic_violence: dataToSubmit.domestic_violence ?? false,
         chronic_illness: dataToSubmit.chronic_illness ?? false,
         immigration_status: dataToSubmit.immigration_status,
-        date_of_birth: dataToSubmit.date_of_birth || null,
+        date_of_birth: dataToSubmit.date_of_birth,
         ssn_last_four: normalizeSsnLastFour(dataToSubmit.ssn_last_four) || null,
         preferred_language: dataToSubmit.preferred_language,
         marital_status: dataToSubmit.marital_status,
@@ -695,6 +784,8 @@ export default function EligibilityPage() {
         childcare_provider: dataToSubmit.childcare_provider || undefined,
         legal_issues: dataToSubmit.legal_issues,
         urgency: dataToSubmit.urgency,
+        org_type: dataToSubmit.org_type || null,
+        partner_org_id: dataToSubmit.partner_org_id || null,
       });
       updateUser(profileRes.data.data);
 
@@ -853,7 +944,7 @@ export default function EligibilityPage() {
               <button
                 key={s.id}
                 type="button"
-                onClick={() => setStep(s.id)}
+                onClick={() => goToStep(s.id)}
                 className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl border transition-all whitespace-nowrap shrink-0 min-w-[72px] ${
                   isActive
                     ? "bg-white border-primary-300 shadow-md text-primary"
@@ -982,19 +1073,107 @@ export default function EligibilityPage() {
                     </div>
 
                     <div>
+                      <PartnerOrgSelect
+                        value={formData.partner_org_id}
+                        onChange={(id) => set("partner_org_id", id)}
+                        onOrgTypeChange={(type) => set("org_type", type)}
+                      />
+                    </div>
+
+                    <div>
+                      <FieldLabel sub="Set automatically from your selected organization.">
+                        What type of organization are you connected with?
+                      </FieldLabel>
+                      <select
+                        value={formData.org_type}
+                        disabled
+                        className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-surface-container-low cursor-not-allowed text-on-surface-variant outline-none text-sm transition-all font-medium"
+                      >
+                        <option value="">
+                          {formData.partner_org_id
+                            ? "Loading organization type…"
+                            : "Select an organization first…"}
+                        </option>
+                        {ORG_TYPE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
                       <FieldLabel>What's your street address? *</FieldLabel>
                       <Input placeholder="123 Main Street, Apt 4B" value={formData.street_address} onChange={(v) => set("street_address", v)} />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <FieldLabel>What city do you live in? *</FieldLabel>
-                        <Input placeholder="Austin" value={formData.city} onChange={(v) => set("city", v)} />
-                      </div>
-                      <div>
-                        <FieldLabel>And your ZIP code? *</FieldLabel>
-                        <Input placeholder="78701" value={formData.zip_code} onChange={(v) => set("zip_code", v.replace(/\D/g, "").slice(0, 5))} maxLength={5} inputMode="numeric" />
-                      </div>
+                      {zipValidation.isEnabled ? (
+                        <>
+                          <div>
+                            <FieldLabel>And your ZIP code? *</FieldLabel>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                placeholder="78701"
+                                value={formData.zip_code}
+                                onChange={(e) => handleZipChange(e.target.value)}
+                                maxLength={10}
+                                inputMode="numeric"
+                                className={`w-full px-4 py-3 pr-10 rounded-xl border bg-white focus:ring-2 focus:ring-primary-100 outline-none text-sm transition-all font-medium text-on-surface placeholder:text-on-surface-variant/60 ${
+                                  zipError || zipValidation.error
+                                    ? "border-red-400 focus:border-red-400"
+                                    : zipValidation.isVerified
+                                      ? "border-emerald-500 focus:border-emerald-500"
+                                      : "border-outline-variant focus:border-primary-500"
+                                }`}
+                              />
+                              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                {zipValidation.isLoading ? (
+                                  <Loader2 className="w-4 h-4 text-primary-500 animate-spin" />
+                                ) : zipValidation.isVerified ? (
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                ) : null}
+                              </div>
+                            </div>
+                            {(zipError || zipValidation.error) && (
+                              <p className="text-xs text-red-600 mt-1.5">{zipError || zipValidation.error}</p>
+                            )}
+                            {zipValidation.isVerified && !zipError && !zipValidation.error && (
+                              <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
+                                <Check className="w-3 h-3" /> ZIP code verified
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <FieldLabel>What city do you live in? *</FieldLabel>
+                            <Input
+                              placeholder="Filled automatically from ZIP"
+                              value={formData.city}
+                              onChange={() => {}}
+                              readOnly
+                              disabled
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <FieldLabel>What city do you live in? *</FieldLabel>
+                            <Input placeholder="Austin" value={formData.city} onChange={(v) => set("city", v)} />
+                          </div>
+                          <div>
+                            <FieldLabel>And your ZIP code? *</FieldLabel>
+                            <Input
+                              placeholder="78701"
+                              value={formData.zip_code}
+                              onChange={(v) => set("zip_code", v.replace(/\D/g, "").slice(0, 5))}
+                              maxLength={5}
+                              inputMode="numeric"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                   </>
                 )}
@@ -1366,13 +1545,25 @@ export default function EligibilityPage() {
                 ) : <div />}
 
                 {step < SECTIONS.length ? (
-                  <button type="button" onClick={handleNextStep}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-primary text-white font-bold text-sm rounded-xl shadow-primary hover:shadow-primary-lg hover:-translate-y-0.5 transition-all">
+                  <button
+                    type="button"
+                    onClick={handleNextStep}
+                    disabled={
+                      zipValidation.isEnabled &&
+                      step === 1 &&
+                      (zipValidation.isLoading || !zipValidation.isVerified)
+                    }
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-primary text-white font-bold text-sm rounded-xl shadow-primary hover:shadow-primary-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-primary"
+                  >
                     Next <ArrowRight className="w-4 h-4" />
                   </button>
                 ) : (
-                  <button type="button" onClick={() => runScan()}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                  <button
+                    type="button"
+                    onClick={() => runScan()}
+                    disabled={zipValidation.isEnabled && (zipValidation.isLoading || !zipValidation.isVerified)}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
+                  >
                     See Results <Sparkles className="w-4 h-4" />
                   </button>
                 )}

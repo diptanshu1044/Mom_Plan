@@ -143,13 +143,14 @@ Input.displayName = "Input";
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
+  hint?: string;
   options: { value: string; label: string }[];
   placeholder?: string;
   allowEmpty?: boolean;
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, options, placeholder, allowEmpty, id, ...props }, ref) => {
+  ({ className, label, error, hint, options, placeholder, allowEmpty, id, ...props }, ref) => {
     const selectId = id || label?.toLowerCase().replace(/\s+/g, "-");
 
     return (
@@ -170,6 +171,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
               error
                 ? "border-red-400"
                 : "border-outline-variant/60 hover:border-outline-variant",
+              props.disabled && "bg-surface-container-low cursor-not-allowed text-on-surface-variant",
               className
             )}
             {...props}
@@ -191,6 +193,9 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             </svg>
           </div>
         </div>
+        {hint && !error && (
+          <p className="text-xs text-on-surface-variant">{hint}</p>
+        )}
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
     );

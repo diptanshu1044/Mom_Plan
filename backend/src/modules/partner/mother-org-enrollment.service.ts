@@ -68,6 +68,7 @@ export class MotherOrgEnrollmentService {
       select: {
         id: true,
         name: true,
+        type: true,
         tagline: true,
         description: true,
         city: true,
@@ -102,7 +103,10 @@ export class MotherOrgEnrollmentService {
     await prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
-        data: { partner_org_id: orgId },
+        data: {
+          partner_org_id: orgId,
+          org_type: org.type || null,
+        },
       });
 
       let mother = await tx.mother.findUnique({ where: { user_id: userId } });

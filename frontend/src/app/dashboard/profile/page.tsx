@@ -440,22 +440,28 @@ export default function ProfilePage() {
                   type="date"
                   {...profileForm.register("date_of_birth")}
                 />
-                <Select
-                  label="Organization Type"
-                  options={ORG_TYPE_OPTIONS}
-                  placeholder="Select organization type…"
-                  error={profileForm.formState.errors.org_type?.message}
-                  {...profileForm.register("org_type")}
-                />
                 <div className="sm:col-span-2">
                   <PartnerOrgSelect
                     value={profileForm.watch("partner_org_id") || ""}
                     onChange={(id) =>
                       profileForm.setValue("partner_org_id", id, { shouldValidate: true })
                     }
+                    onOrgTypeChange={(type) =>
+                      profileForm.setValue("org_type", type, { shouldValidate: true })
+                    }
                     error={profileForm.formState.errors.partner_org_id?.message}
                   />
                 </div>
+                <Select
+                  label="Organization Type"
+                  options={ORG_TYPE_OPTIONS}
+                  placeholder="Select an organization first…"
+                  allowEmpty
+                  disabled
+                  hint="Set automatically from your selected organization"
+                  error={profileForm.formState.errors.org_type?.message}
+                  {...profileForm.register("org_type")}
+                />
                 <Select
                   label="Preferred Language"
                   options={PREFERRED_LANGUAGE_OPTIONS}
