@@ -337,19 +337,26 @@ function SsnLastFourInput({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
-function DollarInput({ placeholder, value, onChange }: { placeholder?: string; value: string; onChange: (v: string) => void }) {
+function DollarInput({ placeholder, value, onChange, error }: { placeholder?: string; value: string; onChange: (v: string) => void; error?: string }) {
   return (
-    <div className="relative">
-      <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-on-surface-variant font-bold text-sm pointer-events-none">$</span>
-      <input
-        type="text"
-        inputMode="numeric"
-        pattern="[0-9]*"
-        placeholder={placeholder || "0"}
-        value={value}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
-        className="w-full pl-8 pr-4 py-3 rounded-xl border border-outline-variant bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-sm transition-all font-medium text-on-surface"
-      />
+    <div>
+      <div className="relative">
+        <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-on-surface-variant font-bold text-sm pointer-events-none">$</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          placeholder={placeholder || "0"}
+          value={value}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
+          className={`w-full pl-8 pr-4 py-3 rounded-xl border bg-white focus:ring-2 focus:ring-primary-100 outline-none text-sm transition-all font-medium text-on-surface ${
+            error
+              ? "border-red-400 focus:border-red-400"
+              : "border-outline-variant focus:border-primary-500"
+          }`}
+        />
+      </div>
+      {error && <p className="text-xs text-red-600 mt-1.5">{error}</p>}
     </div>
   );
 }
@@ -401,6 +408,7 @@ export default function EligibilityPage() {
   const [dobError, setDobError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [zipError, setZipError] = useState<string | null>(null);
+  const [monthlyIncomeError, setMonthlyIncomeError] = useState<string | null>(null);
   const [isFetchingProfile, setIsFetchingProfile] = useState(false);
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
@@ -658,8 +666,18 @@ export default function EligibilityPage() {
     return true;
   };
 
+  const validateStep2 = (): boolean => {
+    if (formData.monthly_income === "") {
+      setMonthlyIncomeError("Please enter your monthly income (enter 0 if you have no income).");
+      return false;
+    }
+    setMonthlyIncomeError(null);
+    return true;
+  };
+
   const goToStep = (target: number) => {
     if (target > 1 && !validateStep1()) return;
+    if (target > 2 && !validateStep2()) return;
     setStep(target);
   };
 
@@ -678,6 +696,7 @@ export default function EligibilityPage() {
 
   const handleNextStep = () => {
     if (step === 1 && !validateStep1()) return;
+    if (step === 2 && !validateStep2()) return;
     setStep((s) => s + 1);
   };
 
@@ -727,6 +746,12 @@ export default function EligibilityPage() {
       }
     }
     setZipError(null);
+    if (dataToSubmit.monthly_income === "") {
+      setMonthlyIncomeError("Please enter your monthly income (enter 0 if you have no income).");
+      setStep(2);
+      return;
+    }
+    setMonthlyIncomeError(null);
     if (!isAuthenticated) {
       if (typeof window !== "undefined") {
         localStorage.setItem("pending_eligibility_scan", JSON.stringify(dataToSubmit));
@@ -1184,7 +1209,15 @@ export default function EligibilityPage() {
                       <FieldLabel sub="Include wages, child support, disability, Social Security — all income sources.">
                         What's your total monthly income before taxes? *
                       </FieldLabel>
-                      <DollarInput placeholder="2,200" value={formData.monthly_income} onChange={(v) => set("monthly_income", v)} />
+                      <DollarInput
+                        placeholder="2,200"
+                        value={formData.monthly_income}
+                        onChange={(v) => {
+                          set("monthly_income", v);
+                          if (v !== "") setMonthlyIncomeError(null);
+                        }}
+                        error={monthlyIncomeError ?? undefined}
+                      />
                     </div>
 
                     <div>
