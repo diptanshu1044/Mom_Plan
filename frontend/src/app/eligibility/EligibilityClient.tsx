@@ -39,6 +39,11 @@ import {
   parseIsoDateLocal,
   validateDateOfBirth,
 } from "@/lib/date-of-birth";
+import {
+  formatPhoneForApi,
+  isValidUsPhoneDigits,
+  normalizeUsPhoneDigits,
+} from "@/lib/phone";
 
 /**
  * Safely converts a value that might be a Prisma Decimal object, number, or
@@ -335,6 +340,44 @@ function DollarInput({ placeholder, value, onChange }: { placeholder?: string; v
   );
 }
 
+function PhoneInput({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
+  const handleChange = (raw: string) => onChange(normalizeUsPhoneDigits(raw));
+
+  return (
+    <div>
+      <div className="flex">
+        <input
+          type="text"
+          value="+1"
+          disabled
+          tabIndex={-1}
+          aria-hidden
+          className="w-[3.25rem] shrink-0 cursor-not-allowed rounded-l-xl border border-r-0 border-outline-variant bg-surface-container px-3 py-3 text-sm font-medium text-on-surface-variant text-center"
+        />
+        <input
+          type="tel"
+          inputMode="numeric"
+          placeholder="5550000000"
+          value={value}
+          maxLength={10}
+          autoComplete="tel-national"
+          onChange={(e) => handleChange(e.target.value)}
+          onPaste={(e) => {
+            e.preventDefault();
+            handleChange(e.clipboardData.getData("text"));
+          }}
+          className={`w-full rounded-r-xl border bg-white px-4 py-3 focus:ring-2 focus:ring-primary-100 outline-none text-sm transition-all font-medium text-on-surface placeholder:text-on-surface-variant/60 ${
+            error
+              ? "border-red-400 focus:border-red-400"
+              : "border-outline-variant focus:border-primary-500"
+          }`}
+        />
+      </div>
+      {error && <p className="text-xs text-red-600 mt-1.5">{error}</p>}
+    </div>
+  );
+}
+
 export default function EligibilityPage() {
   const [step, setStep] = useState(1);
   const [isScanning, setIsScanning] = useState(false);
@@ -342,6 +385,7 @@ export default function EligibilityPage() {
   const [results, setResults] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [dobError, setDobError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [isFetchingProfile, setIsFetchingProfile] = useState(false);
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
@@ -418,7 +462,7 @@ export default function EligibilityPage() {
           last_name: freshUser?.last_name || fp?.last_name || "",
           date_of_birth: dobStr,
           ssn_last_four: normalizeSsnLastFour(fp?.ssn_last_four),
-          phone: freshUser?.phone || fp?.phone || "",
+          phone: normalizeUsPhoneDigits(freshUser?.phone || fp?.phone || ""),
           email: freshUser?.email || fp?.email || "",
           preferred_language: fp?.preferred_language || "English",
           street_address: fp?.street_address || "",
@@ -471,7 +515,7 @@ export default function EligibilityPage() {
             first_name: user.first_name || fp?.first_name || "",
             last_name: user.last_name || fp?.last_name || "",
             date_of_birth: dobStr,
-            phone: user.phone || fp?.phone || "",
+            phone: normalizeUsPhoneDigits(user.phone || fp?.phone || ""),
             email: user.email || fp?.email || "",
             state: user.state || fp?.state || "GA",
             zip_code: user.zip_code || fp?.zip_code || "",
@@ -495,7 +539,11 @@ export default function EligibilityPage() {
         try {
           const parsed = JSON.parse(pendingScan);
           if (parsed) {
-            setFormData({ ...parsed, ssn_last_four: normalizeSsnLastFour(parsed.ssn_last_four) });
+            setFormData({
+              ...parsed,
+              ssn_last_four: normalizeSsnLastFour(parsed.ssn_last_four),
+              phone: normalizeUsPhoneDigits(parsed.phone),
+            });
             if (isAuthenticated) {
               localStorage.removeItem("pending_eligibility_scan");
               runScan(parsed);
@@ -540,8 +588,24 @@ export default function EligibilityPage() {
     return true;
   };
 
+  const validatePhone = (digits = formData.phone): boolean => {
+    if (!digits) {
+      setPhoneError(null);
+      return true;
+    }
+    if (!isValidUsPhoneDigits(digits)) {
+      setPhoneError("Enter a valid 10-digit US phone number");
+      return false;
+    }
+    setPhoneError(null);
+    return true;
+  };
+
   const handleNextStep = () => {
-    if (step === 1 && !validateMotherDob()) return;
+    if (step === 1) {
+      if (!validateMotherDob()) return;
+      if (!validatePhone()) return;
+    }
     setStep((s) => s + 1);
   };
 
@@ -570,6 +634,10 @@ export default function EligibilityPage() {
       return;
     }
     setDobError(null);
+    if (!validatePhone(dataToSubmit.phone)) {
+      setStep(1);
+      return;
+    }
     if (!isAuthenticated) {
       if (typeof window !== "undefined") {
         localStorage.setItem("pending_eligibility_scan", JSON.stringify(dataToSubmit));
@@ -590,7 +658,7 @@ export default function EligibilityPage() {
       const profileRes = await api.put("/api/user/profile", {
         first_name: dataToSubmit.first_name || null,
         last_name: dataToSubmit.last_name || null,
-        phone: dataToSubmit.phone || undefined,
+        phone: formatPhoneForApi(dataToSubmit.phone) || undefined,
         email: dataToSubmit.email || undefined,
         state: dataToSubmit.state || undefined,
         zip_code: dataToSubmit.zip_code || undefined,
@@ -890,7 +958,11 @@ export default function EligibilityPage() {
 
                     <div>
                       <FieldLabel sub="Agencies will call or text this number about your application.">What's the best phone number to reach you?</FieldLabel>
-                      <Input placeholder="(512) 555-0100" value={formData.phone} onChange={(v) => set("phone", v)} type="tel" />
+                      <PhoneInput
+                        value={formData.phone}
+                        onChange={(v) => set("phone", v)}
+                        error={phoneError ?? undefined}
+                      />
                     </div>
 
                     <div>

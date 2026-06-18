@@ -81,15 +81,17 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         )}
         <div className={cn("relative", prefix && "flex")}>
           {prefix && (
-            <div
+            <input
+              type="text"
+              value={prefix}
+              disabled
+              tabIndex={-1}
               aria-hidden
               className={cn(
-                "flex shrink-0 items-center rounded-l-lg border border-r-0 bg-surface-container px-3 py-3 text-sm text-on-surface-variant select-none",
+                "flex w-auto shrink-0 cursor-not-allowed items-center rounded-l-lg border border-r-0 bg-surface-container px-3 py-3 text-sm text-on-surface-variant",
                 error ? "border-red-400" : "border-outline-variant/60"
               )}
-            >
-              {prefix}
-            </div>
+            />
           )}
           {leftIcon && !prefix && (
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">

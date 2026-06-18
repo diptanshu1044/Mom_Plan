@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/Button";
 import { PlanBadge } from "@/components/ui/Badge";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
 import { ORG_TYPE_OPTIONS, ORG_TYPES } from "@/lib/org-types";
+import { formatPhoneForApi, normalizeUsPhoneDigits } from "@/lib/phone";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { formatUserName, userInitials } from "@/lib/name";
@@ -138,7 +139,12 @@ const profileSchema = z.object({
   middle_name: z.string().optional(),
   last_name: z.string().min(1, "Required"),
   email: z.string().email("Invalid email"),
-  phone: z.string().optional(),
+  phone: z
+    .string()
+    .optional()
+    .refine((val) => !val || /^\d{10}$/.test(val), {
+      message: "Enter a valid 10-digit US phone number",
+    }),
   state: z.string().optional(),
   zip_code: z.string().optional(),
   profile_picture: z.string().optional(),
@@ -209,7 +215,7 @@ export default function ProfilePage() {
       middle_name: currentUser?.middle_name || "",
       last_name: currentUser?.last_name || "",
       email: currentUser?.email || "",
-      phone: currentUser?.phone || "",
+      phone: normalizeUsPhoneDigits(currentUser?.phone || ""),
       state: currentUser?.state || "",
       zip_code: currentUser?.zip_code || "",
       profile_picture: currentUser?.profile_picture || "",
@@ -273,6 +279,7 @@ export default function ProfilePage() {
     mutationFn: (data: ProfileForm) => {
       const payload = {
         ...data,
+        phone: data.phone ? formatPhoneForApi(data.phone) : undefined,
         org_type: data.org_type || null,
         partner_org_id: data.partner_org_id || null,
         household_size: data.household_size ? parseInt(data.household_size) : undefined,
@@ -403,8 +410,14 @@ export default function ProfilePage() {
                 <Input
                   label="Phone Number"
                   type="tel"
+                  inputMode="numeric"
                   numericOnly={true}
+                  prefix="+1"
+                  placeholder="5550000000"
+                  maxLength={10}
                   hint="Used for deadline SMS alerts"
+                  error={profileForm.formState.errors.phone?.message}
+                  autoComplete="tel-national"
                   {...profileForm.register("phone")}
                 />
                 <div className="grid grid-cols-2 gap-2">
