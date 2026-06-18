@@ -110,8 +110,24 @@ export default function BenefitsPage() {
   });
 
   const results = data?.results ?? [];
-  const summary = data?.summary;
+  const scanTotalCount = data?.scanTotalCount ?? 0;
+  const hasScanResults = scanTotalCount > 0 || results.length > 0;
   const aiProcessing: boolean = data?.aiProcessing ?? false;
+  const filteredStats = useMemo(() => {
+    const qualified = results.filter(
+      (result: { status: string }) =>
+        result.status === "qualified" || result.status === "likely_qualified"
+    );
+
+    return {
+      qualifiedCount: qualified.length,
+      totalMonthlyValueMax: qualified.reduce(
+        (acc: number, result: { program?: { estimated_monthly_value_max?: number | null } }) =>
+          acc + (result.program?.estimated_monthly_value_max || 0),
+        0
+      ),
+    };
+  }, [results]);
   const availableYears = data?.availableYears ?? [];
   const yearFilterOptions = useMemo(
     () => buildYearFilterOptions(availableYears),
@@ -182,7 +198,7 @@ export default function BenefitsPage() {
       </div>
 
       {/* Total value banner */}
-      {summary && summary.totalCount > 0 && (
+      {hasScanResults && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -196,13 +212,13 @@ export default function BenefitsPage() {
               <div className="flex-1">
                 <div className="text-white/70 text-sm">Estimated Total Monthly Benefits</div>
                 <div className="font-display font-bold text-3xl text-white">
-                  {formatCurrency(summary.totalMonthlyValueMax)}
+                  {formatCurrency(filteredStats.totalMonthlyValueMax)}
                 </div>
               </div>
               <div className="text-right">
                 <div className="text-white/70 text-xs">Qualified programs</div>
                 <div className="font-bold text-2xl text-white">
-                  {summary.qualifiedCount}
+                  {filteredStats.qualifiedCount}
                 </div>
               </div>
             </div>
@@ -328,14 +344,14 @@ export default function BenefitsPage() {
         <div className="text-center py-16">
           <Sparkles className="w-12 h-12 text-on-surface-variant/30 mx-auto mb-4" />
           <h3 className="font-display font-semibold text-xl text-on-surface mb-2">
-            {!summary?.totalCount ? "No scan results yet" : "No programs match your filter"}
+            {!hasScanResults ? "No scan results yet" : "No programs match your filter"}
           </h3>
           <p className="text-on-surface-variant mb-6 max-w-sm mx-auto">
-            {!summary?.totalCount
+            {!hasScanResults
               ? "We need a bit more information about your family to find the best matches. Complete your profile to see eligible benefits."
               : "Try adjusting your filter criteria"}
           </p>
-          {!summary?.totalCount && (
+          {!hasScanResults && (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button onClick={() => router.push("/eligibility")} variant="primary">
                 <ArrowRight className="w-4 h-4" />

@@ -291,6 +291,7 @@ export class EligibilityService {
     return {
       results: enrichedResults,
       summary,
+      scanTotalCount: results.length,
       availableStates,
       availableYears,
       profileState: profileState ?? null,

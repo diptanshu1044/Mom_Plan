@@ -25,6 +25,8 @@ export interface EligibilityResultsSummary {
 export interface EligibilityResultsResponse {
   results: unknown[];
   summary: EligibilityResultsSummary;
+  /** Total eligibility results before user-facing filters are applied. */
+  scanTotalCount: number;
   availableStates: string[];
   availableYears: number[];
   profileState: string | null;
