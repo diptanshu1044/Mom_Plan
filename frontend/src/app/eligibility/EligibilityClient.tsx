@@ -245,6 +245,18 @@ function otherAdultsPossible(householdSize: number, numChildren: number) {
   return householdSize - 1 - numChildren > 0;
 }
 
+const WORK_HOURS_IDS = new Set(WORK_HOURS_OPTIONS.map((o) => o.id));
+
+function parseWorkHours(stored: string | null | undefined): string[] {
+  if (!stored) return [];
+  return stored.split(",").map((s) => s.trim()).filter((id) => WORK_HOURS_IDS.has(id));
+}
+
+function normalizeWorkHours(value: string | string[] | undefined | null): string[] {
+  if (Array.isArray(value)) return value.filter((id) => WORK_HOURS_IDS.has(id));
+  return parseWorkHours(value || "");
+}
+
 function YesNo({ value, onChange, yesLabel = "Yes", noLabel = "No", disabled = false }: {
   value: boolean | null; onChange: (v: boolean) => void; yesLabel?: string; noLabel?: string; disabled?: boolean;
 }) {
@@ -456,7 +468,7 @@ export default function EligibilityPage() {
     childcare_preference: "",
     childcare_provider: "",
     monthly_childcare_cost: "",
-    work_hours: "",
+    work_hours: [] as string[],
     health_insurance: "none",
     chronic_illness: null as boolean | null,
     er_visit: null as boolean | null,
@@ -525,7 +537,7 @@ export default function EligibilityPage() {
           childcare_preference: fp?.childcare_preference || "",
           childcare_provider: fp?.childcare_provider || "",
           monthly_childcare_cost: parseDecimalToString(fp?.monthly_childcare_cost),
-          work_hours: fp?.work_situation || "",
+          work_hours: parseWorkHours(fp?.work_situation),
           health_insurance: fp?.health_insurance || "none",
           chronic_illness: fp?.chronic_illness ?? null,
           er_visit: null,
@@ -588,6 +600,7 @@ export default function EligibilityPage() {
               children_birthdates: (parsed.children_birthdates || []).slice(0, numChildren),
               has_disability: numChildren > 0 ? (parsed.has_disability ?? null) : null,
               other_adults: otherAdultsPossible(householdSize, numChildren) ? (parsed.other_adults ?? null) : null,
+              work_hours: normalizeWorkHours(parsed.work_hours),
               ssn_last_four: normalizeSsnLastFour(parsed.ssn_last_four),
               phone: normalizeUsPhoneDigits(parsed.phone),
             });
@@ -648,7 +661,7 @@ export default function EligibilityPage() {
     return true;
   };
 
-  const toggleMulti = (field: "income_sources" | "legal_issues", id: string, exclusiveId?: string) => {
+  const toggleMulti = (field: "income_sources" | "legal_issues" | "work_hours", id: string, exclusiveId?: string) => {
     setFormData((prev) => {
       let arr = [...(prev[field] as string[])];
       if (id === exclusiveId || (exclusiveId && arr.includes(exclusiveId) && id !== exclusiveId)) {
@@ -859,7 +872,7 @@ export default function EligibilityPage() {
         marital_status: dataToSubmit.marital_status,
         other_adults: dataToSubmit.other_adults ?? false,
         income_sources: dataToSubmit.income_sources,
-        work_situation: dataToSubmit.employment_status,
+        work_situation: dataToSubmit.work_hours.length > 0 ? dataToSubmit.work_hours.join(",") : undefined,
         employer_name: dataToSubmit.employer_name || undefined,
         health_insurance: dataToSubmit.health_insurance,
         savings_assets: dataToSubmit.savings_assets,
@@ -1516,10 +1529,16 @@ export default function EligibilityPage() {
                     </div>
 
                     <div>
-                      <FieldLabel sub="Subsidies usually need proof of work, school, or training hours.">What are your typical work hours?</FieldLabel>
+                      <FieldLabel sub="Subsidies usually need proof of work, school, or training hours. (Tap all that apply)">
+                        What are your typical work hours?
+                      </FieldLabel>
                       <div className="flex flex-wrap gap-2">
                         {WORK_HOURS_OPTIONS.map((opt) => (
-                          <PillButton key={opt.id} active={formData.work_hours === opt.id} onClick={() => set("work_hours", opt.id)}>
+                          <PillButton
+                            key={opt.id}
+                            active={formData.work_hours.includes(opt.id)}
+                            onClick={() => toggleMulti("work_hours", opt.id, "not_working")}
+                          >
                             {opt.label}
                           </PillButton>
                         ))}
