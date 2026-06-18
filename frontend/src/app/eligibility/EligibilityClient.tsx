@@ -415,6 +415,7 @@ export default function EligibilityPage() {
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [zipError, setZipError] = useState<string | null>(null);
   const [monthlyIncomeError, setMonthlyIncomeError] = useState<string | null>(null);
+  const [monthlyRentError, setMonthlyRentError] = useState<string | null>(null);
   const [isFetchingProfile, setIsFetchingProfile] = useState(false);
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
@@ -692,9 +693,19 @@ export default function EligibilityPage() {
     return true;
   };
 
+  const validateStep4 = (): boolean => {
+    if (formData.monthly_rent === "") {
+      setMonthlyRentError("Please enter your monthly rent (enter 0 if you pay nothing).");
+      return false;
+    }
+    setMonthlyRentError(null);
+    return true;
+  };
+
   const goToStep = (target: number) => {
     if (target > 1 && !validateStep1()) return;
     if (target > 2 && !validateStep2()) return;
+    if (target > 4 && !validateStep4()) return;
     setStep(target);
   };
 
@@ -714,6 +725,7 @@ export default function EligibilityPage() {
   const handleNextStep = () => {
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
+    if (step === 4 && !validateStep4()) return;
     setStep((s) => s + 1);
   };
 
@@ -793,6 +805,12 @@ export default function EligibilityPage() {
       return;
     }
     setMonthlyIncomeError(null);
+    if (dataToSubmit.monthly_rent === "") {
+      setMonthlyRentError("Please enter your monthly rent (enter 0 if you pay nothing).");
+      setStep(4);
+      return;
+    }
+    setMonthlyRentError(null);
     if (!isAuthenticated) {
       if (typeof window !== "undefined") {
         localStorage.setItem("pending_eligibility_scan", JSON.stringify(dataToSubmit));
@@ -1429,9 +1447,17 @@ export default function EligibilityPage() {
 
                     <div>
                       <FieldLabel sub="Enter $0 if you pay nothing (staying with family, shelter, etc.).">
-                        How much do you pay each month for rent?
+                        How much do you pay each month for rent? *
                       </FieldLabel>
-                      <DollarInput placeholder="950" value={formData.monthly_rent} onChange={(v) => set("monthly_rent", v)} />
+                      <DollarInput
+                        placeholder="950"
+                        value={formData.monthly_rent}
+                        onChange={(v) => {
+                          set("monthly_rent", v);
+                          if (v !== "") setMonthlyRentError(null);
+                        }}
+                        error={monthlyRentError ?? undefined}
+                      />
                     </div>
 
                     <div>
