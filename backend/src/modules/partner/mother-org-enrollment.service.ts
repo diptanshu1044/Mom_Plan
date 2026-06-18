@@ -26,7 +26,7 @@ function buildAddress(fp: {
   return line || null;
 }
 
-async function pickCaseworker(orgId: string): Promise<string> {
+async function pickCaseworker(orgId: string): Promise<string | null> {
   const caseworkers = await prisma.orgUser.findMany({
     where: {
       org_id: orgId,
@@ -42,10 +42,7 @@ async function pickCaseworker(orgId: string): Promise<string> {
       where: { org_id: orgId, is_active: true },
       orderBy: { created_at: 'asc' },
     });
-    if (!fallback) {
-      throw new BadRequestError('This organization has no active staff to receive members');
-    }
-    return fallback.id;
+    return fallback?.id ?? null;
   }
 
   caseworkers.sort((a, b) => a._count.cases - b._count.cases);
