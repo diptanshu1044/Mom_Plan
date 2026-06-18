@@ -59,7 +59,7 @@ export default function BenefitsPage() {
   const [selectedProgram, setSelectedProgram] = useState<any>(null);
   const [availableStateCodes, setAvailableStateCodes] = useState<string[]>([]);
   const hasAutoSelectedProfileState = useRef(false);
-  const profileStateRef = useRef<string | null>(null);
+  const userChoseAllStates = useRef(false);
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -88,7 +88,11 @@ export default function BenefitsPage() {
     if (programType === "federal") params.federal = "true";
     if (programType === "state") params.state_only = "true";
 
-    if (selectedState !== "All" && selectedState !== profileStateRef.current) {
+    if (selectedState === "All") {
+      if (userChoseAllStates.current) {
+        params.state = "All";
+      }
+    } else {
       params.state = selectedState;
     }
 
@@ -160,12 +164,9 @@ export default function BenefitsPage() {
   }, [data?.availableStates]);
 
   useEffect(() => {
-    if (profileState) {
-      profileStateRef.current = profileState;
-      if (!hasAutoSelectedProfileState.current) {
-        setSelectedState(profileState);
-        hasAutoSelectedProfileState.current = true;
-      }
+    if (profileState && !hasAutoSelectedProfileState.current) {
+      setSelectedState(profileState);
+      hasAutoSelectedProfileState.current = true;
     }
   }, [profileState]);
 
@@ -320,7 +321,15 @@ export default function BenefitsPage() {
             <select
               id="state-filter"
               value={selectedState}
-              onChange={(e) => setSelectedState(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "All") {
+                  userChoseAllStates.current = true;
+                } else {
+                  userChoseAllStates.current = false;
+                }
+                setSelectedState(value);
+              }}
               className={`${selectClassName} pl-9`}
             >
               <option value="All">All states</option>

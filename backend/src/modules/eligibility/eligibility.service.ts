@@ -242,7 +242,7 @@ export class EligibilityService {
 
     const filtersWithProfile: EligibilityResultsFilters = {
       ...filters,
-      ...(filters?.state ? {} : { profileState }),
+      ...(filters?.state || filters?.allStates ? {} : { profileState }),
     };
 
     const programIds = results.map((result) => result.program_id);

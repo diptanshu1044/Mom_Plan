@@ -10,7 +10,10 @@ export interface EligibilityResultsFilters {
   profileState?: string;
   federal?: boolean;
   stateOnly?: boolean;
+  /** Explicit state code filter (federal programs are always included). */
   state?: string;
+  /** When true, do not scope results to profile or a single state. */
+  allStates?: boolean;
   stateSearch?: string;
   year?: number | 'all';
   quarter?: Quarter;
@@ -136,15 +139,17 @@ export function applyEligibilityFilters<T extends ResultLike>(
 
   let filtered = results;
 
-  if (filters.state) {
-    const targetState = filters.state.trim().toUpperCase();
-    filtered = filtered.filter((result) =>
-      isFederalProgram(result.program) || getProgramStateCode(result.program) === targetState
-    );
-  } else if (filters.profileState) {
-    filtered = filtered.filter((result) =>
-      matchesProfileStateScope(result.program, filters.profileState!)
-    );
+  if (!filters.allStates) {
+    if (filters.state) {
+      const targetState = filters.state.trim().toUpperCase();
+      filtered = filtered.filter((result) =>
+        isFederalProgram(result.program) || getProgramStateCode(result.program) === targetState
+      );
+    } else if (filters.profileState) {
+      filtered = filtered.filter((result) =>
+        matchesProfileStateScope(result.program, filters.profileState!)
+      );
+    }
   }
 
   if (filters.federal) {
@@ -192,10 +197,14 @@ export function parseEligibilityResultsFilters(query: Record<string, unknown>): 
       ? (quarter as Quarter)
       : getQuarterForMonth(new Date().getUTCMonth() + 1);
 
+  const rawState = typeof query.state === 'string' ? query.state.trim() : '';
+  const allStates = rawState.toUpperCase() === 'ALL';
+
   return {
     federal: query.federal === 'true' || query.federal === true,
     stateOnly: query.state_only === 'true' || query.state_only === true,
-    state: typeof query.state === 'string' && query.state.trim() ? query.state.trim() : undefined,
+    allStates: allStates || undefined,
+    state: rawState && !allStates ? rawState : undefined,
     stateSearch:
       typeof query.state_search === 'string' && query.state_search.trim()
         ? query.state_search.trim()
