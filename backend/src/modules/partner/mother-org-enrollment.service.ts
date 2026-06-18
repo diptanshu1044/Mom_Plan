@@ -1,5 +1,9 @@
 import { prisma } from '../../config/prisma';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
+import {
+  organizationPublicSelect,
+  toPublicOrganization,
+} from '../../utils/organization.utils';
 
 function currentQuarter(): string {
   const m = new Date().getMonth();
@@ -64,22 +68,13 @@ async function defaultIntakeProgramId(): Promise<string> {
 
 export class MotherOrgEnrollmentService {
   async listOrganizations() {
-    return prisma.organization.findMany({
-      select: {
-        id: true,
-        name: true,
-        type: true,
-        tagline: true,
-        description: true,
-        city: true,
-        state: true,
-        services_offered: true,
-        service_area: true,
-        primary_language: true,
-        website: true,
-      },
-      orderBy: { name: 'asc' },
+    const orgs = await prisma.organization.findMany({
+      where: { active: true },
+      select: organizationPublicSelect,
+      orderBy: { org_name: 'asc' },
     });
+
+    return orgs.map(toPublicOrganization);
   }
 
   async enrollUserInPartnerOrg(userId: string, orgId: string) {
@@ -105,7 +100,7 @@ export class MotherOrgEnrollmentService {
         where: { id: userId },
         data: {
           org_id: orgId,
-          org_type: org.type || null,
+          org_type: org.org_type || org.category || null,
         },
       });
 
@@ -158,7 +153,7 @@ export class MotherOrgEnrollmentService {
           old_status: null,
           new_status: 'not_started',
           changed_by: null,
-          notes: `Enrolled with ${org.name} via MomPlan`,
+          notes: `Enrolled with ${org.org_name} via MomPlan`,
         },
       });
     });

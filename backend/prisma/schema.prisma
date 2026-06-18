@@ -48,6 +48,8 @@ model User {
   reminders              Reminder[]
   eligibility_results    EligibilityResult[]
   subscriptions          Subscription[]
+  organization           Organization?        @relation(fields: [org_id], references: [id], onDelete: SetNull)
+  billing_organization   Organization?        @relation("OrganizationBillingUser")
 
   @@index([org_id])
   @@map("users")
@@ -553,11 +555,29 @@ model Organization {
   created_at         DateTime?           @default(now()) @db.Timestamptz(6)
   updated_at         DateTime?           @default(now()) @db.Timestamptz(6)
   service_tags       String[]            @default([])
-  referral_notes     String?
-  org_type           String?
-  appointments       Appointment[]
-  services           OrgService[]
-  results            EligibilityResult[]
+  referral_notes           String?
+  org_type                 String?
+  billing_user_id          String?             @unique @db.Uuid
+  onboarding_completed     Boolean             @default(false)
+  tagline                  String?
+  description              String?
+  services_offered         String?
+  service_area             String?
+  primary_language         String?             @default("English")
+  notification_frequency   String?             @default("daily")
+  case_numbering_prefix    String?             @default("CASE")
+  country                  String?
+  employees                String?
+  founded                  String?
+  tax_id                   String?
+  linkedin                 String?
+  contact_email            String?
+  appointments             Appointment[]
+  services                 OrgService[]
+  results                  EligibilityResult[]
+  users                    User[]
+  org_users                OrgUser[]           @relation("OrgUserOrganization")
+  billing_user             User?               @relation("OrganizationBillingUser", fields: [billing_user_id], references: [id], onDelete: SetNull)
 
   @@index([dv_safety_mode], map: "idx_organizations_dv_safety_mode")
   @@index([state], map: "idx_organizations_state")
@@ -632,6 +652,7 @@ model OrgUser {
   refresh_tokens       OrgRefreshToken[]   @relation("OrgRefreshTokenUser")
   referrals            Referral[]          @relation("ReferralReferredBy")
   status_changes       StatusHistory[]     @relation("StatusHistoryChangedBy")
+  organization         Organization        @relation("OrgUserOrganization", fields: [org_id], references: [id], onDelete: Cascade)
 
   @@index([org_id])
   @@map("org_users")

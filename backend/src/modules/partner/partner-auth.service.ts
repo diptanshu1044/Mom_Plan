@@ -1,12 +1,15 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { OrganizationType } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { BadRequestError, UnauthorizedError } from '../../utils/errors';
 import { splitFullName } from '../../utils/name.utils';
-import { parseOrgType } from '../../constants/org-types';
+import { ORG_TYPE_LABELS, parseOrgType } from '../../constants/org-types';
+import {
+  PartnerOrganization,
+  toPartnerOrganization,
+} from '../../utils/partner-organization.utils';
 
 // ---- Token helpers ----
 
@@ -47,33 +50,6 @@ async function createRefreshToken(orgUserId: string): Promise<string> {
   return raw;
 }
 
-type FullOrg = {
-  id: string;
-  name: string;
-  type: OrganizationType | null;
-  website: string | null;
-  description: string | null;
-  phone: string | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  zip: string | null;
-  country: string | null;
-  contact_email: string | null;
-  employees: string | null;
-  founded: string | null;
-  tax_id: string | null;
-  linkedin: string | null;
-  tagline: string | null;
-  services_offered: string | null;
-  service_area: string | null;
-  primary_language: string | null;
-  notification_frequency: string | null;
-  case_numbering_prefix: string | null;
-  onboarding_completed: boolean;
-  created_at: Date;
-};
-
 async function issueSession(orgUser: {
   id: string;
   email: string;
@@ -81,7 +57,7 @@ async function issueSession(orgUser: {
   role: string;
   org_id: string;
   must_change_password: boolean;
-  organization: FullOrg;
+  organization: PartnerOrganization;
 }) {
   const accessToken = generateAccessToken({
     orgUserId: orgUser.id,
@@ -145,17 +121,20 @@ export class PartnerAuthService {
     const { org, adminUser } = await prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({
         data: {
-          name:          data.orgName,
-          type:          orgType,
+          org_name:      data.orgName,
+          category:      ORG_TYPE_LABELS[orgType],
+          org_type:      orgType,
           website:       data.website || null,
           description:   data.description || null,
+          purpose:       data.description || null,
           phone:         data.phone || null,
           address:       data.address,
           city:          data.city,
           state:         data.state || null,
-          zip:           data.zip || null,
+          zip_code:      data.zip || null,
           country:       data.country || null,
           contact_email: data.email,
+          email:         data.email,
           employees:     data.employees || null,
           founded:       data.founded || null,
           tax_id:        data.taxId || null,
@@ -197,7 +176,7 @@ export class PartnerAuthService {
 
     return issueSession({
       ...adminUser,
-      organization: org,
+      organization: toPartnerOrganization(org),
     });
   }
 
@@ -223,7 +202,7 @@ export class PartnerAuthService {
 
     return issueSession({
       ...orgUser,
-      organization: orgUser.organization,
+      organization: toPartnerOrganization(orgUser.organization),
     });
   }
 
@@ -266,7 +245,7 @@ export class PartnerAuthService {
 
     return issueSession({
       ...orgUser,
-      organization: orgUser.organization,
+      organization: toPartnerOrganization(orgUser.organization),
     });
   }
 
@@ -295,7 +274,7 @@ export class PartnerAuthService {
 
     return issueSession({
       ...updated,
-      organization: updated.organization,
+      organization: toPartnerOrganization(updated.organization),
     });
   }
 }

@@ -12,6 +12,7 @@ import {
   ProfileWithFamily,
 } from './profile-update.utils';
 import { decimalToNumberOrNull } from '../../utils/decimal.utils';
+import { toPublicOrganizationSummary } from '../../utils/organization.utils';
 
 const eligibilityService = new EligibilityService();
 
@@ -22,10 +23,18 @@ const motherOrgEnrollment = new MotherOrgEnrollmentService();
  * so they are never sent to the client as Prisma Decimal objects ([object Object]).
  */
 function serializeProfile(user: any): any {
-  if (!user?.family_profile) return user;
-  const fp = user.family_profile;
-  return {
+  const serialized = {
     ...user,
+    organization: user.organization
+      ? toPublicOrganizationSummary(user.organization)
+      : user.organization,
+  };
+
+  if (!serialized.family_profile) return serialized;
+
+  const fp = serialized.family_profile;
+  return {
+    ...serialized,
     family_profile: {
       ...fp,
       monthly_rent: decimalToNumberOrNull(fp.monthly_rent),
@@ -57,7 +66,7 @@ export class UserService {
         org_id: true,
         org_type: true,
         organization: {
-          select: { id: true, name: true, city: true, state: true },
+          select: { id: true, org_name: true, city: true, state: true },
         },
         family_profile: true,
       },
@@ -95,7 +104,7 @@ export class UserService {
       include: {
         family_profile: true,
         organization: {
-          select: { id: true, name: true, city: true, state: true },
+          select: { id: true, org_name: true, city: true, state: true },
         },
       },
     })) as ProfileWithFamily | null;
@@ -145,10 +154,11 @@ export class UserService {
         await motherOrgEnrollment.enrollUserInPartnerOrg(userId, org_id);
         userUpdate.org_id = org_id;
         userUpdate.org_type = org_type || null;
-        organization = await prisma.organization.findUnique({
+        const org = await prisma.organization.findUnique({
           where: { id: org_id },
-          select: { id: true, name: true, city: true, state: true },
+          select: { id: true, org_name: true, city: true, state: true },
         });
+        organization = org ? toPublicOrganizationSummary(org) : null;
       }
     }
 
