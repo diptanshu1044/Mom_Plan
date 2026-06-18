@@ -556,13 +556,12 @@ model Organization {
   updated_at         DateTime?           @default(now()) @db.Timestamptz(6)
   service_tags       String[]            @default([])
   referral_notes     String?
-  org_type           String?
+  type               OrganizationType?
   appointments       Appointment[]
   services           OrgService[]
   results            EligibilityResult[]
 
   @@index([dv_safety_mode], map: "idx_organizations_dv_safety_mode")
-  @@index([org_type], map: "idx_organizations_org_type")
   @@index([state], map: "idx_organizations_state")
   @@map("organizations")
 }
@@ -614,7 +613,7 @@ model Reminder {
 model PartnerOrganization {
   id                     String               @id @default(uuid()) @db.Uuid
   name                   String
-  type                   String?
+  type                   OrganizationType?
   address                String?
   contact_email          String?
   created_at             DateTime             @default(now()) @db.Timestamptz(6)
@@ -902,6 +901,13 @@ model StatusHistory {
   @@index([case_id])
   @@index([changed_by])
   @@map("status_history")
+}
+
+enum OrganizationType {
+  nonprofit_501c3   @map("Non-profit (501c3)")
+  government_agency @map("Government Agency")
+  cooperative       @map("Cooperative")
+  other             @map("Other")
 }
 
 enum UserRole {

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { OrganizationType, PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -402,7 +402,7 @@ async function seedPartnerOrg() {
     create: {
       id:            DEMO_ORG_ID,
       name:          'Blossom Community Hub',
-      type:          'Non-profit (501c3)',
+      type:          OrganizationType.nonprofit_501c3,
       website:       'https://www.blossomcommunityhub.org',
       description:   'Connecting underserved mothers and families to the benefits, resources, and community they deserve.',
       phone:         '+1 (404) 555-0192',

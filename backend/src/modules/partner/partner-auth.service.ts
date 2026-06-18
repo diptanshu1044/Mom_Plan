@@ -1,10 +1,12 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { OrganizationType } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { BadRequestError, UnauthorizedError } from '../../utils/errors';
 import { splitFullName } from '../../utils/name.utils';
+import { parseOrgType } from '../../constants/org-types';
 
 // ---- Token helpers ----
 
@@ -48,7 +50,7 @@ async function createRefreshToken(orgUserId: string): Promise<string> {
 type FullOrg = {
   id: string;
   name: string;
-  type: string | null;
+  type: OrganizationType | null;
   website: string | null;
   description: string | null;
   phone: string | null;
@@ -134,13 +136,17 @@ export class PartnerAuthService {
     }
 
     const password_hash = await bcrypt.hash(data.adminPassword, 10);
+    const orgType = parseOrgType(data.orgType);
+    if (!orgType) {
+      throw new BadRequestError('Invalid organization type');
+    }
 
     // Create org + admin in a transaction
     const { org, adminUser } = await prisma.$transaction(async (tx) => {
       const org = await tx.partnerOrganization.create({
         data: {
           name:          data.orgName,
-          type:          data.orgType,
+          type:          orgType,
           website:       data.website || null,
           description:   data.description || null,
           phone:         data.phone || null,
