@@ -887,7 +887,9 @@ export default function EligibilityPage() {
       updateUser(profileRes.data.data);
 
       const scanRes = await api.post("/api/eligibility/scan");
-      setResults(scanRes.data.data || []);
+      // Response shape: { results: [...], aiStatus: "processing" }
+      const scanData = scanRes.data.data;
+      setResults(scanData?.results ?? scanData ?? []);
       queryClient.invalidateQueries({ queryKey: ["eligibility-results"] });
       queryClient.invalidateQueries({ queryKey: ["applications"] });
       queryClient.invalidateQueries({ queryKey: ["deadlines"] });

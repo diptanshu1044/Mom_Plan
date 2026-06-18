@@ -370,6 +370,7 @@ model EligibilityResult {
   ai_rank          Int?
   reasons          String[]          @default([])
   program_code     String?
+  ai_processed     Boolean           @default(false)
   created_at       DateTime?         @default(now()) @db.Timestamptz
 
   @@unique([user_id, program_id])

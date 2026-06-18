@@ -9,8 +9,8 @@ export class EligibilityController {
   async runScan(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.user) throw new UnauthorizedError();
-      const results = await eligibilityService.runScan(req.user.id);
-      res.status(200).json({ success: true, data: results });
+      const { results, aiStatus } = await eligibilityService.runScan(req.user.id);
+      res.status(200).json({ success: true, data: { results, aiStatus } });
     } catch (error) {
       next(error);
     }

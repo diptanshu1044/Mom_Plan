@@ -18,6 +18,7 @@ import {
   Eye,
   Calendar,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { usePdfGeneration } from "@/hooks/usePdfGeneration";
 import DocumentReadinessModal from "@/components/pdf/DocumentReadinessModal";
@@ -92,10 +93,13 @@ export default function BenefitsPage() {
     queryFn: () =>
       api.get("/api/eligibility/results", { params: filterParams }).then((r) => r.data.data),
     placeholderData: (previousData) => previousData,
+    // Poll every 5 seconds while AI explanations are still being generated
+    refetchInterval: (query) => (query.state.data?.aiProcessing ? 5000 : false),
   });
 
   const results = data?.results ?? [];
   const summary = data?.summary;
+  const aiProcessing: boolean = data?.aiProcessing ?? false;
   const availableYears = data?.availableYears ?? [];
   const yearFilterOptions = useMemo(
     () => buildYearFilterOptions(availableYears),
@@ -156,6 +160,20 @@ export default function BenefitsPage() {
               </div>
             </div>
           </Card>
+        </motion.div>
+      )}
+
+      {/* AI processing banner — shown while background explanations are generating */}
+      {aiProcessing && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-5 flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800"
+        >
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary-600" />
+          <span>
+            Generating personalized recommendations… Results will update automatically.
+          </span>
         </motion.div>
       )}
 

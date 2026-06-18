@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { ANTHROPIC_MODEL } from '../../config/anthropic';
 import { prisma } from '../../config/prisma';
 import { RulesEngine } from './rules.engine';
-import Anthropic from '@anthropic-ai/sdk';
 import { FamilyProfile } from '@prisma/client';
 import {
   applyEligibilityFilters,
@@ -13,7 +11,7 @@ import {
   filterStateOptions,
   normalizeStateCode,
 } from './eligibility.filters';
-import { getProgramsForEligibilityScan, formatEstimatedBenefit, EligibilityScanProgram } from '../programs/programs.eligibility';
+import { getProgramsForEligibilityScan, EligibilityScanProgram } from '../programs/programs.eligibility';
 import {
   buildQuarterDueDatesByProgramAndYear,
   getAvailableYearsFromProgramYearMap,
@@ -22,184 +20,12 @@ import {
   quarterDueDatesByYearToObject,
   QuarterDueDatesByProgramAndYear,
 } from '../programs/quarterDueDates.service';
+import { EligibilityAIService } from './eligibility-ai.service';
 
-function stripJsonFences(text: string): string {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  if (fenced) return fenced[1].trim();
-  const openOnly = trimmed.match(/^```(?:json)?\s*([\s\S]*)$/i);
-  if (openOnly) return openOnly[1].trim();
-  return trimmed;
-}
-
-function extractJsonArray(text: string): string {
-  const start = text.indexOf('[');
-  if (start === -1) return text;
-  const end = text.lastIndexOf(']');
-  return end > start ? text.slice(start, end + 1) : text.slice(start);
-}
-
-function salvageJsonObjects(text: string): unknown[] {
-  const results: unknown[] = [];
-  let depth = 0;
-  let start = -1;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inString) {
-      if (escaped) escaped = false;
-      else if (ch === '\\') escaped = true;
-      else if (ch === '"') inString = false;
-      continue;
-    }
-    if (ch === '"') inString = true;
-    else if (ch === '{') {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (ch === '}') {
-      depth--;
-      if (depth === 0 && start !== -1) {
-        try {
-          results.push(JSON.parse(text.slice(start, i + 1)));
-        } catch {
-          // skip malformed object
-        }
-        start = -1;
-      }
-    }
-  }
-  return results;
-}
-
-function parseAiJsonArray(text: string): unknown[] {
-  const cleaned = extractJsonArray(stripJsonFences(text));
-  try {
-    const parsed = JSON.parse(cleaned);
-    if (Array.isArray(parsed)) return parsed;
-  } catch {
-    const salvaged = salvageJsonObjects(cleaned);
-    if (salvaged.length > 0) return salvaged;
-    throw new Error(`Invalid JSON from AI response (${cleaned.length} chars)`);
-  }
-  throw new Error('AI response is not a JSON array');
-}
-
-const AI_MAX_TOKENS = 8192;
-/** ~120 chars/object — keeps each batch well under AI_MAX_TOKENS output. */
-const AI_BATCH_SIZE = 50;
-const AI_MIN_SCORE = 60;
-const AI_MAX_SCORE = 80;
-const MAX_AI_PROGRAMS = 20;
-
-function needsAiRefinement(ruleResult: { score: number }): boolean {
-  return ruleResult.score >= AI_MIN_SCORE && ruleResult.score <= AI_MAX_SCORE;
-}
-
-type AiEligibilityResult = {
-  programId: string;
-  status: string;
-  confidence_score?: number;
-  reasoning?: string;
-};
-
-type RuleScanResult = {
-  programId: string;
-  score: number;
-  status: string;
-  reasoning: string;
-};
-
-function buildCompactProfile(profile: FamilyProfile, state: string) {
-  return {
-    state,
-    household_size: profile.household_size,
-    num_children: profile.num_children,
-    children_ages: profile.children_ages,
-    monthly_income: profile.monthly_income,
-    employment_status: profile.employment_status,
-    is_pregnant: profile.is_pregnant,
-    has_disability: profile.has_disability,
-    housing_status: profile.housing_status,
-    immigration_status: profile.immigration_status,
-    needs_childcare: profile.needs_childcare,
-    monthly_rent: profile.monthly_rent,
-    eviction_risk: profile.eviction_risk,
-    domestic_violence: profile.domestic_violence,
-    health_insurance: profile.health_insurance,
-    legal_issues: profile.legal_issues,
-    urgency: profile.urgency,
-  };
-}
-
-type AiRefinementProgram = {
-  id: string;
-  name: string;
-  state_code: string | null;
-  program_type: string;
-  estimated_benefit: string | null;
-  eligibility_summary: string | null;
-  rules_engine_score: number;
-};
-
-function buildAiProgramPayload(
-  ruleResult: RuleScanResult,
-  program: EligibilityScanProgram
-): AiRefinementProgram {
-  return {
-    id: program.id,
-    name: program.name,
-    state_code: program.state_code,
-    program_type: program.program_type,
-    estimated_benefit: formatEstimatedBenefit(program),
-    eligibility_summary: program.eligibility_summary,
-    rules_engine_score: ruleResult.score,
-  };
-}
-
-function buildAiPrompt(
-  profileSummary: ReturnType<typeof buildCompactProfile>,
-  programs: AiRefinementProgram[]
-): string {
-  return [
-    'Refine only the rule-engine results below. Return one JSON object per programId (use the program id field) in the batch.',
-    `Profile: ${JSON.stringify(profileSummary)}`,
-    `Programs: ${JSON.stringify(programs)}`,
-  ].join('\n');
-}
-
-function mergeAiWithRuleResults(
-  ruleResults: RuleScanResult[],
-  aiByProgramId: Map<string, AiEligibilityResult>
-) {
-  return ruleResults.map((r) => {
-    const ai = aiByProgramId.get(r.programId);
-    return ai
-      ? {
-          programId: r.programId,
-          status: ai.status,
-          confidence_score: ai.confidence_score ?? r.score,
-          reasoning: ai.reasoning ?? r.reasoning,
-        }
-      : {
-          programId: r.programId,
-          status: r.status,
-          confidence_score: r.score,
-          reasoning: r.reasoning,
-        };
-  });
-}
+const eligibilityAIService = new EligibilityAIService();
 
 export class EligibilityService {
   private static scansInProgress = new Set<string>();
-  private anthropic: Anthropic;
-
-  constructor() {
-    this.anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY || 'placeholder',
-    });
-  }
 
   async runScan(userId: string) {
     if (EligibilityService.scansInProgress.has(userId)) {
@@ -226,13 +52,12 @@ export class EligibilityService {
     }
 
     const profile = user.family_profile;
-
     const userState = user.state || profile.state || 'GA';
 
     // 2. Active programs scoped to user state + federal (DB-filtered)
     const programs = await getProgramsForEligibilityScan(userState);
 
-    // 3. Run Deterministic Rules Engine
+    // 3. Run deterministic rules engine — this is the source of truth for eligibility
     const rulesEngine = new RulesEngine();
     const ruleResults = programs.map((p) => {
       const evaluation = rulesEngine.evaluate(p, {
@@ -246,13 +71,11 @@ export class EligibilityService {
         disability_status: profile.has_disability ?? false,
         housing_status: profile.housing_status ?? 'stable',
         student_status: profile.employment_status === 'student',
-        
-        // Map citizenship_status correctly (citizen or eligible_non_citizen)
-        citizenship_status: profile.immigration_status === 'citizen' || profile.immigration_status === 'eligible_non_citizen'
-          ? profile.immigration_status
-          : 'citizen',
-        
-        // Apply Wiser Moms eligibility fields
+        citizenship_status:
+          profile.immigration_status === 'citizen' ||
+          profile.immigration_status === 'eligible_non_citizen'
+            ? profile.immigration_status
+            : 'citizen',
         needs_childcare: profile.needs_childcare ?? undefined,
         monthly_rent: profile.monthly_rent ? Number(profile.monthly_rent) : undefined,
         eviction_risk: profile.eviction_risk ?? undefined,
@@ -263,49 +86,23 @@ export class EligibilityService {
         income_sources: (profile.income_sources as string[]) || undefined,
         health_insurance: profile.health_insurance || undefined,
         savings_assets: profile.savings_assets || undefined,
-        monthly_childcare_cost: profile.monthly_childcare_cost ? Number(profile.monthly_childcare_cost) : undefined,
-        legal_issues: profile.legal_issues && Array.isArray(profile.legal_issues) ? (profile.legal_issues as string[]) : [],
+        monthly_childcare_cost: profile.monthly_childcare_cost
+          ? Number(profile.monthly_childcare_cost)
+          : undefined,
+        legal_issues:
+          profile.legal_issues && Array.isArray(profile.legal_issues)
+            ? (profile.legal_issues as string[])
+            : [],
         urgency: profile.urgency || undefined,
       });
       return { programId: p.id, ...evaluation };
     });
 
-    // 4. Refine with AI (Claude) if API key is present
-    const isPlaceholder = process.env.ANTHROPIC_API_KEY?.includes('placeholder') || !process.env.ANTHROPIC_API_KEY;
-    let parsedResults: any[] = [];
-
-    if (isPlaceholder) {
-      // Fallback to rules only
-      parsedResults = ruleResults.map((r) => ({
-        programId: r.programId,
-        status: r.status,
-        confidence_score: r.score,
-        reasoning: r.reasoning,
-      }));
-    } else {
-      try {
-        parsedResults = await this.refineWithAi(
-          profile,
-          userState,
-          programs,
-          ruleResults
-        );
-      } catch (err) {
-        console.error('AI Refinement Error:', err);
-        // Fallback to rules on error
-        parsedResults = ruleResults.map((r) => ({
-          programId: r.programId,
-          status: r.status,
-          confidence_score: r.score,
-          reasoning: r.reasoning,
-        }));
-      }
-    }
-
-    // 5. Replace prior results in bulk (delete + createMany) — one transaction, two round trips
+    // 4. Build result rows from rules engine data — save immediately with ai_processed=false
     const programById = new Map(programs.map((p) => [p.id, p]));
     const resultIdsByProgramId = new Map<string, string>();
-    const eligibilityRows = parsedResults
+
+    const eligibilityRows = ruleResults
       .map((res) => {
         const program = programById.get(res.programId);
         if (!program) return null;
@@ -316,50 +113,67 @@ export class EligibilityService {
           user_id: userId,
           program_id: program.id,
           status: res.status,
-          confidence_score: res.confidence_score || 0,
+          confidence_score: res.score,
           reasoning: res.reasoning,
+          ai_processed: false,
         };
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);
 
+    // 5. Replace prior results atomically, then return immediately
     await prisma.$transaction(async (tx) => {
-      await tx.eligibilityResult.deleteMany({
-        where: { user_id: userId },
-      });
-
+      await tx.eligibilityResult.deleteMany({ where: { user_id: userId } });
       if (eligibilityRows.length > 0) {
-        await tx.eligibilityResult.createMany({
-          data: eligibilityRows,
-        });
+        await tx.eligibilityResult.createMany({ data: eligibilityRows });
       }
     });
 
-    // 6. Save a scan-complete notification
-    const qualified = parsedResults.filter(
-      (r) => r.status === 'qualified' || r.status === 'likely_qualified'
-    );
+    // 6. Fire-and-forget: AI explanation generation happens after response is sent
+    const qualifiedProgramIds = ruleResults
+      .filter((r) => r.status === 'qualified' || r.status === 'likely_qualified')
+      .map((r) => r.programId);
 
-    await prisma.notification.create({
-      data: {
-        user_id: userId,
-        type: 'status_update',
-        title: '🎯 Eligibility Scan Complete',
-        message: `Scan complete: ${qualified.length} program${qualified.length !== 1 ? 's' : ''} matched out of ${parsedResults.length} checked. View your Benefits page for details.`,
-      },
-    }).catch(() => {
-      // Non-critical — swallow if notification creation fails
-    });
+    void eligibilityAIService
+      .processAiExplanations(userId, programs, profile, userState, qualifiedProgramIds)
+      .catch((err) => console.error('[EligibilityService] AI background job error:', err));
+
+    // 7. Save scan-complete notification (non-blocking)
+    const qualifiedCount = ruleResults.filter(
+      (r) => r.status === 'qualified' || r.status === 'likely_qualified'
+    ).length;
+
+    prisma.notification
+      .create({
+        data: {
+          user_id: userId,
+          type: 'status_update',
+          title: '🎯 Eligibility Scan Complete',
+          message: `Scan complete: ${qualifiedCount} program${qualifiedCount !== 1 ? 's' : ''} matched out of ${ruleResults.length} checked. View your Benefits page for details.`,
+        },
+      })
+      .catch(() => {});
 
     const profileState =
       normalizeStateCode(user.state) ?? normalizeStateCode(profile.state);
 
-    return this.buildScanResultsFromMemory(
-      parsedResults,
+    const scanResults = this.buildScanResultsFromMemory(
+      ruleResults.map((r) => ({
+        programId: r.programId,
+        status: r.status,
+        confidence_score: r.score,
+        reasoning: r.reasoning,
+        ai_processed: false,
+      })),
       programs,
       userId,
       resultIdsByProgramId,
       profileState
     );
+
+    return {
+      results: scanResults,
+      aiStatus: 'processing' as const,
+    };
   }
 
   private buildScanResultsFromMemory(
@@ -368,6 +182,7 @@ export class EligibilityService {
       status: string;
       confidence_score?: number;
       reasoning?: string;
+      ai_processed?: boolean;
     }>,
     programs: EligibilityScanProgram[],
     userId: string,
@@ -389,6 +204,7 @@ export class EligibilityService {
           status: res.status,
           confidence_score: res.confidence_score || 0,
           reasoning: res.reasoning ?? '',
+          ai_processed: res.ai_processed ?? false,
           checked_at: checkedAt,
           program,
         };
@@ -402,83 +218,6 @@ export class EligibilityService {
 
     const emptyQuarterMap: QuarterDueDatesByProgramAndYear = new Map();
     return this.enrichResultsWithQuarterDueDates(filtered, emptyQuarterMap);
-  }
-
-  private async refineWithAi(
-    profile: FamilyProfile,
-    state: string,
-    programs: EligibilityScanProgram[],
-    ruleResults: RuleScanResult[]
-  ) {
-    const toRefine = ruleResults
-      .filter(needsAiRefinement)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, MAX_AI_PROGRAMS);
-
-    if (toRefine.length === 0) {
-      return mergeAiWithRuleResults(ruleResults, new Map());
-    }
-
-    const programById = new Map(programs.map((p) => [p.id, p]));
-    const profileSummary = buildCompactProfile(profile, state);
-    const aiByProgramId = new Map<string, AiEligibilityResult>();
-
-    for (let i = 0; i < toRefine.length; i += AI_BATCH_SIZE) {
-      const batch = toRefine.slice(i, i + AI_BATCH_SIZE);
-      const programPayloads = batch.map((r) => {
-        const program = programById.get(r.programId);
-        if (!program) {
-          return {
-            id: r.programId,
-            name: r.programId,
-            state_code: null,
-            program_type: 'unknown',
-            estimated_benefit: null,
-            eligibility_summary: null,
-            rules_engine_score: r.score,
-          };
-        }
-        return buildAiProgramPayload(r, program);
-      });
-      const prompt = buildAiPrompt(profileSummary, programPayloads);
-
-      const { text: aiResponse, stopReason } = await Promise.race([
-        this.callClaudeApi(prompt),
-        new Promise<{ text: string; stopReason: string | null }>((_, reject) =>
-          setTimeout(() => reject(new Error('AI Refinement Timeout')), 60000)
-        ),
-      ]);
-
-      if (stopReason === 'max_tokens') {
-        console.warn(
-          `AI eligibility batch ${Math.floor(i / AI_BATCH_SIZE) + 1} truncated at max_tokens; salvaging complete objects`
-        );
-      }
-
-      const aiParsed = parseAiJsonArray(aiResponse) as AiEligibilityResult[];
-
-      for (const result of aiParsed) {
-        if (result.programId) aiByProgramId.set(result.programId, result);
-      }
-    }
-
-    return mergeAiWithRuleResults(ruleResults, aiByProgramId);
-  }
-
-  private async callClaudeApi(
-    prompt: string
-  ): Promise<{ text: string; stopReason: string | null }> {
-    const response = await this.anthropic.messages.create({
-      model: ANTHROPIC_MODEL,
-      max_tokens: AI_MAX_TOKENS,
-      system:
-        'You refine borderline eligibility matches for MomPlan. Return ONLY a raw JSON array (no markdown). Each object: programId, status (qualified|likely_qualified|check_required|not_qualified), confidence_score (0-100), reasoning (max 80 chars). One object per programId in the user message. No extra keys.',
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const content = response.content[0];
-    const text = content.type === 'text' ? content.text : '';
-    return { text, stopReason: response.stop_reason ?? null };
   }
 
   async getResults(
@@ -548,12 +287,16 @@ export class EligibilityService {
 
     const summary = computeSummary(filtered);
 
+    // True if any result is still waiting for background AI explanations
+    const aiProcessing = results.some((r) => !r.ai_processed);
+
     return {
       results: enrichedResults,
       summary,
       availableStates,
       availableYears,
       profileState: profileState ?? null,
+      aiProcessing,
     };
   }
 

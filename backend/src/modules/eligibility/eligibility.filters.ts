@@ -32,6 +32,8 @@ export interface EligibilityResultsResponse {
   availableStates: AvailableStateOption[];
   availableYears: number[];
   profileState: string | null;
+  /** True while at least one result is still awaiting AI explanation generation. */
+  aiProcessing: boolean;
 }
 
 const US_STATES = [
