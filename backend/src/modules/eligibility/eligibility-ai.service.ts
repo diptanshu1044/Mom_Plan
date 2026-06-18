@@ -3,6 +3,7 @@ import { ANTHROPIC_MODEL } from '../../config/anthropic';
 import { prisma } from '../../config/prisma';
 import { FamilyProfile } from '@prisma/client';
 import { EligibilityScanProgram, formatEstimatedBenefit } from '../programs/programs.eligibility';
+import { decimalToNumber } from '../../utils/decimal.utils';
 
 const AI_MAX_PROGRAMS = 20;
 const AI_MAX_TOKENS = 4096;
@@ -120,11 +121,12 @@ export class EligibilityAIService {
     state: string,
     programs: EligibilityScanProgram[]
   ): Promise<AiExplanationResult[]> {
+    const monthlyIncome = decimalToNumber(profile.monthly_income);
     const profileSummary = {
       state,
       household_size: profile.household_size,
       num_children: profile.num_children,
-      monthly_income: profile.monthly_income,
+      monthly_income: monthlyIncome,
       employment_status: profile.employment_status,
       is_pregnant: profile.is_pregnant,
       has_disability: profile.has_disability,

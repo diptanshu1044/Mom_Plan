@@ -22,6 +22,7 @@ import {
   QuarterDueDatesByProgramAndYear,
 } from '../programs/quarterDueDates.service';
 import { EligibilityAIService } from './eligibility-ai.service';
+import { decimalToNumber } from '../../utils/decimal.utils';
 
 const eligibilityAIService = new EligibilityAIService();
 
@@ -53,6 +54,7 @@ export class EligibilityService {
     }
 
     const profile = user.family_profile;
+    const monthlyIncome = decimalToNumber(profile.monthly_income);
     const userState = user.state || profile.state || 'GA';
 
     // 2. Active programs scoped to user state + federal (DB-filtered)
@@ -65,7 +67,7 @@ export class EligibilityService {
         household_size: profile.household_size ?? 1,
         number_of_children: profile.num_children ?? 0,
         children_ages: Array.isArray(profile.children_ages) ? (profile.children_ages as number[]) : [],
-        monthly_income: profile.monthly_income ?? 0,
+        monthly_income: monthlyIncome,
         employment_status: profile.employment_status ?? 'unemployed',
         state: userState,
         pregnancy_status: profile.is_pregnant ?? false,

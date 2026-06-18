@@ -3,18 +3,19 @@ import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { zipValidationService, isZipValidationEnabled } from '../../services/zipValidation.service';
 import { MotherOrgEnrollmentService } from '../partner/mother-org-enrollment.service';
 import { joinFullName, userNameSelect } from '../../utils/name.utils';
+import { EligibilityService } from '../eligibility/eligibility.service';
+import {
+  buildFamilyProfilePatch,
+  buildUserProfilePatch,
+  mergeProfileResponse,
+  profileUpdateAffectsEligibility,
+  ProfileWithFamily,
+} from './profile-update.utils';
+import { decimalToNumberOrNull } from '../../utils/decimal.utils';
+
+const eligibilityService = new EligibilityService();
 
 const motherOrgEnrollment = new MotherOrgEnrollmentService();
-
-/**
- * Converts a Prisma Decimal object (or string/number) to a plain JS number.
- * Returns null if the value is null/undefined or cannot be parsed.
- */
-function parseDecimal(val: any): number | null {
-  if (val === null || val === undefined) return null;
-  const num = Number(val);
-  return isNaN(num) ? null : num;
-}
 
 /**
  * Serializes Decimal fields in a family_profile object to plain numbers
@@ -27,10 +28,10 @@ function serializeProfile(user: any): any {
     ...user,
     family_profile: {
       ...fp,
-      monthly_rent: parseDecimal(fp.monthly_rent),
-      monthly_utilities: parseDecimal(fp.monthly_utilities),
-      monthly_childcare_cost: parseDecimal(fp.monthly_childcare_cost),
-      monthly_income: parseDecimal(fp.monthly_income),
+      monthly_rent: decimalToNumberOrNull(fp.monthly_rent),
+      monthly_utilities: decimalToNumberOrNull(fp.monthly_utilities),
+      monthly_childcare_cost: decimalToNumberOrNull(fp.monthly_childcare_cost),
+      monthly_income: decimalToNumberOrNull(fp.monthly_income),
     },
   };
 }
@@ -73,33 +74,48 @@ export class UserService {
     userId: string,
     data: any
   ) {
-    const { 
+    const {
       first_name, middle_name, last_name, phone, email, state, zip_code, partner_org_id,
       org_type,
       household_size, num_children, children_ages, monthly_income,
       employment_status, housing_status, has_disability, is_pregnant,
-      
-      // New Wiser Moms fields
+
       needs_childcare, monthly_rent, monthly_utilities, eviction_risk, domestic_violence,
       chronic_illness, immigration_status, date_of_birth, ssn_last_four, preferred_language,
       marital_status, other_adults, income_sources, work_situation, employer_name,
       health_insurance, savings_assets, child_support_status,
       monthly_childcare_cost, childcare_preference, childcare_provider, legal_issues, urgency,
       children_dobs,
-      // Address
       street_address, city,
       profile_picture,
     } = data;
 
+    const existingProfile = (await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        family_profile: true,
+        partner_organization: {
+          select: { id: true, name: true, city: true, state: true },
+        },
+      },
+    })) as ProfileWithFamily | null;
+
+    if (!existingProfile) {
+      throw new NotFoundError('User profile not found');
+    }
+
+    const parsedDob = date_of_birth ? new Date(date_of_birth) : undefined;
+    const normalizedData = {
+      ...data,
+      ...(date_of_birth !== undefined && { date_of_birth: parsedDob }),
+    };
+
+    const shouldRescanEligibility = profileUpdateAffectsEligibility(existingProfile, normalizedData);
+
     const touchesAddress = [zip_code, state, street_address, city].some((v) => v !== undefined);
     if (touchesAddress && isZipValidationEnabled()) {
-      const existing = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { state: true, zip_code: true },
-      });
-
-      const effectiveZip = zip_code !== undefined ? zip_code : existing?.zip_code;
-      const effectiveState = state !== undefined ? state : existing?.state;
+      const effectiveZip = zip_code !== undefined ? zip_code : existingProfile.zip_code;
+      const effectiveState = state !== undefined ? state : existingProfile.state;
 
       if (effectiveZip && effectiveState) {
         const zipResult = await zipValidationService.validateZip(
@@ -114,141 +130,104 @@ export class UserService {
       }
     }
 
-    // Update User basic info
-    const userUpdate: any = {};
-    if (first_name !== undefined) userUpdate.first_name = first_name.trim();
-    if (middle_name !== undefined) userUpdate.middle_name = middle_name?.trim() || null;
-    if (last_name !== undefined) userUpdate.last_name = last_name.trim();
-    if (phone !== undefined) userUpdate.phone = phone;
-    if (state !== undefined) userUpdate.state = state;
-    if (zip_code !== undefined) userUpdate.zip_code = zip_code;
-    if (profile_picture !== undefined) userUpdate.profile_picture = profile_picture;
-    if (org_type !== undefined) userUpdate.org_type = org_type || null;
-    // Only update email if provided (requires uniqueness check implicitly via Prisma)
-    if (email !== undefined) userUpdate.email = email;
+    const userUpdate = buildUserProfilePatch(existingProfile, normalizedData);
+    const familyUpdate = buildFamilyProfilePatch(existingProfile.family_profile, normalizedData);
+    let partnerOrganization = existingProfile.partner_organization;
 
     if (partner_org_id !== undefined) {
       if (!partner_org_id) {
-        userUpdate.partner_org_id = null;
-        userUpdate.org_type = null;
-      } else {
+        if (existingProfile.partner_org_id !== null) {
+          userUpdate.partner_org_id = null;
+          userUpdate.org_type = null;
+          partnerOrganization = null;
+        }
+      } else if (partner_org_id !== existingProfile.partner_org_id) {
         await motherOrgEnrollment.enrollUserInPartnerOrg(userId, partner_org_id);
+        userUpdate.partner_org_id = partner_org_id;
+        userUpdate.org_type = org_type || null;
+        partnerOrganization = await prisma.partnerOrganization.findUnique({
+          where: { id: partner_org_id },
+          select: { id: true, name: true, city: true, state: true },
+        });
       }
     }
 
-    if (Object.keys(userUpdate).length > 0) {
-      await prisma.user.update({
-        where: { id: userId },
-        data: userUpdate,
-        include: { family_profile: true },
-      });
-    }
+    if (Object.keys(userUpdate).length > 0 || familyUpdate) {
+      await prisma.$transaction(async (tx) => {
+        if (Object.keys(userUpdate).length > 0) {
+          await tx.user.update({
+            where: { id: userId },
+            data: userUpdate,
+          });
+        }
 
-    // Update Family Profile if any family fields are present
-    const hasFamilyData = [
-      household_size, num_children, monthly_income, 
-      employment_status, housing_status, has_disability, is_pregnant,
-      needs_childcare, monthly_rent, monthly_utilities, eviction_risk, domestic_violence,
-      chronic_illness, immigration_status, date_of_birth, ssn_last_four, preferred_language,
-      marital_status, other_adults, income_sources, work_situation, employer_name,
-      health_insurance, savings_assets, child_support_status,
-      monthly_childcare_cost, childcare_preference, childcare_provider, legal_issues, urgency,
-      first_name, last_name, children_dobs,
-      street_address, city,
-    ].some(val => val !== undefined);
-
-    if (hasFamilyData) {
-      const parsedDob = date_of_birth ? new Date(date_of_birth) : undefined;
-
-      await prisma.familyProfile.upsert({
-        where: { user_id: userId },
-        create: {
-          user_id: userId,
-          household_size: household_size || 1,
-          num_children: num_children || 0,
-          children_ages: children_ages || [],
-          monthly_income: monthly_income || 0,
-          employment_status: employment_status || 'unemployed',
-          housing_status: housing_status || 'renting',
-          has_disability: has_disability || false,
-          is_pregnant: is_pregnant || false,
-          
-          needs_childcare: needs_childcare || false,
-          monthly_rent: monthly_rent || 0,
-          monthly_utilities: monthly_utilities || 0,
-          eviction_risk: eviction_risk || false,
-          domestic_violence: domestic_violence || false,
-          chronic_illness: chronic_illness || false,
-          immigration_status: immigration_status || 'citizen',
-          date_of_birth: parsedDob,
-          ssn_last_four: ssn_last_four || null,
-          preferred_language: preferred_language || 'English',
-          marital_status: marital_status || 'single',
-          other_adults: other_adults || false,
-          income_sources: income_sources || [],
-          work_situation: work_situation || '',
-          employer_name: employer_name || null,
-          health_insurance: health_insurance || '',
-          savings_assets: savings_assets || '',
-          child_support_status: child_support_status || 'none',
-          monthly_childcare_cost: monthly_childcare_cost || null,
-          childcare_preference: childcare_preference || null,
-          childcare_provider: childcare_provider || null,
-          legal_issues: legal_issues || [],
-          urgency: urgency || 'not_urgent',
-          street_address: street_address || null,
-          city: city || null,
-          state: state || null,
-          zip_code: zip_code || null,
-          first_name: first_name || null,
-          last_name: last_name || null,
-          children_dobs: children_dobs || [],
-        },
-        update: {
-          ...(household_size !== undefined && { household_size }),
-          ...(num_children !== undefined && { num_children }),
-          ...(children_ages !== undefined && { children_ages }),
-          ...(monthly_income !== undefined && { monthly_income }),
-          ...(employment_status !== undefined && { employment_status }),
-          ...(housing_status !== undefined && { housing_status }),
-          ...(has_disability !== undefined && { has_disability }),
-          ...(is_pregnant !== undefined && { is_pregnant }),
-          
-          ...(needs_childcare !== undefined && { needs_childcare }),
-          ...(monthly_rent !== undefined && { monthly_rent }),
-          ...(monthly_utilities !== undefined && { monthly_utilities }),
-          ...(eviction_risk !== undefined && { eviction_risk }),
-          ...(domestic_violence !== undefined && { domestic_violence }),
-          ...(chronic_illness !== undefined && { chronic_illness }),
-          ...(immigration_status !== undefined && { immigration_status }),
-          ...(date_of_birth !== undefined && { date_of_birth: parsedDob }),
-          ...(ssn_last_four !== undefined && { ssn_last_four }),
-          ...(preferred_language !== undefined && { preferred_language }),
-          ...(marital_status !== undefined && { marital_status }),
-          ...(other_adults !== undefined && { other_adults }),
-          ...(income_sources !== undefined && { income_sources }),
-          ...(work_situation !== undefined && { work_situation }),
-          ...(employer_name !== undefined && { employer_name }),
-          ...(health_insurance !== undefined && { health_insurance }),
-          ...(savings_assets !== undefined && { savings_assets }),
-          ...(child_support_status !== undefined && { child_support_status }),
-          ...(monthly_childcare_cost !== undefined && { monthly_childcare_cost }),
-          ...(childcare_preference !== undefined && { childcare_preference }),
-          ...(childcare_provider !== undefined && { childcare_provider }),
-          ...(legal_issues !== undefined && { legal_issues }),
-          ...(urgency !== undefined && { urgency }),
-          ...(street_address !== undefined && { street_address }),
-          ...(city !== undefined && { city }),
-          ...(state !== undefined && { state }),
-          ...(zip_code !== undefined && { zip_code }),
-          ...(first_name !== undefined && { first_name }),
-          ...(last_name !== undefined && { last_name }),
-          ...(children_dobs !== undefined && { children_dobs }),
+        if (familyUpdate) {
+          if (existingProfile.family_profile) {
+            await tx.familyProfile.update({
+              where: { user_id: userId },
+              data: familyUpdate,
+            });
+          } else {
+            await tx.familyProfile.create({
+              data: {
+                user_id: userId,
+                household_size: household_size || 1,
+                num_children: num_children || 0,
+                children_ages: children_ages || [],
+                monthly_income: monthly_income || 0,
+                employment_status: employment_status || 'unemployed',
+                housing_status: housing_status || 'renting',
+                has_disability: has_disability || false,
+                is_pregnant: is_pregnant || false,
+                needs_childcare: needs_childcare || false,
+                monthly_rent: monthly_rent || 0,
+                monthly_utilities: monthly_utilities || 0,
+                eviction_risk: eviction_risk || false,
+                domestic_violence: domestic_violence || false,
+                chronic_illness: chronic_illness || false,
+                immigration_status: immigration_status || 'citizen',
+                date_of_birth: parsedDob,
+                ssn_last_four: ssn_last_four || null,
+                preferred_language: preferred_language || 'English',
+                marital_status: marital_status || 'single',
+                other_adults: other_adults || false,
+                income_sources: income_sources || [],
+                work_situation: work_situation || '',
+                employer_name: employer_name || null,
+                health_insurance: health_insurance || '',
+                savings_assets: savings_assets || '',
+                child_support_status: child_support_status || 'none',
+                monthly_childcare_cost: monthly_childcare_cost || null,
+                childcare_preference: childcare_preference || null,
+                childcare_provider: childcare_provider || null,
+                legal_issues: legal_issues || [],
+                urgency: urgency || 'not_urgent',
+                street_address: street_address || null,
+                city: city || null,
+                state: state || null,
+                zip_code: zip_code || null,
+                first_name: first_name || null,
+                last_name: last_name || null,
+                children_dobs: children_dobs || [],
+                ...familyUpdate,
+              },
+            });
+          }
         }
       });
     }
 
-    return this.getProfile(userId);
+    const profile = serializeProfile(
+      mergeProfileResponse(existingProfile, userUpdate, familyUpdate, partnerOrganization)
+    );
+
+    if (shouldRescanEligibility && profile.family_profile) {
+      void eligibilityService.runScan(userId).catch((err) => {
+        console.error('[UserService] Eligibility rescan failed:', err);
+      });
+    }
+
+    return profile;
   }
 
   async getFamilyProfile(userId: string) {

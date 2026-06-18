@@ -1,6 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { sendEmail } from '../../config/email';
 import { formatUserName } from '../../utils/name.utils';
+import { decimalToNumber } from '../../utils/decimal.utils';
 /**
  * Government Contact Ingestion & Caching Strategy
  * Supports scalable dynamic routing for email composition.
@@ -108,11 +109,12 @@ Do not include any placeholder brackets like [Name] in your final output, use th
 Keep the email structured, clear, and focused on application submission.`;
 
     const applicantName = formatUserName(application.user);
+    const monthlyIncome = decimalToNumber(application.user.family_profile.monthly_income);
     const userPrompt = `Draft an application submission email for ${applicantName} applying to ${program.name}.
 Agency: ${program.agency}
 Applicant Profile:
 - Household Size: ${application.user.family_profile.household_size}
-- Income: $${application.user.family_profile.monthly_income}/month
+- Income: $${monthlyIncome}/month
 - Address: ${application.user.family_profile.city}, ${application.user.state}
 - Documents Attached: ${docsToAttach.length > 0 ? docsToAttach.map(d => d.display_name).join(', ') : 'None'}
 

@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
+import { useAuthStore } from "@/store/auth.store";
 import { filterStatesByCodes, mergeStateCodes, normalizeStateCodesFromApi, resolveStateCode } from "@/lib/us-states";
 import {
   buildYearFilterOptions,
@@ -60,8 +61,11 @@ export default function BenefitsPage() {
   const [availableStateCodes, setAvailableStateCodes] = useState<string[]>([]);
   const hasAutoSelectedProfileState = useRef(false);
   const userChoseAllStates = useRef(false);
+  const prevProfileStateRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { user } = useAuthStore();
+  const authProfileState = resolveStateCode(user?.state ?? null) ?? null;
 
   const {
     generatingPdfId,
@@ -108,7 +112,6 @@ export default function BenefitsPage() {
     queryKey: ["eligibility-results", filterParams],
     queryFn: () =>
       api.get("/api/eligibility/results", { params: filterParams }).then((r) => r.data.data),
-    placeholderData: (previousData) => previousData,
     // Poll every 5 seconds while AI explanations are still being generated
     refetchInterval: (query) => (query.state.data?.aiProcessing ? 5000 : false),
   });
@@ -164,11 +167,23 @@ export default function BenefitsPage() {
   }, [data?.availableStates]);
 
   useEffect(() => {
-    if (profileState && !hasAutoSelectedProfileState.current) {
-      setSelectedState(profileState);
+    const nextProfileState = profileState ?? authProfileState;
+    if (!nextProfileState) return;
+
+    const previousProfileState = prevProfileStateRef.current;
+    if (
+      previousProfileState &&
+      previousProfileState !== nextProfileState &&
+      !userChoseAllStates.current
+    ) {
+      setSelectedState(nextProfileState);
+    } else if (!hasAutoSelectedProfileState.current) {
+      setSelectedState(nextProfileState);
       hasAutoSelectedProfileState.current = true;
     }
-  }, [profileState]);
+
+    prevProfileStateRef.current = nextProfileState;
+  }, [profileState, authProfileState]);
 
   const scanMutation = useMutation({
     mutationFn: () => api.post("/api/eligibility/scan"),

@@ -3,15 +3,15 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useState, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
   User,
   Lock,
   Save,
   ShieldAlert,
-  Sparkles,
   AlertTriangle,
   Calendar,
   Languages,
@@ -206,8 +206,6 @@ type PasswordForm = z.infer<typeof passwordSchema>;
 export default function ProfilePage() {
   const { user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
-  const [profileSuccess, setProfileSuccess] = useState(false);
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   const getFormDefaults = (currentUser: typeof user) => {
     return {
@@ -268,12 +266,14 @@ export default function ProfilePage() {
   const watchHousingStatus = profileForm.watch("housing_status");
   const watchNeedsChildcare = profileForm.watch("needs_childcare");
 
-  // Keep form fields synced with Zustand user state when it changes (e.g. after layout fetch)
+  const hasHydratedForm = useRef(false);
+
+  // Sync form once when profile data first loads (e.g. after dashboard layout fetch)
   useEffect(() => {
-    if (user) {
-      profileForm.reset(getFormDefaults(user));
-    }
-  }, [user]);
+    if (!user?.family_profile || hasHydratedForm.current) return;
+    profileForm.reset(getFormDefaults(user));
+    hasHydratedForm.current = true;
+  }, [user?.family_profile]);
 
   const profileMutation = useMutation({
     mutationFn: (data: ProfileForm) => {
@@ -292,21 +292,22 @@ export default function ProfilePage() {
       };
       return api.put("/api/user/profile", payload);
     },
-    onSuccess: async (res) => {
+    onSuccess: (res) => {
       updateUser(res.data.data);
-      setProfileSuccess(true);
-      setTimeout(() => setProfileSuccess(false), 3000);
+      toast.success("Profile saved");
 
-      // Trigger recalculation of benefit eligibility in the background
-      try {
-        await api.post("/api/eligibility/scan");
-        // Invalidate cached queries so layout/dashboard pages reload new database updates instantly
-        queryClient.invalidateQueries({ queryKey: ["eligibility-results"] });
-        queryClient.invalidateQueries({ queryKey: ["applications"] });
-        queryClient.invalidateQueries({ queryKey: ["deadlines"] });
-      } catch (err) {
-        console.error("Failed to rescan eligibility after profile update", err);
-      }
+      queryClient.invalidateQueries({
+        queryKey: ["eligibility-results"],
+        refetchType: "none",
+      });
+      queryClient.invalidateQueries({ queryKey: ["applications"], refetchType: "none" });
+      queryClient.invalidateQueries({ queryKey: ["deadlines"], refetchType: "none" });
+    },
+    onError: (error) => {
+      const message =
+        (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data
+          ?.error?.message || "Failed to save profile";
+      toast.error(message);
     },
   });
 
@@ -314,8 +315,13 @@ export default function ProfilePage() {
     mutationFn: (data: PasswordForm) => api.put("/api/auth/password", data),
     onSuccess: () => {
       passwordForm.reset();
-      setPasswordSuccess(true);
-      setTimeout(() => setPasswordSuccess(false), 3000);
+      toast.success("Password updated");
+    },
+    onError: (error) => {
+      const message =
+        (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data
+          ?.error?.message || "Password change failed";
+      toast.error(message);
     },
   });
 
@@ -364,13 +370,6 @@ export default function ProfilePage() {
         </CardHeader>
 
         <CardContent>
-          {profileSuccess && (
-            <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-600" />
-              Profile updated successfully! Benefit eligibility matches refreshed in the background.
-            </div>
-          )}
-
           <form
             onSubmit={profileForm.handleSubmit((data) => profileMutation.mutate(data))}
             className="space-y-8"
@@ -779,18 +778,6 @@ export default function ProfilePage() {
         </CardHeader>
 
         <CardContent>
-          {passwordSuccess && (
-            <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm">
-              ✓ Password changed successfully!
-            </div>
-          )}
-          {passwordMutation.isError && (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
-              {(passwordMutation.error as any)?.response?.data?.error?.message ||
-                "Password change failed"}
-            </div>
-          )}
-
           <form
             onSubmit={passwordForm.handleSubmit((data) => passwordMutation.mutate(data))}
             className="space-y-4"

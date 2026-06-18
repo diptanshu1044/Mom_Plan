@@ -8,6 +8,7 @@ import {
   isOrgAdmin,
 } from './partner-access';
 import { formatUserName, hasUserName } from '../../utils/name.utils';
+import { decimalToNumberOrNull } from '../../utils/decimal.utils';
 
 const PROGRAM_SHORT: Record<string, string> = {
   snap: 'SNAP',
@@ -421,7 +422,7 @@ export class PartnerCasesService {
         assigned_date: c.intake_date?.toISOString() ?? c.created_at.toISOString(),
       },
       eligibility: {
-        monthly_income: fp?.monthly_income ?? null,
+        monthly_income: decimalToNumberOrNull(fp?.monthly_income),
         income_threshold_pct: 185,
         eligible: true,
         last_verified: fp?.updated_at?.toISOString() ?? null,

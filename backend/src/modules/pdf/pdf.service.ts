@@ -9,6 +9,7 @@ import { Quarter } from '../programs/quarterDueDates.types';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { getPresignedDownloadUrl } from '../../config/s3';
 import { hasUserName, joinFullName, userNameSelect } from '../../utils/name.utils';
+import { decimalToNumber } from '../../utils/decimal.utils';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -54,6 +55,7 @@ export class PdfService {
 
     if (!user) throw new Error('User not found');
     const profile = user.family_profile;
+    const monthlyIncome = decimalToNumber(profile?.monthly_income);
 
     const program = await prisma.benefitProgram.findUnique({ where: { id: programId } });
     if (!program) throw new Error('Program not found');
@@ -88,7 +90,7 @@ export class PdfService {
         const ages = profile.children_ages as any;
         return Array.isArray(ages) && ages.length > 0;
       }
-      if (field === 'monthly_income') return profile.monthly_income !== null && profile.monthly_income >= 0;
+      if (field === 'monthly_income') return profile.monthly_income !== null && monthlyIncome >= 0;
       if (field === 'employment_status') return !!profile.employment_status;
       if (field === 'immigration_status') return !!profile.immigration_status;
       if (field === 'employer_name') return !!profile.employer_name;
@@ -160,6 +162,7 @@ export class PdfService {
     }
 
     const profile = user.family_profile;
+    const monthlyIncome = decimalToNumber(profile.monthly_income);
     const program = await prisma.benefitProgram.findUnique({ where: { id: programId } });
     if (!program) throw new Error('Benefit program not found.');
 
@@ -349,9 +352,9 @@ Write the eligibility summary for this applicant's application packet.`;
       drawRow('Marital Status:', this.slugToTitle(profile.marital_status || 'N/A'));
       drawRow('Employment Status:', this.slugToTitle(profile.employment_status || 'N/A'));
       if (profile.employer_name) drawRow('Employer:', profile.employer_name);
-      drawRow('Monthly Income:', this.formatCurrency(profile.monthly_income || 0));
-      drawRow('Annual Income:', this.formatCurrency((profile.monthly_income || 0) * 12));
-      drawRow('Federal Poverty Level %:', this.calculateFplPercentage(profile.household_size || 1, profile.monthly_income || 0));
+      drawRow('Monthly Income:', this.formatCurrency(monthlyIncome));
+      drawRow('Annual Income:', this.formatCurrency(monthlyIncome * 12));
+      drawRow('Federal Poverty Level %:', this.calculateFplPercentage(profile.household_size || 1, monthlyIncome));
 
       let incomeSourcesStr = 'N/A';
       if (profile.income_sources && Array.isArray(profile.income_sources)) {
