@@ -136,7 +136,7 @@ export default function ApplyModal({
   const [uploadError, setUploadError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const { data: applications } = useQuery({
+  const { data: applications, isLoading: applicationsLoading } = useQuery({
     queryKey: ["applications", pdfQuarter, pdfYear],
     queryFn: () =>
       api
@@ -242,7 +242,8 @@ export default function ApplyModal({
     };
 
     const initApplication = async () => {
-      // Check if an application already exists
+      if (applicationsLoading) return;
+
       const existing = (applications || []).find((a: any) => a.program_id === program.id);
       if (existing) {
         setApplicationId(existing.id);
@@ -265,10 +266,9 @@ export default function ApplyModal({
     if (!applicationId) {
       initApplication();
     } else {
-      // Find matching application to check for generated pdf
       loadDraft(applicationId);
     }
-  }, [isOpen, applicationId, program, applications]);
+  }, [isOpen, applicationId, program, applications, applicationsLoading]);
 
   // Reset modal state on close
   useEffect(() => {

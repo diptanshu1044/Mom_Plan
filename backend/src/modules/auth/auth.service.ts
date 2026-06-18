@@ -8,6 +8,10 @@ import { sendEmail } from '../../config/email';
 import { UserRole, UserPlan } from '@prisma/client';
 import { MotherOrgEnrollmentService } from '../partner/mother-org-enrollment.service';
 import { joinFullName } from '../../utils/name.utils';
+import {
+  isZipValidationEnabled,
+  zipValidationService,
+} from '../../services/zipValidation.service';
 
 const motherOrgEnrollment = new MotherOrgEnrollmentService();
 
@@ -131,6 +135,7 @@ export class AuthService {
     state?: string;
     city?: string;
     county?: string;
+    zip_code?: string;
   }) {
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
@@ -138,6 +143,25 @@ export class AuthService {
 
     if (existingUser) {
       throw new BadRequestError('Email is already registered');
+    }
+
+    const state = data.state?.trim();
+    const city = data.city?.trim();
+    const county = data.county?.trim();
+    const zip_code = data.zip_code?.trim();
+
+    if (!zip_code) {
+      throw new BadRequestError('ZIP code is required.');
+    }
+
+    let resolvedLocation: { zip_code: string; state: string; city: string };
+    if (isZipValidationEnabled()) {
+      resolvedLocation = await zipValidationService.resolveLocationFromZip(zip_code);
+    } else {
+      if (!state || !city) {
+        throw new BadRequestError('State and city are required.');
+      }
+      resolvedLocation = { zip_code, state, city };
     }
 
     const password_hash = await bcrypt.hash(data.password, 10);
@@ -154,25 +178,22 @@ export class AuthService {
         last_name,
         phone: data.phone,
         org_type: data.org_type || null,
-        state: data.state?.trim() || null,
+        state: resolvedLocation.state,
+        zip_code: resolvedLocation.zip_code,
       },
     });
 
-    const city = data.city?.trim();
-    const county = data.county?.trim();
-    const state = data.state?.trim();
-    if (city || county || state) {
-      await prisma.familyProfile.create({
-        data: {
-          user_id: user.id,
-          first_name,
-          last_name,
-          city: city || null,
-          county: county || null,
-          state: state || null,
-        },
-      });
-    }
+    await prisma.familyProfile.create({
+      data: {
+        user_id: user.id,
+        first_name,
+        last_name,
+        city: resolvedLocation.city,
+        county: county || null,
+        state: resolvedLocation.state,
+        zip_code: resolvedLocation.zip_code,
+      },
+    });
 
     if (data.org_id) {
       await motherOrgEnrollment.enrollUserInPartnerOrg(user.id, data.org_id);

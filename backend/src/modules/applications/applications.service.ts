@@ -16,6 +16,46 @@ function resolvePdfQuarterYearFilters(quarter?: string, year?: number) {
   return { quarter: resolvedQuarter, year: resolvedYear };
 }
 
+const APPLICATION_STATUS_RANK: Record<string, number> = {
+  approved: 7,
+  under_review: 6,
+  submitted: 5,
+  action_required: 4,
+  draft: 3,
+  rejected: 2,
+  withdrawn: 1,
+};
+
+function dedupeApplicationsByProgram<
+  T extends { id: string; program_id: string | null; status: string; last_updated_at: Date },
+>(applications: T[]): T[] {
+  const byProgram = new Map<string, T>();
+
+  for (const app of applications) {
+    if (!app.program_id) continue;
+
+    const existing = byProgram.get(app.program_id);
+    if (!existing) {
+      byProgram.set(app.program_id, app);
+      continue;
+    }
+
+    const existingRank = APPLICATION_STATUS_RANK[existing.status] ?? 0;
+    const appRank = APPLICATION_STATUS_RANK[app.status] ?? 0;
+    const existingTime = existing.last_updated_at.getTime();
+    const appTime = app.last_updated_at.getTime();
+
+    if (appRank > existingRank || (appRank === existingRank && appTime > existingTime)) {
+      byProgram.set(app.program_id, app);
+    }
+  }
+
+  const withoutProgram = applications.filter((app) => !app.program_id);
+  return [...byProgram.values(), ...withoutProgram].sort(
+    (a, b) => b.last_updated_at.getTime() - a.last_updated_at.getTime()
+  );
+}
+
 function generatedPdfsInclude(quarter?: string, year?: number, filterByQuarter = false) {
   const pdfWhere = filterByQuarter
     ? resolvePdfQuarterYearFilters(quarter, year)
@@ -42,7 +82,7 @@ export class ApplicationsService {
     );
 
     if (role === 'admin' || role === 'counselor') {
-      return prisma.application.findMany({
+      const applications = await prisma.application.findMany({
         include: {
           program: true,
           user: {
@@ -52,9 +92,10 @@ export class ApplicationsService {
         },
         orderBy: [{ priority: 'desc' }, { last_updated_at: 'desc' }],
       });
+      return dedupeApplicationsByProgram(applications);
     }
 
-    return prisma.application.findMany({
+    const applications = await prisma.application.findMany({
       where: { user_id: userId },
       include: {
         program: true,
@@ -62,6 +103,8 @@ export class ApplicationsService {
       },
       orderBy: { last_updated_at: 'desc' },
     });
+
+    return dedupeApplicationsByProgram(applications);
   }
 
   async getApplicationById(id: string, userId: string, role: UserRole) {
@@ -100,6 +143,21 @@ export class ApplicationsService {
 
     if (!program) {
       throw new NotFoundError('Benefit program not found');
+    }
+
+    const existing = await prisma.application.findFirst({
+      where: { user_id: userId, program_id: data.program_id },
+      orderBy: { last_updated_at: 'desc' },
+      include: {
+        program: true,
+        generated_pdfs: {
+          orderBy: { generated_at: 'desc' },
+        },
+      },
+    });
+
+    if (existing) {
+      return existing;
     }
 
     const application = await prisma.application.create({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,8 +44,8 @@ import {
   isValidUsPhoneDigits,
   normalizeUsPhoneDigits,
 } from "@/lib/phone";
-import { isZipValidationEnabled, normalizeZipInput, validateZip } from "@/services/zipValidation";
-import { useZipValidation } from "@/hooks/useZipValidation";
+import { ProfileLocationDisplay } from "@/components/profile/ProfileLocationDisplay";
+import { getUserLocationDefaults } from "@/hooks/useUserLocationDefaults";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
 
 /**
@@ -71,26 +71,6 @@ function parseDecimalToString(val: any): string {
   }
   return "";
 }
-
-const US_STATES = [
-  { value: "AL", label: "Alabama" }, { value: "AK", label: "Alaska" }, { value: "AZ", label: "Arizona" },
-  { value: "AR", label: "Arkansas" }, { value: "CA", label: "California" }, { value: "CO", label: "Colorado" },
-  { value: "CT", label: "Connecticut" }, { value: "DE", label: "Delaware" }, { value: "FL", label: "Florida" },
-  { value: "GA", label: "Georgia" }, { value: "HI", label: "Hawaii" }, { value: "ID", label: "Idaho" },
-  { value: "IL", label: "Illinois" }, { value: "IN", label: "Indiana" }, { value: "IA", label: "Iowa" },
-  { value: "KS", label: "Kansas" }, { value: "KY", label: "Kentucky" }, { value: "LA", label: "Louisiana" },
-  { value: "ME", label: "Maine" }, { value: "MD", label: "Maryland" }, { value: "MA", label: "Massachusetts" },
-  { value: "MI", label: "Michigan" }, { value: "MN", label: "Minnesota" }, { value: "MS", label: "Mississippi" },
-  { value: "MO", label: "Missouri" }, { value: "MT", label: "Montana" }, { value: "NE", label: "Nebraska" },
-  { value: "NV", label: "Nevada" }, { value: "NH", label: "New Hampshire" }, { value: "NJ", label: "New Jersey" },
-  { value: "NM", label: "New Mexico" }, { value: "NY", label: "New York" }, { value: "NC", label: "North Carolina" },
-  { value: "ND", label: "North Dakota" }, { value: "OH", label: "Ohio" }, { value: "OK", label: "Oklahoma" },
-  { value: "OR", label: "Oregon" }, { value: "PA", label: "Pennsylvania" }, { value: "RI", label: "Rhode Island" },
-  { value: "SC", label: "South Carolina" }, { value: "SD", label: "South Dakota" }, { value: "TN", label: "Tennessee" },
-  { value: "TX", label: "Texas" }, { value: "UT", label: "Utah" }, { value: "VT", label: "Vermont" },
-  { value: "VA", label: "Virginia" }, { value: "WA", label: "Washington" }, { value: "WV", label: "West Virginia" },
-  { value: "WI", label: "Wisconsin" }, { value: "WY", label: "Wyoming" },
-];
 
 const SECTIONS = [
   { id: 1, label: "Personal Info",  icon: User,       emoji: "🧍", color: "from-primary to-secondary" },
@@ -422,13 +402,19 @@ export default function EligibilityPage() {
   const [error, setError] = useState<string | null>(null);
   const [dobError, setDobError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
-  const [zipError, setZipError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [monthlyIncomeError, setMonthlyIncomeError] = useState<string | null>(null);
   const [monthlyRentError, setMonthlyRentError] = useState<string | null>(null);
   const [isFetchingProfile, setIsFetchingProfile] = useState(false);
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
   const router = useRouter();
+
+  const profileLocation = getUserLocationDefaults(user);
+  const hasProfileLocation =
+    Boolean(profileLocation.zip_code.trim()) &&
+    Boolean(profileLocation.state.trim()) &&
+    Boolean(profileLocation.city.trim());
 
   const [formData, setFormData] = useState({
     first_name: "",
@@ -439,9 +425,6 @@ export default function EligibilityPage() {
     email: "",
     preferred_language: "English",
     street_address: "",
-    city: "",
-    state: "GA",
-    zip_code: "",
     monthly_income: "",
     income_sources: [] as string[],
     employment_status: "full_time",
@@ -508,9 +491,6 @@ export default function EligibilityPage() {
           email: freshUser?.email || fp?.email || "",
           preferred_language: fp?.preferred_language || "English",
           street_address: fp?.street_address || "",
-          city: fp?.city || "",
-          state: freshUser?.state || fp?.state || "GA",
-          zip_code: freshUser?.zip_code || fp?.zip_code || "",
           monthly_income: parseDecimalToString(fp?.monthly_income),
           income_sources: (fp?.income_sources as string[]) || [],
           employment_status: fp?.employment_status || "full_time",
@@ -562,8 +542,6 @@ export default function EligibilityPage() {
             date_of_birth: dobStr,
             phone: normalizeUsPhoneDigits(user.phone || fp?.phone || ""),
             email: user.email || fp?.email || "",
-            state: user.state || fp?.state || "GA",
-            zip_code: user.zip_code || fp?.zip_code || "",
             monthly_income: parseDecimalToString(fp?.monthly_income),
             monthly_rent: parseDecimalToString(fp?.monthly_rent),
             monthly_utilities: parseDecimalToString(fp?.monthly_utilities),
@@ -616,45 +594,18 @@ export default function EligibilityPage() {
   const set = (field: string, value: any) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
 
-  const handleCityResolved = useCallback((city: string) => {
-    setFormData((prev) => (prev.city === city ? prev : { ...prev, city }));
-    setZipError(null);
-  }, []);
-
-  const handleCityCleared = useCallback(() => {
-    setFormData((prev) => (prev.city === "" ? prev : { ...prev, city: "" }));
-  }, []);
-
-  const zipValidation = useZipValidation({
-    zip: formData.zip_code,
-    state: formData.state,
-    onCityResolved: handleCityResolved,
-    onCityCleared: handleCityCleared,
-  });
-
-  const handleZipChange = (raw: string) => {
-    const normalized = normalizeZipInput(raw);
-    set("zip_code", normalized);
-    if (!normalized.trim()) {
-      setZipError(null);
+  const validateProfileLocation = (): boolean => {
+    if (!isAuthenticated) {
+      setLocationError(null);
+      return true;
     }
-  };
-
-  const validateZipForStep = (): boolean => {
-    if (!isZipValidationEnabled()) return true;
-    if (!formData.zip_code.trim()) {
-      setZipError("Please enter a valid US ZIP code.");
+    if (!hasProfileLocation) {
+      setLocationError(
+        "Your profile is missing location details. Add your ZIP code in Profile before running a scan."
+      );
       return false;
     }
-    if (zipValidation.isLoading) {
-      setZipError("Verifying ZIP code…");
-      return false;
-    }
-    if (!zipValidation.isVerified) {
-      setZipError(zipValidation.error || "Please enter a valid US ZIP code.");
-      return false;
-    }
-    setZipError(null);
+    setLocationError(null);
     return true;
   };
 
@@ -690,7 +641,7 @@ export default function EligibilityPage() {
   const validateStep1 = (): boolean => {
     if (!validateMotherDob()) return false;
     if (!validatePhone()) return false;
-    if (!validateZipForStep()) return false;
+    if (!validateProfileLocation()) return false;
     return true;
   };
 
@@ -792,23 +743,14 @@ export default function EligibilityPage() {
       setStep(1);
       return;
     }
-    if (!dataToSubmit.zip_code.trim() || !dataToSubmit.state) {
-      setZipError("Please enter a valid US ZIP code.");
+    if (isAuthenticated && !hasProfileLocation) {
+      setLocationError(
+        "Your profile is missing location details. Add your ZIP code in Profile before running a scan."
+      );
       setStep(1);
       return;
     }
-    if (isZipValidationEnabled()) {
-      const zipResult = await validateZip(dataToSubmit.zip_code, dataToSubmit.state);
-      if (!zipResult.valid) {
-        setZipError(zipResult.error || "Please enter a valid US ZIP code.");
-        setStep(1);
-        return;
-      }
-      if (zipResult.city) {
-        dataToSubmit.city = zipResult.city;
-      }
-    }
-    setZipError(null);
+    setLocationError(null);
     if (dataToSubmit.monthly_income === "") {
       setMonthlyIncomeError("Please enter your monthly income (enter 0 if you have no income).");
       setStep(2);
@@ -843,10 +785,7 @@ export default function EligibilityPage() {
         last_name: dataToSubmit.last_name || null,
         phone: formatPhoneForApi(dataToSubmit.phone) || undefined,
         email: dataToSubmit.email || undefined,
-        state: dataToSubmit.state || undefined,
-        zip_code: dataToSubmit.zip_code || undefined,
         street_address: dataToSubmit.street_address || undefined,
-        city: dataToSubmit.city || undefined,
         household_size: dataToSubmit.household_size,
         num_children: dataToSubmit.num_children,
         children_ages: ages,
@@ -1080,7 +1019,7 @@ export default function EligibilityPage() {
                   <div>
                     <h2 className="font-display font-bold text-xl text-white">{currentSection.label}</h2>
                     <p className="text-white/80 text-xs mt-0.5">
-                      {step === 1 && "Your state, identity, contact, and address."}
+                      {step === 1 && "Your identity, contact, and saved location."}
                       {step === 2 && "Income, savings, and child support drive eligibility for most programs."}
                       {step === 3 && "Your household composition."}
                       {step === 4 && "Housing costs and stability."}
@@ -1096,23 +1035,10 @@ export default function EligibilityPage() {
 
                 {step === 1 && (
                   <>
-                    <div>
-                      <FieldLabel sub="Programs, agencies, and application portals depend on your state.">
-                        Which state should we use for your benefits search? *
-                      </FieldLabel>
-                      <select
-                        value={formData.state}
-                        onChange={(e) => set("state", e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-outline-variant bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-sm transition-all font-medium text-on-surface"
-                      >
-                        <option value="" disabled>Select your state...</option>
-                        {US_STATES.map((s) => (
-                          <option key={s.value} value={s.value}>
-                            {s.label} ({s.value})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <ProfileLocationDisplay location={profileLocation} />
+                    {locationError && (
+                      <p className="text-xs text-red-600">{locationError}</p>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -1195,75 +1121,6 @@ export default function EligibilityPage() {
                     <div>
                       <FieldLabel>What's your street address? *</FieldLabel>
                       <Input placeholder="123 Main Street, Apt 4B" value={formData.street_address} onChange={(v) => set("street_address", v)} />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      {zipValidation.isEnabled ? (
-                        <>
-                          <div>
-                            <FieldLabel>And your ZIP code? *</FieldLabel>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                placeholder="78701"
-                                value={formData.zip_code}
-                                onChange={(e) => handleZipChange(e.target.value)}
-                                maxLength={10}
-                                inputMode="numeric"
-                                className={`w-full px-4 py-3 pr-10 rounded-xl border bg-white focus:ring-2 focus:ring-primary-100 outline-none text-sm transition-all font-medium text-on-surface placeholder:text-on-surface-variant/60 ${
-                                  zipError || zipValidation.error
-                                    ? "border-red-400 focus:border-red-400"
-                                    : zipValidation.isVerified
-                                      ? "border-emerald-500 focus:border-emerald-500"
-                                      : "border-outline-variant focus:border-primary-500"
-                                }`}
-                              />
-                              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
-                                {zipValidation.isLoading ? (
-                                  <Loader2 className="w-4 h-4 text-primary-500 animate-spin" />
-                                ) : zipValidation.isVerified ? (
-                                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                ) : null}
-                              </div>
-                            </div>
-                            {(zipError || zipValidation.error) && (
-                              <p className="text-xs text-red-600 mt-1.5">{zipError || zipValidation.error}</p>
-                            )}
-                            {zipValidation.isVerified && !zipError && !zipValidation.error && (
-                              <p className="text-xs text-emerald-600 mt-1.5 flex items-center gap-1">
-                                <Check className="w-3 h-3" /> ZIP code verified
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <FieldLabel>What city do you live in? *</FieldLabel>
-                            <Input
-                              placeholder="Filled automatically from ZIP"
-                              value={formData.city}
-                              onChange={() => {}}
-                              readOnly
-                              disabled
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div>
-                            <FieldLabel>What city do you live in? *</FieldLabel>
-                            <Input placeholder="Austin" value={formData.city} onChange={(v) => set("city", v)} />
-                          </div>
-                          <div>
-                            <FieldLabel>And your ZIP code? *</FieldLabel>
-                            <Input
-                              placeholder="78701"
-                              value={formData.zip_code}
-                              onChange={(v) => set("zip_code", v.replace(/\D/g, "").slice(0, 5))}
-                              maxLength={5}
-                              inputMode="numeric"
-                            />
-                          </div>
-                        </>
-                      )}
                     </div>
                   </>
                 )}
@@ -1669,11 +1526,7 @@ export default function EligibilityPage() {
                   <button
                     type="button"
                     onClick={handleNextStep}
-                    disabled={
-                      zipValidation.isEnabled &&
-                      step === 1 &&
-                      (zipValidation.isLoading || !zipValidation.isVerified)
-                    }
+                    disabled={isAuthenticated && step === 1 && !hasProfileLocation}
                     className="flex items-center gap-2 px-6 py-2.5 bg-gradient-primary text-white font-bold text-sm rounded-xl shadow-primary hover:shadow-primary-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-primary"
                   >
                     Next <ArrowRight className="w-4 h-4" />
@@ -1682,7 +1535,7 @@ export default function EligibilityPage() {
                   <button
                     type="button"
                     onClick={() => runScan()}
-                    disabled={zipValidation.isEnabled && (zipValidation.isLoading || !zipValidation.isVerified)}
+                    disabled={isAuthenticated && !hasProfileLocation}
                     className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
                   >
                     See Results <Sparkles className="w-4 h-4" />

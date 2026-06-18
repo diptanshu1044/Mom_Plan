@@ -274,20 +274,24 @@ The email should be ready to send as-is. End with "MomPlan Automations System" a
       console.log(`[Worker] Successfully processed Apply Now for application: ${applicationId}`);
     } catch (error: any) {
       console.error(`[Worker] Failed to process application ${applicationId}:`, error);
-      
-      // Create an error notification
+
+      await prisma.application.update({
+        where: { id: applicationId },
+        data: {
+          status: 'action_required',
+          notes: `Secure submission failed: ${error.message}`,
+        },
+      });
+
       await prisma.notification.create({
         data: {
           user_id: userId,
           type: 'system',
           title: 'Application Submission Failed',
-          message: `We encountered an error submitting your application. Our team has been notified. Error: ${error.message}`,
+          message: `We encountered an error submitting your application. Please try again or contact support. Error: ${error.message}`,
           related_application_id: applicationId,
         },
       });
-      
-      // Optionally rethrow if you want the API to fail immediately
-      // throw error; 
     }
   }
 }

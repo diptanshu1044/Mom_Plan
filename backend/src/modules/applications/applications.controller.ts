@@ -83,12 +83,11 @@ export class ApplicationsController {
       const { automationService } = require('../automation/automation.service');
       const { subject, body, to, attach_pdf, document_ids } = req.body;
 
-      // Update local status to under_review or action_required immediately to show progress
       const application = await applicationsService.updateApplication(
         req.params.id,
         req.user.id,
         req.user.role,
-        { status: 'under_review', notes: 'Automated application submission processing...' }
+        { status: 'submitted', notes: 'Secure application package sent to agency.' }
       );
 
       // Execute background task without BullMQ, pass custom subject/body/to and attach_pdf if edited, along with document_ids

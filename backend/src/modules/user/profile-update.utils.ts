@@ -94,6 +94,13 @@ export function profileUpdateAffectsEligibility(
     return true;
   }
 
+  if (
+    fieldChanged(existing, updates, 'zip_code', (profile) => profile.zip_code) &&
+    String(updates.zip_code ?? '') !== String(existing.zip_code ?? '')
+  ) {
+    return true;
+  }
+
   const eligibilityFields = [
     'household_size',
     'num_children',

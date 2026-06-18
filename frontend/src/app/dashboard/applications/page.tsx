@@ -203,6 +203,50 @@ export default function ApplicationsPage() {
                     </Button>
                   </div>
                 )}
+                {["submitted", "under_review"].includes(app.status) && (
+                  <div className="mt-3 pt-3 border-t border-surface-container-highest flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>
+                        Secure application sent
+                        {app.submitted_at
+                          ? ` on ${formatDate(app.submitted_at, "MMM d, yyyy")}`
+                          : ""}
+                      </span>
+                    </div>
+                    {app.generated_pdfs && app.generated_pdfs.length > 0 && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => viewPdf(app.generated_pdfs[0].id)}
+                          disabled={!!isViewing || !!isDownloading}
+                          loading={isViewing === app.generated_pdfs[0].id}
+                        >
+                          <Eye className="w-3.5 h-3.5 mr-1" />
+                          View Package
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            downloadPdf(app.generated_pdfs[0].id, {
+                              programName: app.program?.name,
+                              quarter: app.generated_pdfs[0].quarter,
+                              year: app.generated_pdfs[0].year,
+                              version: app.generated_pdfs[0].version,
+                            })
+                          }
+                          disabled={!!isViewing || !!isDownloading}
+                          loading={isDownloading === app.generated_pdfs[0].id}
+                        >
+                          <Download className="w-3.5 h-3.5 mr-1" />
+                          Download
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {app.generated_pdfs && app.generated_pdfs.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-surface-container-highest flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5 text-xs text-on-surface-variant font-medium">

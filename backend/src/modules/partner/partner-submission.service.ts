@@ -1,4 +1,7 @@
 import { prisma } from '../../config/prisma';
+import { MotherOrgEnrollmentService } from './mother-org-enrollment.service';
+
+const motherOrgEnrollment = new MotherOrgEnrollmentService();
 
 function currentQuarter(): string {
   const m = new Date().getMonth();
@@ -49,11 +52,15 @@ export async function syncPartnerPortalOnSecureSubmission(params: {
 
   if (!application?.program_id || !application.user?.org_id) return;
 
-  const mother = application.user.mother_profile;
+  const orgId = application.user.org_id;
+  let mother =
+    application.user.mother_profile ??
+    (await motherOrgEnrollment.ensureMotherForOrg(params.userId, orgId));
+
   if (!mother) return;
 
-  const orgId = application.user.org_id;
   const submittedAt = new Date();
+  const quarter = currentQuarter();
   const resolvedDocIds = [...new Set(params.documentIds)];
 
   const submission = await prisma.applicationSubmission.create({
@@ -78,6 +85,15 @@ export async function syncPartnerPortalOnSecureSubmission(params: {
     orderBy: { created_at: 'desc' },
   });
 
+  const caseUpdateData = {
+    application_id: params.applicationId,
+    secure_submitted_at: submittedAt,
+    status: 'submitted' as const,
+    last_activity: submittedAt,
+    quarter,
+    caseworker_id: mother.caseworker_id,
+  };
+
   if (!partnerCase) {
     partnerCase = await prisma.partnerCase.create({
       data: {
@@ -86,7 +102,7 @@ export async function syncPartnerPortalOnSecureSubmission(params: {
         program_id: application.program_id,
         status: 'submitted',
         urgency_level: 'normal',
-        quarter: currentQuarter(),
+        quarter,
         intake_date: new Date(),
         application_id: params.applicationId,
         secure_submitted_at: submittedAt,
@@ -108,10 +124,8 @@ export async function syncPartnerPortalOnSecureSubmission(params: {
     partnerCase = await prisma.partnerCase.update({
       where: { id: partnerCase.id },
       data: {
-        application_id: params.applicationId,
-        secure_submitted_at: submittedAt,
+        ...caseUpdateData,
         status: partnerCase.status === 'approved' ? 'approved' : 'submitted',
-        last_activity: submittedAt,
       },
     });
 
@@ -126,19 +140,19 @@ export async function syncPartnerPortalOnSecureSubmission(params: {
         },
       });
     }
-
-    await prisma.communication.create({
-      data: {
-        case_id: partnerCase.id,
-        sent_by: null,
-        type: 'application_submitted',
-        channel: 'email',
-        message: `Secure application package sent for ${application.program?.name ?? 'benefit program'}`,
-        sent_at: submittedAt,
-        delivery_status: 'sent',
-      },
-    });
   }
+
+  await prisma.communication.create({
+    data: {
+      case_id: partnerCase.id,
+      sent_by: null,
+      type: 'application_submitted',
+      channel: 'email',
+      message: `Secure application package sent for ${application.program?.name ?? 'benefit program'}`,
+      sent_at: submittedAt,
+      delivery_status: 'sent',
+    },
+  });
 
   await prisma.caseDocument.deleteMany({ where: { case_id: partnerCase.id } });
 

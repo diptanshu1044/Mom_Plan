@@ -18,6 +18,8 @@ export interface AuthUser {
   phone?: string;
   state?: string;
   zip_code?: string;
+  city?: string | null;
+  county?: string | null;
   profile_picture?: string;
   org_type?: string | null;
   org_id?: string;

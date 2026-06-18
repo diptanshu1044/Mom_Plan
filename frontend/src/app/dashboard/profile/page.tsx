@@ -27,11 +27,12 @@ import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { PlanBadge } from "@/components/ui/Badge";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
+import { LocationFields, type UseLocationFieldsResult } from "@/components/profile/LocationFields";
 import { formatPhoneForApi, normalizeUsPhoneDigits } from "@/lib/phone";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { formatUserName, userInitials } from "@/lib/name";
-import { US_STATES } from "@/lib/us-states";
+import { getUserLocationDefaults } from "@/hooks/useUserLocationDefaults";
 
 /**
  * Safely converts a Prisma Decimal, number, or string to a string for form inputs.
@@ -205,16 +206,17 @@ export default function ProfilePage() {
   const queryClient = useQueryClient();
 
   const getFormDefaults = (currentUser: typeof user) => {
+    const locationDefaults = getUserLocationDefaults(currentUser);
     return {
       first_name: currentUser?.first_name || "",
       middle_name: currentUser?.middle_name || "",
       last_name: currentUser?.last_name || "",
       email: currentUser?.email || "",
       phone: normalizeUsPhoneDigits(currentUser?.phone || ""),
-      state: currentUser?.state || currentUser?.family_profile?.state || "",
-      city: currentUser?.family_profile?.city || "",
-      county: currentUser?.family_profile?.county || "",
-      zip_code: currentUser?.zip_code || currentUser?.family_profile?.zip_code || "",
+      state: locationDefaults.state,
+      city: locationDefaults.city,
+      county: locationDefaults.county,
+      zip_code: locationDefaults.zip_code,
       profile_picture: currentUser?.profile_picture || "",
       org_type: currentUser?.org_type || "",
       org_id: currentUser?.org_id || "",
@@ -264,9 +266,12 @@ export default function ProfilePage() {
   // Watch fields to dynamically show conditional inputs
   const watchHousingStatus = profileForm.watch("housing_status");
   const watchNeedsChildcare = profileForm.watch("needs_childcare");
-  const watchState = profileForm.watch("state", "");
-  const watchCity = profileForm.watch("city", "");
-  const watchCounty = profileForm.watch("county", "");
+  const watchState = profileForm.watch("state") || "";
+  const watchCity = profileForm.watch("city") || "";
+  const watchCounty = profileForm.watch("county") || "";
+  const watchZipCode = profileForm.watch("zip_code") || "";
+
+  const locationValidationRef = useRef<UseLocationFieldsResult | null>(null);
 
   const clearPartnerOrgSelection = () => {
     profileForm.setValue("org_id", "", { shouldValidate: true });
@@ -378,7 +383,16 @@ export default function ProfilePage() {
 
         <CardContent>
           <form
-            onSubmit={profileForm.handleSubmit((data) => profileMutation.mutate(data))}
+            onSubmit={profileForm.handleSubmit((data) => {
+              if (!locationValidationRef.current?.validate()) {
+                toast.error(
+                  locationValidationRef.current?.getValidationError() ||
+                    "Please verify your state, city, and ZIP code."
+                );
+                return;
+              }
+              profileMutation.mutate(data);
+            })}
             className="space-y-8"
           >
             {/* Section 1: Basic Info */}
@@ -426,60 +440,37 @@ export default function ProfilePage() {
                   autoComplete="tel-national"
                   {...profileForm.register("phone")}
                 />
-                <div>
-                  <label className="block text-sm font-medium text-on-surface mb-1.5">
-                    State
-                  </label>
-                  <select
-                    {...profileForm.register("state", {
-                      onChange: clearPartnerOrgSelection,
-                    })}
-                    className={`w-full px-3 py-2.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                      profileForm.formState.errors.state
-                        ? "border-red-400"
-                        : "border-outline-variant/60"
-                    }`}
-                    autoComplete="address-level1"
-                  >
-                    <option value="">Select your state…</option>
-                    {US_STATES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label} ({s.value})
-                      </option>
-                    ))}
-                  </select>
-                  {profileForm.formState.errors.state?.message && (
-                    <p className="text-xs text-red-600 mt-1">
-                      {profileForm.formState.errors.state.message}
-                    </p>
-                  )}
-                </div>
-                <Input
-                  label="Zip Code"
-                  placeholder="30303"
-                  maxLength={5}
-                  numericOnly={true}
-                  {...profileForm.register("zip_code")}
-                />
-                <Input
-                  label="City"
-                  type="text"
-                  placeholder="Atlanta"
-                  autoComplete="address-level2"
-                  error={profileForm.formState.errors.city?.message}
-                  {...profileForm.register("city", {
-                    onChange: clearPartnerOrgSelection,
-                  })}
+                <LocationFields
+                  sectionTitle="Where do you live?"
+                  values={{
+                    state: watchState,
+                    city: watchCity,
+                    zip: watchZipCode,
+                  }}
+                  onChange={(field, value) => {
+                    const formField = field === "zip" ? "zip_code" : field;
+                    profileForm.setValue(formField, value, { shouldValidate: true });
+                  }}
+                  errors={{
+                    state: profileForm.formState.errors.state?.message,
+                    city: profileForm.formState.errors.city?.message,
+                    zip: profileForm.formState.errors.zip_code?.message,
+                  }}
+                  requireZip
+                  lockDerivedFields
+                  onLocationChange={clearPartnerOrgSelection}
+                  validationRef={locationValidationRef}
+                  className="sm:col-span-2"
                 />
                 <Input
                   label="County"
                   type="text"
                   placeholder="Fulton"
-                  hint="The county where you live"
+                  hint="Set during signup — update your ZIP in Profile to refresh location"
+                  readOnly
+                  disabled
+                  value={watchCounty}
                   error={profileForm.formState.errors.county?.message}
-                  {...profileForm.register("county", {
-                    onChange: clearPartnerOrgSelection,
-                  })}
                 />
                 <Input
                   label="Date of Birth"

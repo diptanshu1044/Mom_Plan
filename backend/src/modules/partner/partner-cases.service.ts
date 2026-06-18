@@ -6,6 +6,7 @@ import {
   motherOrgWhere,
   OrgAccessContext,
   isOrgAdmin,
+  secureSubmittedCaseWhere,
 } from './partner-access';
 import { formatUserName, hasUserName } from '../../utils/name.utils';
 import { decimalToNumberOrNull } from '../../utils/decimal.utils';
@@ -303,6 +304,7 @@ export class PartnerCasesService {
     const cases = await prisma.partnerCase.findMany({
       where: {
         ...caseListWhere(ctx, caseworkerFilter),
+        ...secureSubmittedCaseWhere(),
         ...(filters.quarter ? { quarter: filters.quarter.toUpperCase() } : {}),
         ...(filters.status && filters.status !== 'all' ? { status: filters.status } : {}),
         ...(filters.program && filters.program !== 'all' ? { program_id: filters.program } : {}),
@@ -465,7 +467,7 @@ export class PartnerCasesService {
     const { start } = quarterDateRange(q, y);
 
     const cases = await prisma.partnerCase.findMany({
-      where: { ...caseListWhere(ctx), quarter: q },
+      where: { ...caseListWhere(ctx), ...secureSubmittedCaseWhere(), quarter: q },
       include: {
         deadlines: { where: { is_resolved: false } },
         documents: true,

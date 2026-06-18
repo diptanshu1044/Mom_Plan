@@ -30,11 +30,21 @@ function serializeProfile(user: any): any {
       : user.organization,
   };
 
-  if (!serialized.family_profile) return serialized;
+  if (!serialized.family_profile) {
+    return {
+      ...serialized,
+      city: null,
+      county: null,
+    };
+  }
 
   const fp = serialized.family_profile;
   return {
     ...serialized,
+    city: fp.city ?? null,
+    county: fp.county ?? null,
+    state: serialized.state ?? fp.state ?? null,
+    zip_code: serialized.zip_code ?? fp.zip_code ?? null,
     family_profile: {
       ...fp,
       monthly_rent: decimalToNumberOrNull(fp.monthly_rent),
@@ -114,28 +124,58 @@ export class UserService {
     }
 
     const parsedDob = date_of_birth ? new Date(date_of_birth) : undefined;
-    const normalizedData = {
+    const normalizedData: Record<string, unknown> = {
       ...data,
       ...(date_of_birth !== undefined && { date_of_birth: parsedDob }),
     };
 
+    // Location is authoritative from ZIP — ignore direct state/city/county edits.
+    delete normalizedData.state;
+    delete normalizedData.city;
+    delete normalizedData.county;
+
+    const zipChanging =
+      zip_code !== undefined &&
+      String(zip_code ?? '').trim() !== String(existingProfile.zip_code ?? '').trim();
+
+    if (zipChanging) {
+      const trimmedZip = String(zip_code ?? '').trim();
+      if (!trimmedZip) {
+        throw new BadRequestError('ZIP code is required.');
+      }
+      if (isZipValidationEnabled()) {
+        const resolved = await zipValidationService.resolveLocationFromZip(trimmedZip);
+        normalizedData.zip_code = resolved.zip_code;
+        normalizedData.state = resolved.state;
+        normalizedData.city = resolved.city;
+      } else {
+        normalizedData.zip_code = trimmedZip;
+      }
+    } else if (zip_code !== undefined) {
+      delete normalizedData.zip_code;
+    }
+
     const shouldRescanEligibility = profileUpdateAffectsEligibility(existingProfile, normalizedData);
 
-    const touchesAddress = [zip_code, state, street_address, city].some((v) => v !== undefined);
-    if (touchesAddress && isZipValidationEnabled()) {
-      const effectiveZip = zip_code !== undefined ? zip_code : existingProfile.zip_code;
-      const effectiveState = state !== undefined ? state : existingProfile.state;
+    const effectiveZip = (normalizedData.zip_code as string | undefined) ?? existingProfile.zip_code;
+    const effectiveState =
+      (normalizedData.state as string | undefined) ?? existingProfile.state;
+    const effectiveCity =
+      (normalizedData.city as string | undefined) ?? existingProfile.family_profile?.city;
 
-      if (effectiveZip && effectiveState) {
-        const zipResult = await zipValidationService.validateZip(
-          String(effectiveZip),
-          String(effectiveState)
-        );
-        if (!zipResult.valid) {
-          throw new BadRequestError(zipResult.error || 'Invalid ZIP code.');
-        }
-      } else if (zip_code || street_address || city) {
-        throw new BadRequestError('ZIP code and state are required for address validation.');
+    if (
+      zipChanging &&
+      isZipValidationEnabled() &&
+      effectiveZip &&
+      effectiveState
+    ) {
+      const zipResult = await zipValidationService.validateZip(
+        String(effectiveZip),
+        String(effectiveState),
+        effectiveCity ? String(effectiveCity) : undefined
+      );
+      if (!zipResult.valid) {
+        throw new BadRequestError(zipResult.error || 'Invalid ZIP code.');
       }
     }
 

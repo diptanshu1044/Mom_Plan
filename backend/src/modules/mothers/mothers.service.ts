@@ -63,7 +63,15 @@ const motherInclude = {
 export class MothersService {
   async listMothers(ctx: OrgAccessContext, filters: { caseworker?: string; search?: string }) {
     const mothers = await prisma.mother.findMany({
-      where: motherListWhere(ctx, filters.caseworker),
+      where: {
+        ...motherListWhere(ctx, filters.caseworker),
+        cases: {
+          some: {
+            ...orgCaseloadCaseWhere(ctx.orgId),
+            secure_submitted_at: { not: null },
+          },
+        },
+      },
       include: motherInclude,
       orderBy: { created_at: 'desc' },
     });
@@ -88,10 +96,12 @@ export class MothersService {
       include: {
         ...motherInclude,
         cases: {
-          where:
-            ctx.role === 'admin'
+          where: {
+            secure_submitted_at: { not: null },
+            ...(ctx.role === 'admin'
               ? orgCaseloadCaseWhere(ctx.orgId)
-              : { mother: { caseworker_id: ctx.orgUserId } },
+              : { mother: { caseworker_id: ctx.orgUserId } }),
+          },
           include: {
             program: true,
             caseworker: { select: { id: true, full_name: true } },

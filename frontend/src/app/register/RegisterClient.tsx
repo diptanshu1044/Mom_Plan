@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
@@ -14,10 +14,11 @@ import { Input } from "@/components/ui/Input";
 import { SignupBgPattern } from "@/components/signup/SignupBgPattern";
 import { SignupBrandPill } from "@/components/signup/SignupBrandPill";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
+import { LocationFields, type UseLocationFieldsResult } from "@/components/profile/LocationFields";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/errors";
-import { US_STATES } from "@/lib/us-states";
+import { useUserLocationDefaults } from "@/hooks/useUserLocationDefaults";
 
 const registerSchema = z
   .object({
@@ -33,6 +34,7 @@ const registerSchema = z
       }),
     state: z.string().trim().min(1, "State is required"),
     city: z.string().trim().min(1, "City is required"),
+    zip_code: z.string().trim().min(1, "ZIP code is required"),
     county: z.string().trim().min(1, "County is required"),
     org_type: z.string().optional(),
     org_id: z
@@ -72,6 +74,8 @@ function RegisterForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirect");
 
+  const locationDefaults = useUserLocationDefaults();
+
   const {
     register,
     handleSubmit,
@@ -81,16 +85,32 @@ function RegisterForm() {
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
+    defaultValues: {
+      state: locationDefaults.state,
+      city: locationDefaults.city,
+      zip_code: locationDefaults.zip_code,
+      county: locationDefaults.county,
+    },
   });
 
   const password = watch("password", "");
   const strength = passwordStrength(password || "");
   const state = watch("state", "");
   const city = watch("city", "");
+  const zip_code = watch("zip_code", "");
   const county = watch("county", "");
+
+  const locationValidationRef = useRef<UseLocationFieldsResult | null>(null);
 
   const onSubmit = async (data: RegisterFormData) => {
     setError("");
+    if (!locationValidationRef.current?.validate()) {
+      setError(
+        locationValidationRef.current?.getValidationError() ||
+          "Please verify your state, city, and ZIP code."
+      );
+      return;
+    }
     try {
       const response = await api.post("/api/auth/register", {
         first_name: data.first_name,
@@ -101,6 +121,7 @@ function RegisterForm() {
         phone: data.phone ? `+1${data.phone}` : undefined,
         state: data.state,
         city: data.city,
+        zip_code: data.zip_code,
         county: data.county,
         org_type: data.org_type || undefined,
         org_id: data.org_id || undefined,
@@ -231,65 +252,45 @@ function RegisterForm() {
                 {...register("phone")}
               />
 
-              <div>
-                <label className="block text-sm font-medium text-on-surface mb-1.5">
-                  State <span className="text-red-500">*</span>
-                </label>
-                <select
-                  {...register("state", {
-                    onChange: () => {
-                      setValue("org_id", "");
-                      setValue("org_type", "");
-                    },
-                  })}
-                  className={`w-full px-3 py-2.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                    errors.state ? "border-red-400" : "border-outline-variant/60"
-                  }`}
-                  autoComplete="address-level1"
-                >
-                  <option value="">Select your state…</option>
-                  {US_STATES.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label} ({s.value})
-                    </option>
-                  ))}
-                </select>
-                {errors.state?.message && (
-                  <p className="text-xs text-red-600 mt-1">{errors.state.message}</p>
-                )}
-              </div>
+              <LocationFields
+                sectionTitle="Where do you live?"
+                values={{ state, city, zip: zip_code }}
+                onChange={(field, value) => {
+                  const formField = field === "zip" ? "zip_code" : field;
+                  setValue(formField, value, { shouldValidate: true });
+                  if (field === "state" || field === "city") {
+                    setValue("org_id", "");
+                    setValue("org_type", "");
+                  }
+                }}
+                errors={{
+                  state: errors.state?.message,
+                  city: errors.city?.message,
+                  zip: errors.zip_code?.message,
+                }}
+                requireZip
+                lockDerivedFields
+                validationRef={locationValidationRef}
+                onLocationChange={() => {
+                  setValue("org_id", "");
+                  setValue("org_type", "");
+                }}
+              />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
-                  label="City"
-                  type="text"
-                  placeholder="Atlanta"
-                  required
-                  autoComplete="address-level2"
-                  error={errors.city?.message}
-                  {...register("city", {
-                    onChange: () => {
-                      setValue("org_id", "");
-                      setValue("org_type", "");
-                    },
-                  })}
-                />
-
-                <Input
-                  label="County"
-                  type="text"
-                  placeholder="Fulton"
-                  required
-                  hint="The county where you live"
-                  error={errors.county?.message}
-                  {...register("county", {
-                    onChange: () => {
-                      setValue("org_id", "");
-                      setValue("org_type", "");
-                    },
-                  })}
-                />
-              </div>
+              <Input
+                label="County"
+                type="text"
+                placeholder="Fulton"
+                required
+                hint="The county where you live"
+                error={errors.county?.message}
+                {...register("county", {
+                  onChange: () => {
+                    setValue("org_id", "");
+                    setValue("org_type", "");
+                  },
+                })}
+              />
 
               <Controller
                 name="org_id"
