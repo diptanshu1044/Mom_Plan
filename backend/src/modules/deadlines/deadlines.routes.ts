@@ -15,6 +15,11 @@ const deadlinesController = withControllerLog(new DeadlinesController(), 'deadli
 router.use(authenticate);
 
 router.get('/dashboard', validate(dashboardQuerySchema), deadlinesController.getDashboard);
+router.get(
+  '/dashboard/submitted',
+  validate(dashboardQuerySchema),
+  deadlinesController.getSubmittedApplicationsDashboard
+);
 router.get('/', deadlinesController.listDeadlines);
 router.post('/', validate(createDeadlineSchema), deadlinesController.createDeadline);
 router.put('/:id/complete', validate(deadlineIdParamSchema), deadlinesController.completeDeadline);

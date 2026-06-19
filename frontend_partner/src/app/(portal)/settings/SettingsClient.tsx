@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useRef } from "react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,12 +19,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BillingSettings } from "@/components/billing/BillingSettings";
+import {
+  LocationFields,
+  type UseLocationFieldsResult,
+} from "@/components/location/LocationFields";
 import { initials } from "@/lib/utils";
+import { formatPhoneForApi, normalizeUsPhoneDigits, optionalUsPhoneFieldSchema } from "@/lib/phone";
 
 const profileSchema = z.object({
   full_name: z.string().min(2),
   email: z.string().email(),
-  phone: z.string().optional(),
+  phone: optionalUsPhoneFieldSchema,
   title: z.string().optional(),
 });
 
@@ -32,8 +37,13 @@ const orgSchema = z.object({
   name: z.string().min(2),
   website: z.string().url().or(z.literal("")),
   description: z.string().max(1000).optional(),
-  phone: z.string().optional(),
+  phone: optionalUsPhoneFieldSchema,
   email: z.string().email().or(z.literal("")),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
+  county: z.string().optional(),
 });
 
 type ProfileData = z.infer<typeof profileSchema>;
@@ -62,17 +72,18 @@ function SettingSection({
 export function SettingsClient() {
   const searchParams = useSearchParams();
   const defaultTab = searchParams.get("tab") === "billing" ? "billing" : "profile";
-  const { user, organization, updateUser } = usePartnerAuthStore();
+  const { user, organization, updateUser, setOrganization } = usePartnerAuthStore();
   const { toast } = useToast();
   const [savedProfile, setSavedProfile] = useState(false);
   const [savedOrg, setSavedOrg] = useState(false);
+  const locationValidationRef = useRef<UseLocationFieldsResult | null>(null);
 
   const profileForm = useForm<ProfileData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       full_name: user?.full_name ?? "",
       email: user?.email ?? "",
-      phone: user?.phone ?? "",
+      phone: normalizeUsPhoneDigits(user?.phone ?? ""),
       title: user?.title ?? "",
     },
   });
@@ -83,15 +94,26 @@ export function SettingsClient() {
       name: organization?.name ?? "",
       website: organization?.website ?? "",
       description: organization?.description ?? "",
-      phone: organization?.phone ?? "",
+      phone: normalizeUsPhoneDigits(organization?.phone ?? ""),
       email: organization?.email ?? "",
+      address: organization?.address ?? "",
+      city: organization?.city ?? "",
+      state: organization?.state ?? "",
+      zip: organization?.zip ?? "",
+      county: organization?.county ?? "",
     },
   });
 
+  const watchState = orgForm.watch("state") || "";
+  const watchCity = orgForm.watch("city") || "";
+  const watchZip = orgForm.watch("zip") || "";
+  const watchCounty = orgForm.watch("county") || "";
+
   const saveProfile = async (data: ProfileData) => {
     try {
-      await api.patch("/api/partner/profile", data);
-      updateUser(data);
+      const payload = { ...data, phone: formatPhoneForApi(data.phone ?? "") ?? "" };
+      await api.patch("/api/partner/profile", payload);
+      updateUser(payload);
       setSavedProfile(true);
       toast({ title: "Profile updated", variant: "success" });
       setTimeout(() => setSavedProfile(false), 3000);
@@ -101,8 +123,21 @@ export function SettingsClient() {
   };
 
   const saveOrg = async (data: OrgData) => {
+    if (!locationValidationRef.current?.validate()) {
+      toast({
+        variant: "destructive",
+        title: "Location verification required",
+        description:
+          locationValidationRef.current?.getValidationError() ||
+          "Please verify your state, city, and ZIP code.",
+      });
+      return;
+    }
     try {
-      await api.patch(`/api/partner/organizations/${organization?.id}`, data);
+      const payload = { ...data, phone: formatPhoneForApi(data.phone ?? "") ?? "" };
+      const response = await api.patch("/api/partner/organization", payload);
+      const updatedOrg = response.data.data.organization;
+      setOrganization(updatedOrg);
       setSavedOrg(true);
       toast({ title: "Organization updated", variant: "success" });
       setTimeout(() => setSavedOrg(false), 3000);
@@ -168,7 +203,20 @@ export function SettingsClient() {
                     </div>
                     <div className="space-y-1.5">
                       <Label>Phone Number</Label>
-                      <Input {...profileForm.register("phone")} type="tel" placeholder="+1 (555) 000-0000" />
+                      <Input
+                        {...profileForm.register("phone")}
+                        type="tel"
+                        inputMode="numeric"
+                        numericOnly
+                        prefix="+1"
+                        placeholder="5550000000"
+                        maxLength={10}
+                        autoComplete="tel-national"
+                        error={!!profileForm.formState.errors.phone}
+                      />
+                      {profileForm.formState.errors.phone && (
+                        <p className="text-xs text-status-error">{profileForm.formState.errors.phone.message}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex justify-end">
@@ -202,7 +250,20 @@ export function SettingsClient() {
                     </div>
                     <div className="space-y-1.5">
                       <Label>Phone</Label>
-                      <Input {...orgForm.register("phone")} type="tel" />
+                      <Input
+                        {...orgForm.register("phone")}
+                        type="tel"
+                        inputMode="numeric"
+                        numericOnly
+                        prefix="+1"
+                        placeholder="5550000000"
+                        maxLength={10}
+                        autoComplete="tel-national"
+                        error={!!orgForm.formState.errors.phone}
+                      />
+                      {orgForm.formState.errors.phone && (
+                        <p className="text-xs text-status-error">{orgForm.formState.errors.phone.message}</p>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-1.5">
@@ -213,6 +274,41 @@ export function SettingsClient() {
                     <Label>Mission / Description</Label>
                     <Textarea {...orgForm.register("description")} rows={4} />
                   </div>
+
+                  <div className="pt-4 border-t border-surface-border space-y-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-text-dark">Location</h4>
+                      <p className="text-xs text-text-soft mt-0.5">
+                        Your organization&apos;s physical address and service location.
+                      </p>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Street Address</Label>
+                      <Input {...orgForm.register("address")} placeholder="123 Lavender Lane, Suite 200" />
+                    </div>
+                    <LocationFields
+                      values={{ state: watchState, city: watchCity, zip: watchZip }}
+                      onChange={(field, value) => {
+                        orgForm.setValue(field, value, { shouldValidate: true });
+                      }}
+                      requireZip
+                      lockDerivedFields
+                      validationRef={locationValidationRef}
+                    />
+                    <div className="space-y-1.5">
+                      <Label>County</Label>
+                      <Input
+                        value={watchCounty}
+                        readOnly
+                        disabled
+                        placeholder="Fulton"
+                      />
+                      <p className="text-xs text-text-soft">
+                        Set during signup — contact support to update your county.
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="flex justify-end">
                     <Button type="submit" loading={orgForm.formState.isSubmitting} className="gap-2">
                       {savedOrg ? <><Check className="w-4 h-4" /> Saved!</> : <><Save className="w-4 h-4" /> Save Changes</>}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -30,6 +30,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { initials } from "@/lib/utils";
+import { formatPhoneForApi, normalizeUsPhoneDigits, optionalUsPhoneFieldSchema } from "@/lib/phone";
+import {
+  LocationFields,
+  type UseLocationFieldsResult,
+} from "@/components/location/LocationFields";
 
 // ---- Steps ----
 
@@ -83,12 +88,13 @@ const profileSchema = z.object({
 
 const locationSchema = z.object({
   address: z.string().min(2),
-  city: z.string().min(1),
-  state: z.string().optional(),
-  zip: z.string().optional(),
+  city: z.string().trim().min(1, "City is required"),
+  state: z.string().trim().min(1, "State is required"),
+  zip: z.string().trim().min(1, "ZIP code is required"),
+  county: z.string().trim().min(1, "County is required"),
   country: z.string().optional(),
   email: z.string().email().or(z.literal("")).optional(),
-  phone: z.string().optional(),
+  phone: optionalUsPhoneFieldSchema,
   service_area: z.string().optional(),
 });
 
@@ -280,6 +286,7 @@ export function OnboardingClient() {
   const [completed, setCompleted] = useState<Set<number>>(new Set());
   const [draft, setDraft] = useState<DraftData>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const locationValidationRef = useRef<UseLocationFieldsResult | null>(null);
 
   const { user, organization } = usePartnerAuthStore();
   const { toast } = useToast();
@@ -325,9 +332,10 @@ export function OnboardingClient() {
       city: organization?.city ?? draft.location?.city ?? "",
       state: organization?.state ?? draft.location?.state ?? "",
       zip: organization?.zip ?? draft.location?.zip ?? "",
+      county: organization?.county ?? draft.location?.county ?? "",
       country: organization?.country ?? draft.location?.country ?? "United States",
       email: (organization as any)?.contact_email ?? organization?.email ?? draft.location?.email ?? "",
-      phone: organization?.phone ?? draft.location?.phone ?? "",
+      phone: normalizeUsPhoneDigits(organization?.phone ?? draft.location?.phone ?? ""),
       service_area: draft.location?.service_area ?? "",
     },
   });
@@ -360,6 +368,16 @@ export function OnboardingClient() {
   };
 
   const handleLocation = async (data: LocationData) => {
+    if (!locationValidationRef.current?.validate()) {
+      toast({
+        variant: "destructive",
+        title: "Location verification required",
+        description:
+          locationValidationRef.current?.getValidationError() ||
+          "Please verify your state, city, and ZIP code.",
+      });
+      return;
+    }
     saveDraft({ location: data });
     markComplete(1);
     setCurrentStep(2);
@@ -385,6 +403,7 @@ export function OnboardingClient() {
         ...draft.location,
         ...draft.team,
         ...draft.pref,
+        phone: formatPhoneForApi(draft.location?.phone ?? "") ?? undefined,
       });
       try {
         localStorage.removeItem(DRAFT_KEY);
@@ -508,28 +527,52 @@ export function OnboardingClient() {
                     <FormField label="Street Address" required error={locationForm.formState.errors.address?.message}>
                       <Input {...locationForm.register("address")} placeholder="123 Lavender Lane, Suite 200" />
                     </FormField>
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField label="City" required error={locationForm.formState.errors.city?.message}>
-                        <Input {...locationForm.register("city")} placeholder="Springfield" />
-                      </FormField>
-                      <FormField label="State">
-                        <Input {...locationForm.register("state")} placeholder="IL" />
-                      </FormField>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField label="ZIP Code">
-                        <Input {...locationForm.register("zip")} placeholder="62701" />
-                      </FormField>
-                      <FormField label="Country">
-                        <Input {...locationForm.register("country")} placeholder="United States" />
-                      </FormField>
-                    </div>
+                    <LocationFields
+                      sectionTitle="Organization location"
+                      values={{
+                        state: locationForm.watch("state") ?? "",
+                        city: locationForm.watch("city") ?? "",
+                        zip: locationForm.watch("zip") ?? "",
+                      }}
+                      onChange={(field, value) => {
+                        locationForm.setValue(field, value, { shouldValidate: true });
+                      }}
+                      errors={{
+                        state: locationForm.formState.errors.state?.message,
+                        city: locationForm.formState.errors.city?.message,
+                        zip: locationForm.formState.errors.zip?.message,
+                      }}
+                      requireZip
+                      lockDerivedFields
+                      validationRef={locationValidationRef}
+                    />
+                    <FormField
+                      label="County"
+                      required
+                      hint="The county where your organization is located"
+                      error={locationForm.formState.errors.county?.message}
+                    >
+                      <Input {...locationForm.register("county")} placeholder="Fulton" />
+                    </FormField>
+                    <FormField label="Country">
+                      <Input {...locationForm.register("country")} placeholder="United States" />
+                    </FormField>
                     <div className="grid grid-cols-2 gap-4">
                       <FormField label="Contact Email" error={locationForm.formState.errors.email?.message}>
                         <Input {...locationForm.register("email")} type="email" placeholder="hello@yourorg.com" />
                       </FormField>
-                      <FormField label="Phone">
-                        <Input {...locationForm.register("phone")} type="tel" placeholder="+1 (555) 000-0000" />
+                      <FormField label="Phone" error={locationForm.formState.errors.phone?.message}>
+                        <Input
+                          {...locationForm.register("phone")}
+                          type="tel"
+                          inputMode="numeric"
+                          numericOnly
+                          prefix="+1"
+                          placeholder="5550000000"
+                          maxLength={10}
+                          autoComplete="tel-national"
+                          error={!!locationForm.formState.errors.phone}
+                        />
                       </FormField>
                     </div>
                     <FormField label="Service Area" hint="Counties, cities, or regions you serve">

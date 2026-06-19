@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,15 +18,14 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { initials } from "@/lib/utils";
 import { getMotherPortalUrl } from "@/lib/portal-urls";
+import {
+  LocationFields,
+  type UseLocationFieldsResult,
+} from "@/components/location/LocationFields";
+import { formatPhoneForApi, optionalUsPhoneFieldSchema } from "@/lib/phone";
+import { ORG_TYPES } from "@/lib/org-types";
 
 // ---- Constants ----
-
-const ORG_TYPES = [
-  "Non-profit (501c3)",
-  "Government Agency",
-  "Cooperative",
-  "Other",
-] as const;
 
 const EMP_RANGES = [
   "1-10",
@@ -58,16 +57,19 @@ const step0Schema = z.object({
 
 const step1Schema = z.object({
   email: z.string().email("Please enter a valid email"),
-  phone: z.string().optional(),
+  phone: optionalUsPhoneFieldSchema,
   address: z.string().min(3, "Street address is required"),
-  city: z.string().min(1, "City is required"),
-  state: z.string().optional(),
-  zip: z.string().optional(),
+  city: z.string().trim().min(1, "City is required"),
+  state: z.string().trim().min(1, "State is required"),
+  zip: z.string().trim().min(1, "ZIP code is required"),
+  county: z.string().trim().min(1, "County is required"),
   country: z.string().optional(),
 });
 
 const step2Schema = z.object({
-  adminName: z.string().min(2, "Full name is required"),
+  adminFirstName: z.string().trim().min(1, "First name is required"),
+  adminMiddleName: z.string().trim().optional(),
+  adminLastName: z.string().trim().min(1, "Last name is required"),
   adminEmail: z.string().email("Please enter a valid email"),
   adminPassword: z.string().min(8, "Password must be at least 8 characters"),
   employees: z.string().optional(),
@@ -260,6 +262,8 @@ export function SignupClient() {
   // Step 2 form
   const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema) });
 
+  const locationValidationRef = useRef<UseLocationFieldsResult | null>(null);
+
   // Preview state — updated from form0/form1 values
   const [preview, setPreview] = useState({
     orgName: "",
@@ -281,6 +285,16 @@ export function SignupClient() {
   };
 
   const handleStep1 = async (data: Step1Data) => {
+    if (!locationValidationRef.current?.validate()) {
+      toast({
+        variant: "destructive",
+        title: "Location verification required",
+        description:
+          locationValidationRef.current?.getValidationError() ||
+          "Please verify your state, city, and ZIP code.",
+      });
+      return;
+    }
     setStep1Data(data);
     updatePreview({ city: data.city, state: data.state ?? "" });
     setStep(2);
@@ -297,14 +311,17 @@ export function SignupClient() {
         description: step0Data.description,
         // contact
         email: step1Data.email,
-        phone: step1Data.phone,
+        phone: formatPhoneForApi(step1Data.phone ?? ""),
         address: step1Data.address,
         city: step1Data.city,
         state: step1Data.state,
         zip: step1Data.zip,
+        county: step1Data.county,
         country: step1Data.country,
         // admin account
-        adminName: data.adminName,
+        adminFirstName: data.adminFirstName,
+        adminMiddleName: data.adminMiddleName,
+        adminLastName: data.adminLastName,
         adminEmail: data.adminEmail,
         adminPassword: data.adminPassword,
         employees: data.employees,
@@ -592,11 +609,20 @@ export function SignupClient() {
                         error={!!form1.formState.errors.email}
                       />
                     </Field>
-                    <Field label="Phone Number">
+                    <Field
+                      label="Phone Number"
+                      error={form1.formState.errors.phone?.message}
+                    >
                       <Input
                         {...form1.register("phone")}
                         type="tel"
-                        placeholder="+1 (555) 000-0000"
+                        inputMode="numeric"
+                        numericOnly
+                        prefix="+1"
+                        placeholder="5550000000"
+                        maxLength={10}
+                        autoComplete="tel-national"
+                        error={!!form1.formState.errors.phone}
                       />
                     </Field>
                   </div>
@@ -613,42 +639,48 @@ export function SignupClient() {
                     />
                   </Field>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <Field
-                      label="City"
-                      required
-                      error={form1.formState.errors.city?.message}
-                    >
-                      <Input
-                        {...form1.register("city")}
-                        placeholder="Springfield"
-                        error={!!form1.formState.errors.city}
-                        onChange={(e) => {
-                          form1.register("city").onChange(e);
-                          updatePreview({ city: e.target.value });
-                        }}
-                      />
-                    </Field>
-                    <Field label="State / Province">
-                      <Input
-                        {...form1.register("state")}
-                        placeholder="IL"
-                        onChange={(e) => {
-                          form1.register("state").onChange(e);
-                          updatePreview({ state: e.target.value });
-                        }}
-                      />
-                    </Field>
-                  </div>
+                  <LocationFields
+                    sectionTitle="Where is your organization located?"
+                    values={{
+                      state: form1.watch("state") ?? "",
+                      city: form1.watch("city") ?? "",
+                      zip: form1.watch("zip") ?? "",
+                    }}
+                    onChange={(field, value) => {
+                      form1.setValue(field, value, { shouldValidate: true });
+                      if (field === "city" || field === "state") {
+                        updatePreview({
+                          city: field === "city" ? value : form1.watch("city") ?? "",
+                          state: field === "state" ? value : form1.watch("state") ?? "",
+                        });
+                      }
+                    }}
+                    errors={{
+                      state: form1.formState.errors.state?.message,
+                      city: form1.formState.errors.city?.message,
+                      zip: form1.formState.errors.zip?.message,
+                    }}
+                    requireZip
+                    lockDerivedFields
+                    validationRef={locationValidationRef}
+                  />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <Field label="ZIP / Postal Code">
-                      <Input {...form1.register("zip")} placeholder="62701" />
-                    </Field>
-                    <Field label="Country">
-                      <Input {...form1.register("country")} placeholder="United States" />
-                    </Field>
-                  </div>
+                  <Field
+                    label="County"
+                    required
+                    hint="The county where your organization is located"
+                    error={form1.formState.errors.county?.message}
+                  >
+                    <Input
+                      {...form1.register("county")}
+                      placeholder="Fulton"
+                      error={!!form1.formState.errors.county}
+                    />
+                  </Field>
+
+                  <Field label="Country">
+                    <Input {...form1.register("country")} placeholder="United States" />
+                  </Field>
 
                   <StepNav step={step} onBack={goBack} isLast={false} isLoading={form1.formState.isSubmitting} />
                 </form>
@@ -657,31 +689,57 @@ export function SignupClient() {
               {/* Step 2 — Account Setup */}
               {step === 2 && (
                 <form onSubmit={form2.handleSubmit(handleStep2)} className="space-y-0">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <Field
-                      label="Your Full Name"
+                      label="First Name"
                       required
-                      error={form2.formState.errors.adminName?.message}
+                      error={form2.formState.errors.adminFirstName?.message}
                     >
                       <Input
-                        {...form2.register("adminName")}
-                        placeholder="Jane Smith"
-                        error={!!form2.formState.errors.adminName}
+                        {...form2.register("adminFirstName")}
+                        placeholder="Jane"
+                        autoComplete="given-name"
+                        error={!!form2.formState.errors.adminFirstName}
                       />
                     </Field>
                     <Field
-                      label="Admin Email"
-                      required
-                      error={form2.formState.errors.adminEmail?.message}
+                      label="Middle Name"
+                      error={form2.formState.errors.adminMiddleName?.message}
                     >
                       <Input
-                        {...form2.register("adminEmail")}
-                        type="email"
-                        placeholder="jane@yourorg.com"
-                        error={!!form2.formState.errors.adminEmail}
+                        {...form2.register("adminMiddleName")}
+                        placeholder="Marie"
+                        autoComplete="additional-name"
+                        error={!!form2.formState.errors.adminMiddleName}
+                      />
+                    </Field>
+                    <Field
+                      label="Last Name"
+                      required
+                      error={form2.formState.errors.adminLastName?.message}
+                    >
+                      <Input
+                        {...form2.register("adminLastName")}
+                        placeholder="Smith"
+                        autoComplete="family-name"
+                        error={!!form2.formState.errors.adminLastName}
                       />
                     </Field>
                   </div>
+
+                  <Field
+                    label="Admin Email"
+                    required
+                    error={form2.formState.errors.adminEmail?.message}
+                  >
+                    <Input
+                      {...form2.register("adminEmail")}
+                      type="email"
+                      placeholder="jane@yourorg.com"
+                      autoComplete="email"
+                      error={!!form2.formState.errors.adminEmail}
+                    />
+                  </Field>
 
                   <Field
                     label="Password"

@@ -555,6 +555,7 @@ model Organization {
   city               String?             @default("Atlanta")
   state              String?             @default("GA")
   zip_code           String?
+  county             String?
   counties_served    String[]            @default([])
   populations_served String[]            @default([])
   languages_served   String[]            @default([])
@@ -904,10 +905,23 @@ model StatusHistory {
 }
 
 enum OrganizationType {
-  nonprofit_501c3   @map("Non-profit (501c3)")
-  government_agency @map("Government Agency")
-  cooperative       @map("Cooperative")
-  other             @map("Other")
+  nonprofit_501c3          @map("Non-profit (501c3)")
+  government_agency        @map("Government Agency")
+  cooperative              @map("Cooperative")
+  other                    @map("Other")
+  network_211              @map("211 Network")
+  childcare_provider       @map("Childcare Provider")
+  dv_coalition             @map("DV Coalition")
+  education_nonprofit      @map("Education Nonprofit")
+  emergency_shelter        @map("Emergency Shelter")
+  faith_based              @map("Faith-Based")
+  food_bank                @map("Food Bank")
+  health_clinic            @map("Health Clinic")
+  housing_nonprofit        @map("Housing Nonprofit")
+  immigration_nonprofit    @map("Immigration Nonprofit")
+  legal_aid                @map("Legal Aid")
+  workforce_development    @map("Workforce Development")
+  wraparound_nonprofit     @map("Wraparound Nonprofit")
 }
 
 enum UserRole {

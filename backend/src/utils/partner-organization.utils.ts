@@ -11,6 +11,7 @@ export type PartnerOrganization = {
   city: string | null;
   state: string | null;
   zip: string | null;
+  county: string | null;
   country: string | null;
   contact_email: string | null;
   employees: string | null;
@@ -39,6 +40,7 @@ export function toPartnerOrganization(org: Organization): PartnerOrganization {
     city: org.city,
     state: org.state,
     zip: org.zip_code,
+    county: org.county,
     country: org.country,
     contact_email: org.contact_email ?? org.email,
     employees: org.employees,

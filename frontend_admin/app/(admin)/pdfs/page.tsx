@@ -43,7 +43,11 @@ export default function PdfsPage() {
   ) => {
     setLoadingPdfId(pdfId);
     try {
-      const safeName = (programName || "Application").replace(/\s+/g, "_");
+      const safeName = (programName || "Application")
+        .replace(/\s+/g, "_")
+        .replace(/[^A-Za-z0-9._-]/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_|_$/g, "") || "Application";
       const quarterPart = quarter && year ? `_${quarter}_${year}` : "";
       const fallbackName = `${safeName}_Package${quarterPart}_v${(version ?? 0) + 1}.pdf`;
       const response = await api.get(`/api/pdf/${pdfId}/download/stream`, {

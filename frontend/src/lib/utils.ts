@@ -245,13 +245,23 @@ export function formatPdfQuarterYear(pdf: { quarter?: string | null; year?: numb
   return "";
 }
 
+function sanitizeFilenamePart(value: string): string {
+  return (
+    value
+      .replace(/\s+/g, "_")
+      .replace(/[^A-Za-z0-9._-]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "") || "Application"
+  );
+}
+
 export function formatPdfFilename(
   programName: string,
   quarter?: string | null,
   year?: number | null,
   version?: number
 ): string {
-  const safeName = (programName || "Application").replace(/\s+/g, "_");
+  const safeName = sanitizeFilenamePart(programName || "Application");
   const quarterPart = quarter && year ? `_${quarter}_${year}` : "";
   const versionPart = version != null ? `_v${version}` : "";
   return `${safeName}_Package${quarterPart}${versionPart}.pdf`;

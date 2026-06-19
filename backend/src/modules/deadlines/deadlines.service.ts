@@ -11,6 +11,8 @@ import {
   buildQuarterDueDatesByProgramAndYear,
   getAvailableYearsFromProgramYearMap,
   getPrimaryDueDateForProgram,
+  getQuarterForMonth,
+  programHasMatchingQuarterData,
 } from '../programs/quarterDueDates.service';
 import { Quarter } from '../programs/quarterDueDates.types';
 
@@ -71,6 +73,145 @@ function sortDashboardItems(items: DeadlineDashboardItem[]): DeadlineDashboardIt
   });
 }
 
+type DashboardProgram = {
+  id: string;
+  name: string;
+  federal_or_state: string | null;
+};
+
+const VALID_QUARTERS: Quarter[] = ['Q1', 'Q2', 'Q3', 'Q4'];
+
+function isValidQuarter(value: string | null | undefined): value is Quarter {
+  return typeof value === 'string' && VALID_QUARTERS.includes(value as Quarter);
+}
+
+type ApplicationQuarterContext = {
+  submitted_at: Date | null;
+  submissions: Array<{
+    generated_pdf: { quarter: string | null; year: number | null } | null;
+  }>;
+  generated_pdfs: Array<{ quarter: string | null; year: number | null }>;
+};
+
+function resolveApplicationQuarterYear(
+  application: ApplicationQuarterContext
+): { quarter: Quarter; year: number } | null {
+  for (const submission of application.submissions) {
+    const pdf = submission.generated_pdf;
+    if (pdf?.quarter && pdf.year && isValidQuarter(pdf.quarter)) {
+      return { quarter: pdf.quarter, year: pdf.year };
+    }
+  }
+
+  for (const pdf of application.generated_pdfs) {
+    if (pdf.quarter && pdf.year && isValidQuarter(pdf.quarter)) {
+      return { quarter: pdf.quarter, year: pdf.year };
+    }
+  }
+
+  if (application.submitted_at) {
+    return {
+      quarter: getQuarterForMonth(application.submitted_at.getUTCMonth() + 1),
+      year: application.submitted_at.getUTCFullYear(),
+    };
+  }
+
+  return null;
+}
+
+function applicationMatchesDashboardFilters(
+  application: ApplicationQuarterContext,
+  filters: DeadlineDashboardFilters
+): boolean {
+  const resolved = resolveApplicationQuarterYear(application);
+  if (!resolved) return false;
+  if (resolved.quarter !== filters.quarter) return false;
+  if (filters.year !== 'all' && resolved.year !== filters.year) return false;
+  return true;
+}
+
+function buildQuarterRecordsWhere(
+  programIds: string[],
+  filters: DeadlineDashboardFilters
+) {
+  return {
+    program_id: { in: programIds },
+    quarter: filters.quarter,
+    ...(filters.year !== 'all' ? { year: filters.year } : {}),
+  };
+}
+
+function buildDashboardResponseForPrograms(
+  programs: DashboardProgram[],
+  filters: DeadlineDashboardFilters,
+  quarterRecords: Array<{
+    program_id: string;
+    year: number;
+    quarter: string;
+    due_dates_json: unknown;
+  }>
+): DeadlineDashboardResponse {
+  const recordsByProgramAndYear = buildQuarterDueDatesByProgramAndYear(quarterRecords);
+  const availableYears = getAvailableYearsFromProgramYearMap(recordsByProgramAndYear);
+
+  const recordsByProgram = new Map<string, typeof quarterRecords>();
+  for (const record of quarterRecords) {
+    const existing = recordsByProgram.get(record.program_id) ?? [];
+    existing.push(record);
+    recordsByProgram.set(record.program_id, existing);
+  }
+
+  const referenceDate = new Date();
+  const items: DeadlineDashboardItem[] = [];
+
+  for (const program of programs) {
+    const records = recordsByProgram.get(program.id) ?? [];
+    const nextDueDate = getPrimaryDueDateForProgram(
+      records.map((record) => ({
+        year: record.year,
+        quarter: record.quarter as Quarter,
+        due_dates_json: record.due_dates_json,
+      })),
+      filters.year,
+      filters.quarter,
+      referenceDate
+    );
+
+    if (!nextDueDate) continue;
+
+    const daysRemaining = computeDaysRemaining(nextDueDate, referenceDate);
+    const status = computeDeadlineStatus(daysRemaining);
+    const federalOrState = (program.federal_or_state ?? 'unknown').toLowerCase();
+
+    items.push({
+      programId: program.id,
+      programName: program.name,
+      federalOrState,
+      nextDueDate,
+      daysRemaining,
+      status,
+    });
+  }
+
+  const uniqueByProgram = new Map<string, DeadlineDashboardItem>();
+  for (const item of items) {
+    const existing = uniqueByProgram.get(item.programId);
+    if (!existing) {
+      uniqueByProgram.set(item.programId, item);
+      continue;
+    }
+
+    if (item.daysRemaining < existing.daysRemaining) {
+      uniqueByProgram.set(item.programId, item);
+    }
+  }
+
+  return {
+    items: sortDashboardItems([...uniqueByProgram.values()]),
+    availableYears,
+  };
+}
+
 export class DeadlinesService {
   async getDashboard(
     userId: string,
@@ -124,71 +265,98 @@ export class DeadlinesService {
       return { items: [], availableYears: [] };
     }
 
-    const referenceDate = new Date();
     const quarterRecords = await prisma.programQuarterDueDate.findMany({
-      where: { program_id: { in: programIds } },
+      where: buildQuarterRecordsWhere(programIds, filters),
     });
 
     const recordsByProgramAndYear = buildQuarterDueDatesByProgramAndYear(quarterRecords);
-    const availableYears = getAvailableYearsFromProgramYearMap(recordsByProgramAndYear);
 
-    const recordsByProgram = new Map<string, typeof quarterRecords>();
-    for (const record of quarterRecords) {
-      const existing = recordsByProgram.get(record.program_id) ?? [];
-      existing.push(record);
-      recordsByProgram.set(record.program_id, existing);
-    }
-
-    const items: DeadlineDashboardItem[] = [];
-
-    for (const result of scopedResults) {
-      if (!result.program) continue;
-
-      const records = recordsByProgram.get(result.program.id) ?? [];
-      const nextDueDate = getPrimaryDueDateForProgram(
-        records.map((record) => ({
-          year: record.year,
-          quarter: record.quarter as Quarter,
-          due_dates_json: record.due_dates_json,
-        })),
-        filters.year,
-        filters.quarter,
-        referenceDate
-      );
-
-      if (!nextDueDate) continue;
-
-      const daysRemaining = computeDaysRemaining(nextDueDate, referenceDate);
-      const status = computeDeadlineStatus(daysRemaining);
-      const federalOrState = (result.program.federal_or_state ?? 'unknown').toLowerCase();
-
-      items.push({
-        programId: result.program.id,
-        programName: result.program.name,
-        federalOrState,
-        nextDueDate,
-        daysRemaining,
-        status,
+    const programs = scopedResults
+      .map((result) => result.program)
+      .filter((program): program is NonNullable<typeof program> => {
+        if (!program) return false;
+        return programHasMatchingQuarterData(
+          recordsByProgramAndYear.get(program.id),
+          filters.year,
+          filters.quarter
+        );
       });
+
+    return buildDashboardResponseForPrograms(programs, filters, quarterRecords);
+  }
+
+  async getSubmittedApplicationsDashboard(
+    userId: string,
+    filters: DeadlineDashboardFilters
+  ): Promise<DeadlineDashboardResponse> {
+    const applications = await prisma.application.findMany({
+      where: {
+        user_id: userId,
+        program_id: { not: null },
+        OR: [
+          { submissions: { some: {} } },
+          {
+            status: 'submitted',
+            notes: { contains: 'Secure application' },
+          },
+        ],
+      },
+      include: {
+        program: {
+          select: {
+            id: true,
+            name: true,
+            federal_or_state: true,
+          },
+        },
+        submissions: {
+          orderBy: { submitted_at: 'desc' },
+          include: {
+            generated_pdf: {
+              select: { quarter: true, year: true },
+            },
+          },
+        },
+        generated_pdfs: {
+          where: { quarter: { not: null }, year: { not: null } },
+          orderBy: { generated_at: 'desc' },
+          select: { quarter: true, year: true },
+        },
+      },
+      orderBy: { submitted_at: 'desc' },
+    });
+
+    const matchingApplications = applications.filter((application) =>
+      applicationMatchesDashboardFilters(application, filters)
+    );
+
+    const programsById = new Map<string, DashboardProgram>();
+    for (const application of matchingApplications) {
+      const program = application.program;
+      if (!program) continue;
+      if (!programsById.has(program.id)) {
+        programsById.set(program.id, program);
+      }
     }
 
-    const uniqueByProgram = new Map<string, DeadlineDashboardItem>();
-    for (const item of items) {
-      const existing = uniqueByProgram.get(item.programId);
-      if (!existing) {
-        uniqueByProgram.set(item.programId, item);
-        continue;
-      }
+    let programs = [...programsById.values()];
 
-      if (item.daysRemaining < existing.daysRemaining) {
-        uniqueByProgram.set(item.programId, item);
-      }
+    if (filters.type === 'federal') {
+      programs = programs.filter((program) => isFederalProgram(program));
+    } else if (filters.type === 'state') {
+      programs = programs.filter((program) => !isFederalProgram(program));
     }
 
-    return {
-      items: sortDashboardItems([...uniqueByProgram.values()]),
-      availableYears,
-    };
+    if (programs.length === 0) {
+      return { items: [], availableYears: [] };
+    }
+
+    const programIds = programs.map((program) => program.id);
+    const quarterRecords = await prisma.programQuarterDueDate.findMany({
+      where: buildQuarterRecordsWhere(programIds, filters),
+    });
+
+    return buildDashboardResponseForPrograms(programs, filters, quarterRecords);
   }
 
   async listDeadlines(userId: string, role: UserRole) {

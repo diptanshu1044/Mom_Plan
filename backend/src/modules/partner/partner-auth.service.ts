@@ -4,12 +4,13 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../config/prisma';
 import { env } from '../../config/env';
 import { BadRequestError, UnauthorizedError } from '../../utils/errors';
-import { splitFullName } from '../../utils/name.utils';
-import { ORG_TYPE_LABELS, parseOrgType } from '../../constants/org-types';
+import { joinFullName } from '../../utils/name.utils';
+import { ORG_TYPE_LABELS, orgTypeSlug, parseOrgType } from '../../constants/org-types';
 import {
   PartnerOrganization,
   toPartnerOrganization,
 } from '../../utils/partner-organization.utils';
+import { resolveLocationInput } from '../../utils/location-input.utils';
 
 // ---- Token helpers ----
 
@@ -96,8 +97,11 @@ export class PartnerAuthService {
     city: string;
     state?: string;
     zip?: string;
+    county?: string;
     country?: string;
-    adminName: string;
+    adminFirstName: string;
+    adminMiddleName?: string;
+    adminLastName: string;
     adminEmail: string;
     adminPassword: string;
     employees?: string;
@@ -117,21 +121,33 @@ export class PartnerAuthService {
       throw new BadRequestError('Invalid organization type');
     }
 
+    const county = data.county?.trim();
+    if (!county) {
+      throw new BadRequestError('County is required.');
+    }
+
+    const resolvedLocation = await resolveLocationInput({
+      zip: data.zip,
+      state: data.state,
+      city: data.city,
+    });
+
     // Create org + admin in a transaction
     const { org, adminUser } = await prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({
         data: {
           org_name:      data.orgName,
           category:      ORG_TYPE_LABELS[orgType],
-          org_type:      orgType,
+          org_type:      orgTypeSlug(orgType),
           website:       data.website || null,
           description:   data.description || null,
           purpose:       data.description || null,
           phone:         data.phone || null,
           address:       data.address,
-          city:          data.city,
-          state:         data.state || null,
-          zip_code:      data.zip || null,
+          city:          resolvedLocation.city,
+          state:         resolvedLocation.state,
+          zip_code:      resolvedLocation.zip_code,
+          county:        county,
           country:       data.country || null,
           contact_email: data.email,
           email:         data.email,
@@ -142,9 +158,14 @@ export class PartnerAuthService {
         },
       });
 
+      const firstName = data.adminFirstName.trim();
+      const middleName = data.adminMiddleName?.trim() || null;
+      const lastName = data.adminLastName.trim();
+      const fullName = joinFullName(firstName, middleName, lastName);
+
       const adminUser = await tx.orgUser.create({
         data: {
-          full_name:     data.adminName,
+          full_name:     fullName,
           email:         data.adminEmail,
           password_hash,
           role:          'admin',
@@ -154,13 +175,12 @@ export class PartnerAuthService {
         },
       });
 
-      const nameParts = splitFullName(adminUser.full_name);
       const billingUser = await tx.user.create({
         data: {
           email: adminUser.email,
-          first_name: nameParts.first_name,
-          middle_name: nameParts.middle_name,
-          last_name: nameParts.last_name,
+          first_name: firstName,
+          middle_name: middleName,
+          last_name: lastName,
           org_id: org.id,
         },
       });

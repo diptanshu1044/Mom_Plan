@@ -24,13 +24,22 @@ export interface ValidationReport {
   can_generate: boolean;
 }
 
+/** HTTP Content-Disposition filenames must be ASCII — strip unicode punctuation (e.g. em dashes). */
+export function sanitizeFilenamePart(value: string): string {
+  return value
+    .replace(/\s+/g, '_')
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '') || 'Application';
+}
+
 export function buildPdfFilename(
   programName: string,
   quarter: string | null | undefined,
   year: number | null | undefined,
   version: number
 ): string {
-  const safeName = (programName || 'Application').replace(/\s+/g, '_');
+  const safeName = sanitizeFilenamePart(programName || 'Application');
   const quarterPart = quarter && year ? `_${quarter}_${year}` : '';
   return `${safeName}_Package${quarterPart}_v${version}.pdf`;
 }

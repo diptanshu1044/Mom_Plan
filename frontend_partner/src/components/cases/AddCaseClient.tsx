@@ -23,12 +23,13 @@ import {
 } from "@/components/ui/select";
 import { currentQuarter } from "@/components/cases/QuarterTabs";
 import type { CaseDetail, CaseFilterOptions } from "@/types";
+import { formatPhoneForApi, optionalUsPhoneFieldSchema } from "@/lib/phone";
 
 const schema = z.object({
   first_name: z.string().min(1, "First name is required"),
   last_name: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
-  phone: z.string().optional(),
+  phone: optionalUsPhoneFieldSchema,
   dob: z.string().optional(),
   address: z.string().optional(),
   program_id: z.string().min(1, "Program is required"),
@@ -72,7 +73,10 @@ export function AddCaseClient() {
 
   const createCase = useMutation({
     mutationFn: async (values: FormValues) => {
-      const res = await api.post("/api/partner/cases", values);
+      const res = await api.post("/api/partner/cases", {
+        ...values,
+        phone: formatPhoneForApi(values.phone ?? ""),
+      });
       return res.data.data as CaseDetail;
     },
     onSuccess: (data) => {
@@ -150,7 +154,21 @@ export function AddCaseClient() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" type="tel" {...register("phone")} />
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  numericOnly
+                  prefix="+1"
+                  placeholder="5550000000"
+                  maxLength={10}
+                  autoComplete="tel-national"
+                  error={!!errors.phone}
+                  {...register("phone")}
+                />
+                {errors.phone && (
+                  <p className="text-xs text-status-error">{errors.phone.message}</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="dob">Date of birth</Label>

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { optionalUsPhoneSchema } from '../../utils/phone.utils';
 
 export const partnerRegisterSchema = z.object({
   body: z.object({
@@ -10,16 +11,19 @@ export const partnerRegisterSchema = z.object({
 
     // Contact / location (step 1)
     email:   z.string().email('Invalid contact email'),
-    phone:   z.string().optional(),
+    phone:   optionalUsPhoneSchema,
     address: z.string().min(3, 'Street address is required'),
-    city:    z.string().min(1, 'City is required'),
-    state:   z.string().optional(),
-    zip:     z.string().optional(),
+    city:    z.string().trim().min(1, 'City is required'),
+    state:   z.string().trim().min(2, 'State is required').max(2),
+    zip:     z.string().trim().min(1, 'ZIP code is required'),
+    county:  z.string().trim().min(1, 'County is required'),
     country: z.string().optional(),
 
     // Admin account (step 2)
-    adminName:     z.string().min(2, 'Admin full name is required'),
-    adminEmail:    z.string().email('Invalid admin email'),
+    adminFirstName:  z.string().trim().min(1, 'First name is required'),
+    adminMiddleName: z.string().trim().optional().or(z.literal('')),
+    adminLastName:   z.string().trim().min(1, 'Last name is required'),
+    adminEmail:      z.string().email('Invalid admin email'),
     adminPassword: z.string().min(8, 'Password must be at least 8 characters'),
     employees:     z.string().optional(),
     founded:       z.string().optional(),

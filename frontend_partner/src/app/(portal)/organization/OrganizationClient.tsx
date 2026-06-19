@@ -73,7 +73,7 @@ export function OrganizationClient() {
               <div className="flex items-start gap-3 text-sm">
                 <MapPin className="w-4 h-4 text-text-soft mt-0.5 shrink-0" />
                 <span className="text-text-mid">
-                  {[org.address, org.city, org.state, org.zip].filter(Boolean).join(", ")}
+                  {[org.address, org.city, org.state, org.zip, org.county].filter(Boolean).join(", ")}
                 </span>
               </div>
             )}

@@ -37,17 +37,9 @@ export interface BulkCreateMembersResult {
 
 // ---- Organization ----
 
-export type OrgType =
-  | "Corporation (C-Corp)"
-  | "S-Corporation"
-  | "Limited Liability (LLC)"
-  | "Partnership"
-  | "Sole Proprietorship"
-  | "Non-profit (501c3)"
-  | "Government Agency"
-  | "Cooperative"
-  | "Startup"
-  | "Other";
+import type { OrgTypeLabel } from "@/lib/org-types";
+
+export type OrgType = OrgTypeLabel;
 
 export type OrgStatus = "pending" | "active" | "suspended" | "inactive";
 
@@ -64,6 +56,7 @@ export interface Organization {
   city?: string | null;
   state?: string | null;
   zip?: string | null;
+  county?: string | null;
   country?: string | null;
   employees?: string | null;
   founded?: string | null;

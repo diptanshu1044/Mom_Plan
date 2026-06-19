@@ -361,6 +361,7 @@ export default function ApplyModal({
       });
       
       queryClient.invalidateQueries({ queryKey: ["applications"] });
+      queryClient.invalidateQueries({ queryKey: ["deadlines-dashboard-submitted"] });
       setSuccess(true);
     } catch (err) {
       console.error("Failed to send application:", err);
