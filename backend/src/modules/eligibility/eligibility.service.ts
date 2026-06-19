@@ -330,6 +330,18 @@ export class EligibilityService {
 
     const summary = computeSummary(filtered);
 
+    const total = enrichedResults.length;
+    const paginate = filters?.limit !== undefined;
+    const page = filters?.page || 1;
+    const limit = filters?.limit ?? total;
+    const totalPages = paginate ? Math.max(1, Math.ceil(total / limit)) : 1;
+    const safePage = paginate ? Math.min(page, totalPages) : 1;
+    const skip = paginate ? (safePage - 1) * limit : 0;
+    const paginatedResults = enrichedResults.slice(
+      skip,
+      paginate ? skip + limit : undefined
+    );
+
     // True if any result is still waiting for background AI explanations
     const aiProcessing = results.some((r) => !r.ai_processed);
 
@@ -340,7 +352,7 @@ export class EligibilityService {
     );
 
     return {
-      results: enrichedResults,
+      results: paginatedResults,
       summary,
       scanTotalCount: results.length,
       availableStates,
@@ -348,6 +360,16 @@ export class EligibilityService {
       profileState: profileState ?? null,
       aiProcessing,
       sync: serializeEligibilitySyncStatus(syncStatus),
+      ...(paginate
+        ? {
+            pagination: {
+              page: safePage,
+              limit,
+              total,
+              totalPages,
+            },
+          }
+        : {}),
     };
   }
 

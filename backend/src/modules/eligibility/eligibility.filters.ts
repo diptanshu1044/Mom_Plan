@@ -17,6 +17,8 @@ export interface EligibilityResultsFilters {
   stateSearch?: string;
   year?: number | 'all';
   quarter?: Quarter;
+  page?: number;
+  limit?: number;
 }
 
 export interface EligibilityResultsSummary {
@@ -44,6 +46,12 @@ export interface EligibilityResultsResponse {
   aiProcessing: boolean;
   /** Profile ↔ scan synchronization metadata. */
   sync: EligibilitySyncMeta;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 const US_STATES = [
@@ -209,6 +217,15 @@ export function parseEligibilityResultsFilters(query: Record<string, unknown>): 
   const rawState = typeof query.state === 'string' ? query.state.trim() : '';
   const allStates = rawState.toUpperCase() === 'ALL';
 
+  const page =
+    query.page !== undefined && query.page !== ''
+      ? Number.parseInt(String(query.page), 10)
+      : undefined;
+  const limit =
+    query.limit !== undefined && query.limit !== ''
+      ? Number.parseInt(String(query.limit), 10)
+      : undefined;
+
   return {
     federal: query.federal === 'true' || query.federal === true,
     stateOnly: query.state_only === 'true' || query.state_only === true,
@@ -220,5 +237,7 @@ export function parseEligibilityResultsFilters(query: Record<string, unknown>): 
         : undefined,
     year: parseYearFilter(query.year),
     quarter: validQuarter,
+    page: page && Number.isFinite(page) && page >= 1 ? page : undefined,
+    limit: limit && Number.isFinite(limit) && limit >= 1 ? limit : undefined,
   };
 }

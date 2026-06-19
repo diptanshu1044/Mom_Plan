@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
@@ -18,6 +18,8 @@ import {
   Eye,
   Calendar,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Loader2,
   MapPin,
 } from "lucide-react";
@@ -55,6 +57,39 @@ const PROGRAM_TYPE_OPTIONS = [
 const selectClassName =
   "w-full appearance-none rounded-lg border border-outline-variant/60 bg-white py-2.5 pl-3 pr-9 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-300 cursor-pointer";
 
+const PAGE_SIZE = 10;
+
+function buildPageNumbers(currentPage: number, totalPages: number): number[] {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const pages = new Set<number>([1, totalPages]);
+  for (let page = currentPage - 1; page <= currentPage + 1; page += 1) {
+    if (page >= 1 && page <= totalPages) pages.add(page);
+  }
+  return [...pages].sort((a, b) => a - b);
+}
+
+type PaginationItem =
+  | { type: "page"; page: number }
+  | { type: "ellipsis"; gapId: string };
+
+function buildPaginationItems(currentPage: number, totalPages: number): PaginationItem[] {
+  const pages = buildPageNumbers(currentPage, totalPages);
+  const items: PaginationItem[] = [];
+
+  pages.forEach((page, index) => {
+    const prevPage = pages[index - 1];
+    if (prevPage !== undefined && page - prevPage > 1) {
+      items.push({ type: "ellipsis", gapId: `gap-${prevPage}-${page}` });
+    }
+    items.push({ type: "page", page });
+  });
+
+  return items;
+}
+
 export default function BenefitsPage() {
   const [programType, setProgramType] = useState<"all" | "federal" | "state">("all");
   const [selectedState, setSelectedState] = useState("All");
@@ -64,9 +99,16 @@ export default function BenefitsPage() {
   const [selectedProgram, setSelectedProgram] = useState<any>(null);
   const [showRescanPrompt, setShowRescanPrompt] = useState(false);
   const [availableStateCodes, setAvailableStateCodes] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageInput, setPageInput] = useState("");
+  const [openJumpGap, setOpenJumpGap] = useState<string | null>(null);
   const hasAutoSelectedProfileState = useRef(false);
   const userChoseAllStates = useRef(false);
   const prevProfileStateRef = useRef<string | null>(null);
+  const filtersKeyRef = useRef("");
+  const totalPagesRef = useRef(1);
+  const pageJumpInputRef = useRef<HTMLInputElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
   const { user } = useAuthStore();
@@ -88,10 +130,26 @@ export default function BenefitsPage() {
     closePdfModal,
   } = usePdfGeneration();
 
+  const filterKey = useMemo(
+    () => `${programType}|${selectedState}|${yearFilter}|${quarterFilter}`,
+    [programType, selectedState, yearFilter, quarterFilter]
+  );
+
+  useEffect(() => {
+    if (filtersKeyRef.current !== filterKey) {
+      filtersKeyRef.current = filterKey;
+      setOpenJumpGap(null);
+      setPageInput("");
+      setCurrentPage(1);
+    }
+  }, [filterKey]);
+
   const filterParams = useMemo(() => {
     const params: Record<string, string> = {
       ...(yearFilter !== "all" ? { year: yearFilter } : { year: "all" }),
       quarter: quarterFilter,
+      page: String(currentPage),
+      limit: String(PAGE_SIZE),
     };
 
     if (programType === "federal") params.federal = "true";
@@ -106,7 +164,7 @@ export default function BenefitsPage() {
     }
 
     return params;
-  }, [programType, selectedState, yearFilter, quarterFilter]);
+  }, [programType, selectedState, yearFilter, quarterFilter, currentPage]);
 
   const pdfQuarterContext = useMemo(
     () => resolveQuarterYearForPdf(quarterFilter, yearFilter),
@@ -121,27 +179,33 @@ export default function BenefitsPage() {
     refetchInterval: (query) => (query.state.data?.aiProcessing ? 5000 : false),
   });
 
+  const isPageLoading =
+    isLoading || (isFetching && data?.pagination?.page !== currentPage);
+
+  useEffect(() => {
+    if (data?.pagination?.totalPages) {
+      totalPagesRef.current = data.pagination.totalPages;
+    }
+  }, [data?.pagination?.totalPages]);
+
+  useEffect(() => {
+    if (openJumpGap) {
+      pageJumpInputRef.current?.focus();
+    }
+  }, [openJumpGap]);
+
   const results = data?.results ?? [];
   const scanTotalCount = data?.scanTotalCount ?? 0;
   const hasScanResults = scanTotalCount > 0 || results.length > 0;
   const aiProcessing: boolean = data?.aiProcessing ?? false;
   const isStale: boolean = data?.sync?.isStale ?? false;
   const hasScan: boolean = data?.sync?.hasScan ?? hasScanResults;
-  const filteredStats = useMemo(() => {
-    const qualified = results.filter(
-      (result: { status: string }) =>
-        result.status === "qualified" || result.status === "likely_qualified"
-    );
-
-    return {
-      qualifiedCount: qualified.length,
-      totalMonthlyValueMax: qualified.reduce(
-        (acc: number, result: { program?: { estimated_monthly_value_max?: number | null } }) =>
-          acc + (result.program?.estimated_monthly_value_max || 0),
-        0
-      ),
-    };
-  }, [results]);
+  const filteredStats = {
+    qualifiedCount: data?.summary?.qualifiedCount ?? 0,
+    totalMonthlyValueMax: data?.summary?.totalMonthlyValueMax ?? 0,
+  };
+  const totalPages = data?.pagination?.totalPages ?? totalPagesRef.current;
+  const paginationItems = buildPaginationItems(currentPage, totalPages);
   const availableYears = data?.availableYears ?? [];
   const yearFilterOptions = useMemo(
     () => buildYearFilterOptions(availableYears),
@@ -217,6 +281,48 @@ export default function BenefitsPage() {
       return;
     }
     scanMutation.mutate();
+  };
+
+  const goToPage = (page: number) => {
+    if (page < 1 || page > totalPages || page === currentPage || isPageLoading) return;
+    setOpenJumpGap(null);
+    setPageInput("");
+    setCurrentPage(page);
+    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const openPageJump = (gapId: string) => {
+    setOpenJumpGap(gapId);
+    setPageInput("");
+  };
+
+  const closePageJump = () => {
+    setOpenJumpGap(null);
+    setPageInput("");
+  };
+
+  const submitPageJump = () => {
+    const parsed = Number.parseInt(pageInput, 10);
+    if (!Number.isFinite(parsed)) {
+      closePageJump();
+      return;
+    }
+    const clamped = Math.min(Math.max(1, parsed), totalPages);
+    if (clamped === currentPage) {
+      closePageJump();
+      return;
+    }
+    goToPage(clamped);
+  };
+
+  const handlePageJumpKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      submitPageJump();
+    }
+    if (event.key === "Escape") {
+      closePageJump();
+    }
   };
 
   return (
@@ -404,9 +510,12 @@ export default function BenefitsPage() {
       </div>
 
       {/* Results */}
-      {isLoading ? (
+      <div ref={resultsRef}>
+      {isPageLoading ? (
         <div className="grid md:grid-cols-2 gap-4">
-          {[0, 1, 2, 3].map((i) => <CardSkeleton key={i} />)}
+          {Array.from({ length: PAGE_SIZE }, (_, i) => (
+            <CardSkeleton key={i} />
+          ))}
         </div>
       ) : results.length === 0 ? (
         <div className="text-center py-16">
@@ -552,6 +661,91 @@ export default function BenefitsPage() {
           })}
         </div>
       )}
+
+      {totalPages > 1 && (
+        <nav
+          className="mt-6 flex items-center justify-center gap-2 flex-wrap"
+          aria-label="Benefits results pagination"
+        >
+          <button
+            type="button"
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage === 1 || isPageLoading}
+            className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-outline-variant/30 bg-white text-sm font-semibold text-on-surface disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Previous
+          </button>
+
+          <div className="flex items-center gap-1">
+            {paginationItems.map((item) => {
+              if (item.type === "page") {
+                return (
+                  <button
+                    key={`page-${item.page}`}
+                    type="button"
+                    onClick={() => goToPage(item.page)}
+                    disabled={isPageLoading}
+                    aria-current={item.page === currentPage ? "page" : undefined}
+                    className={`min-w-10 h-10 rounded-xl text-sm font-semibold border transition-colors ${
+                      item.page === currentPage
+                        ? "bg-primary border-primary text-white shadow-primary"
+                        : "bg-white border-outline-variant/30 text-on-surface hover:bg-surface-container"
+                    }`}
+                  >
+                    {item.page}
+                  </button>
+                );
+              }
+
+              if (openJumpGap === item.gapId) {
+                return (
+                  <input
+                    key={item.gapId}
+                    ref={pageJumpInputRef}
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    value={pageInput}
+                    onChange={(e) => setPageInput(e.target.value)}
+                    onKeyDown={handlePageJumpKeyDown}
+                    onBlur={submitPageJump}
+                    disabled={isPageLoading}
+                    aria-label="Enter page number"
+                    placeholder="Page"
+                    className="w-14 h-10 px-2 rounded-xl border border-primary bg-white text-sm text-on-surface text-center font-semibold focus:outline-none focus:ring-2 focus:ring-primary-500/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                );
+              }
+
+              return (
+                <button
+                  key={item.gapId}
+                  type="button"
+                  onClick={() => openPageJump(item.gapId)}
+                  disabled={isPageLoading}
+                  aria-label="Jump to page"
+                  title="Jump to page"
+                  className="min-w-10 h-10 rounded-xl text-sm font-semibold border border-outline-variant/30 bg-white text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+                >
+                  …
+                </button>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage === totalPages || isPageLoading}
+            className="inline-flex items-center gap-1 px-4 py-2 rounded-xl border border-outline-variant/30 bg-white text-sm font-semibold text-on-surface disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container transition-colors"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </nav>
+      )}
+      </div>
 
       {/* Validation Warning Modal */}
       <DocumentReadinessModal

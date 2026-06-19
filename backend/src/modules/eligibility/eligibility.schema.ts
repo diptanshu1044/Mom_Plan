@@ -15,6 +15,8 @@ export const getResultsQuerySchema = z.object({
     state_search: z.string().max(100).optional(),
     year: z.union([z.literal('all'), z.coerce.number().int().positive()]).optional(),
     quarter: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
+    page: z.coerce.number().int().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
   }),
 });
 

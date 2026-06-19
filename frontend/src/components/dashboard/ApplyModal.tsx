@@ -140,7 +140,6 @@ export default function ApplyModal({
   const [draftTo, setDraftTo] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [attachPdf, setAttachPdf] = useState(true);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -221,7 +220,6 @@ export default function ApplyModal({
       .map((d: any) => d.id);
 
     setSelectedDocIds(ids);
-    setAttachPdf(!!pdfPackage);
   }, [documents, packageVaultDoc?.id, pdfPackage?.id, programApplicationIds.join(",")]);
 
   // Backfill vault entry for PDFs generated before vault sync existed
@@ -350,6 +348,10 @@ export default function ApplyModal({
     if (!applicationId) return;
     setIsSubmitting(true);
     try {
+      const attachPdf =
+        !!pdfPackage &&
+        (!packageVaultDoc || selectedDocIds.includes(packageVaultDoc.id));
+
       await api.post(`/api/applications/${applicationId}/apply`, {
         subject: draftSubject,
         body: draftBody,
@@ -529,42 +531,8 @@ export default function ApplyModal({
                         </label>
                         
                         <div className="border border-outline-variant/50 rounded-xl overflow-hidden bg-surface-container-lowest flex-1 flex flex-col min-h-[300px]">
-                          {/* Generated Application PDF attachment */}
-                          <div className="p-3 border-b border-surface-container bg-surface-container-low/50">
-                            {pdfPackage ? (
-                              <div className="flex items-start gap-2.5">
-                                <input
-                                  type="checkbox"
-                                  id="attach-pdf-cb"
-                                  checked={attachPdf}
-                                  onChange={(e) => setAttachPdf(e.target.checked)}
-                                  className="w-4 h-4 mt-0.5 rounded text-primary-600 focus:ring-primary-500 border-outline-variant/60 cursor-pointer"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <label htmlFor="attach-pdf-cb" className="block text-xs font-bold text-on-surface cursor-pointer select-none">
-                                    📄 Generated Application PDF
-                                  </label>
-                                  <p className="text-[10px] text-on-surface-variant mt-0.5 truncate">
-                                    Version {pdfPackage.version}
-                                    {pdfPackage.quarter && pdfPackage.year
-                                      ? ` • ${pdfPackage.quarter} ${pdfPackage.year}`
-                                      : ""}
-                                    {" • "}
-                                    Created {new Date(pdfPackage.generated_at).toLocaleDateString()}
-                                  </p>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-center p-1.5 bg-blue-50/50 rounded-lg border border-dashed border-blue-200">
-                                <p className="text-[10px] text-blue-800 leading-normal">
-                                  💡 Generate the Application PDF first in the dashboard to attach it here automatically.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-
                           {/* Vault documents list */}
-                          <div className="flex-1 overflow-y-auto p-3 space-y-2 max-h-[220px]">
+                          <div className="flex-1 overflow-y-auto p-3 space-y-2 max-h-[280px]">
                             <span className="block text-[10px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">
                               From Documents Vault ({vaultDocuments.length})
                             </span>
