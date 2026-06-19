@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -25,8 +25,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Input, Select } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { PlanBadge } from "@/components/ui/Badge";
-import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
+import { PartnerOrgSelect, type PartnerOrgOption } from "@/components/profile/PartnerOrgSelect";
 import { LocationFields, type UseLocationFieldsResult } from "@/components/profile/LocationFields";
 import { formatPhoneForApi, normalizeUsPhoneDigits } from "@/lib/phone";
 import { useAuthStore } from "@/store/auth.store";
@@ -280,12 +279,36 @@ export default function ProfilePage() {
 
   const hasHydratedForm = useRef(false);
 
+  const selectedPartnerOrg = useMemo((): PartnerOrgOption | null => {
+    if (!user?.org_id) return null;
+    return {
+      id: user.org_id,
+      name: user.organization?.name || "Your organization",
+      type: user.org_type,
+      city: user.organization?.city,
+      state: user.organization?.state,
+    };
+  }, [user?.org_id, user?.org_type, user?.organization]);
+
   // Sync form once when profile data first loads (e.g. after dashboard layout fetch)
   useEffect(() => {
     if (!user?.family_profile || hasHydratedForm.current) return;
     profileForm.reset(getFormDefaults(user));
     hasHydratedForm.current = true;
   }, [user?.family_profile]);
+
+  // Keep org fields in sync when the profile API updates (e.g. after save or layout fetch)
+  useEffect(() => {
+    if (!user) return;
+    const orgId = user.org_id || "";
+    const orgType = user.org_type || "";
+    if (profileForm.getValues("org_id") !== orgId) {
+      profileForm.setValue("org_id", orgId, { shouldDirty: false });
+    }
+    if (profileForm.getValues("org_type") !== orgType) {
+      profileForm.setValue("org_type", orgType, { shouldDirty: false });
+    }
+  }, [user?.org_id, user?.org_type]);
 
   const profileMutation = useMutation({
     mutationFn: (data: ProfileForm) => {
@@ -305,12 +328,23 @@ export default function ProfilePage() {
       return api.put("/api/user/profile", payload);
     },
     onSuccess: (res) => {
-      updateUser(res.data.data);
+      const saved = res.data.data;
+      updateUser(saved);
+      if (saved?.org_id) {
+        profileForm.setValue("org_id", saved.org_id, { shouldDirty: false });
+        profileForm.setValue("org_type", saved.org_type || "", { shouldDirty: false });
+      }
       toast.success("Profile saved");
+
+      if (res.data.data?.eligibilityFieldsChanged) {
+        toast.info(
+          "Your profile changes may affect your benefit results. Run a new eligibility scan to refresh your recommendations.",
+          { duration: 6000 }
+        );
+      }
 
       queryClient.invalidateQueries({
         queryKey: ["eligibility-results"],
-        refetchType: "none",
       });
       queryClient.invalidateQueries({ queryKey: ["applications"], refetchType: "none" });
       queryClient.invalidateQueries({ queryKey: ["deadlines"], refetchType: "none" });
@@ -367,7 +401,6 @@ export default function ProfilePage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-on-surface-variant">{user?.email}</span>
-            <PlanBadge plan={user?.plan || "community"} />
           </div>
         </div>
       </motion.div>
@@ -480,6 +513,7 @@ export default function ProfilePage() {
                 <div className="sm:col-span-2">
                   <PartnerOrgSelect
                     value={profileForm.watch("org_id") || ""}
+                    selectedOrg={selectedPartnerOrg}
                     onChange={(id) =>
                       profileForm.setValue("org_id", id, { shouldValidate: true })
                     }

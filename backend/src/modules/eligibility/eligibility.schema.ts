@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { updateProfileSchema } from '../user/user.schema';
 
 export const getResultParamSchema = z.object({
   params: z.object({
@@ -15,4 +16,14 @@ export const getResultsQuerySchema = z.object({
     year: z.union([z.literal('all'), z.coerce.number().int().positive()]).optional(),
     quarter: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
   }),
+});
+
+/** Optional profile payload merged into the user profile before scanning. */
+export const runScanSchema = z.object({
+  body: z
+    .object({
+      profile: updateProfileSchema.shape.body.optional(),
+    })
+    .optional()
+    .default({}),
 });

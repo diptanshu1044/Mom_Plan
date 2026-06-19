@@ -14,7 +14,6 @@ export interface AuthUser {
   middle_name?: string | null;
   last_name: string;
   role: "user" | "admin" | "counselor";
-  plan: "community" | "partner" | "network";
   phone?: string;
   state?: string;
   zip_code?: string;
@@ -77,6 +76,12 @@ export interface AuthUser {
 
     childcare_preference?: string | null;
     childcare_provider?: string | null;
+  };
+  eligibilitySync?: {
+    isStale: boolean;
+    hasScan: boolean;
+    lastProfileUpdateAt: string | null;
+    lastEligibilityScanAt: string | null;
   };
 }
 

@@ -1,4 +1,4 @@
-import { UserRole, UserPlan } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import type { Logger } from 'pino';
 
 declare global {
@@ -10,7 +10,6 @@ declare global {
         id: string;
         email: string;
         role: UserRole;
-        plan: UserPlan;
       };
     }
   }

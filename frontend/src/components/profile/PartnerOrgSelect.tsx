@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Building2, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -25,6 +25,8 @@ interface PartnerOrgSelectProps {
   value: string;
   onChange: (orgId: string) => void;
   onOrgTypeChange?: (orgType: string) => void;
+  /** Saved org from profile — kept visible even when not in the location-filtered list. */
+  selectedOrg?: PartnerOrgOption | null;
   error?: string;
   required?: boolean;
   locationFilters?: PartnerOrgLocationFilters;
@@ -54,6 +56,7 @@ export function PartnerOrgSelect({
   value,
   onChange,
   onOrgTypeChange,
+  selectedOrg,
   error,
   required,
   locationFilters,
@@ -61,7 +64,7 @@ export function PartnerOrgSelect({
 }: PartnerOrgSelectProps) {
   const canFetch = locationFiltersReady(locationFilters, requireLocation);
 
-  const { data: orgs = [], isLoading } = useQuery({
+  const { data: orgs = [], isLoading, isFetched } = useQuery({
     queryKey: ["organizations", locationFilters],
     queryFn: () =>
       api
@@ -71,27 +74,40 @@ export function PartnerOrgSelect({
     enabled: canFetch,
   });
 
+  const displayOrgs = useMemo(() => {
+    const list = [...orgs];
+    if (value && selectedOrg?.id === value && !list.some((org) => org.id === value)) {
+      list.unshift(selectedOrg);
+    }
+    return list;
+  }, [orgs, selectedOrg, value]);
+
   const syncOrgType = (orgId: string) => {
     if (!onOrgTypeChange) return;
-    const org = orgs.find((o) => o.id === orgId);
+    const org = displayOrgs.find((o) => o.id === orgId);
     onOrgTypeChange(org?.type || "");
   };
 
   useEffect(() => {
-    if (!value || orgs.length === 0) return;
+    if (!value || displayOrgs.length === 0) return;
     syncOrgType(value);
-  }, [value, orgs]);
+  }, [value, displayOrgs]);
 
+  // Only clear a stale selection after the org list has finished loading.
   useEffect(() => {
-    if (!value || orgs.some((org) => org.id === value)) return;
+    if (!value || !canFetch || isLoading || !isFetched) return;
+    if (displayOrgs.some((org) => org.id === value)) return;
     onChange("");
     onOrgTypeChange?.("");
-  }, [value, orgs, onChange, onOrgTypeChange]);
+  }, [value, displayOrgs, canFetch, isLoading, isFetched, onChange, onOrgTypeChange]);
 
   const handleChange = (orgId: string) => {
     onChange(orgId);
     syncOrgType(orgId);
   };
+
+  const hasSavedSelection = Boolean(value && selectedOrg?.id === value);
+  const showSelect = displayOrgs.length > 0;
 
   return (
     <div className="space-y-1.5">
@@ -104,20 +120,20 @@ export function PartnerOrgSelect({
           : "Optional — choose a community organization to support your benefits applications."}
       </p>
 
-      {!canFetch ? (
+      {!canFetch && !hasSavedSelection ? (
         <p className="text-sm text-on-surface-variant bg-surface-container rounded-lg px-3 py-2.5 border border-outline-variant/40">
           Enter your state, city, and county above to see organizations in your area.
         </p>
-      ) : isLoading ? (
+      ) : canFetch && isLoading && !hasSavedSelection ? (
         <div className="flex items-center gap-2 text-sm text-on-surface-variant py-3">
           <Loader2 className="w-4 h-4 animate-spin" />
           Loading organizations…
         </div>
-      ) : orgs.length === 0 ? (
+      ) : canFetch && isFetched && !isLoading && orgs.length === 0 && !hasSavedSelection ? (
         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           No partner organizations serve your county yet. You can still create your account and check back later.
         </p>
-      ) : (
+      ) : showSelect ? (
         <div className="relative">
           <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
           <select
@@ -128,7 +144,7 @@ export function PartnerOrgSelect({
             }`}
           >
             <option value="">Select an organization…</option>
-            {orgs.map((org) => (
+            {displayOrgs.map((org) => (
               <option key={org.id} value={org.id}>
                 {org.name}
                 {[org.city, org.state].filter(Boolean).length
@@ -138,12 +154,18 @@ export function PartnerOrgSelect({
             ))}
           </select>
         </div>
+      ) : null}
+
+      {!canFetch && hasSavedSelection && (
+        <p className="text-xs text-on-surface-variant">
+          Your saved organization is shown above. Enter state, city, and county to browse other options.
+        </p>
       )}
 
       {value && (
         <p className="text-xs text-on-surface-variant">
-          {orgs.find((o) => o.id === value)?.tagline ||
-            orgs.find((o) => o.id === value)?.service_area ||
+          {displayOrgs.find((o) => o.id === value)?.tagline ||
+            displayOrgs.find((o) => o.id === value)?.service_area ||
             "Your caseworker at this organization will see your profile in their portal."}
         </p>
       )}

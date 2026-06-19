@@ -23,23 +23,57 @@ import {
 } from '../programs/quarterDueDates.service';
 import { EligibilityAIService } from './eligibility-ai.service';
 import { decimalToNumber } from '../../utils/decimal.utils';
+import {
+  computeEligibilitySyncStatus,
+  serializeEligibilitySyncStatus,
+} from './eligibility-sync.utils';
 
 const eligibilityAIService = new EligibilityAIService();
 
 export class EligibilityService {
   private static scansInProgress = new Set<string>();
 
-  async runScan(userId: string) {
+  async runScan(userId: string, profileUpdates?: Record<string, unknown>) {
     if (EligibilityService.scansInProgress.has(userId)) {
       throw new Error('Eligibility scan already in progress. Please wait for it to finish.');
     }
     EligibilityService.scansInProgress.add(userId);
 
     try {
+      if (profileUpdates && Object.keys(profileUpdates).length > 0) {
+        const { UserService } = await import('../user/user.service');
+        const userService = new UserService();
+        await userService.updateProfile(userId, profileUpdates);
+      }
       return await this.executeScan(userId);
     } finally {
       EligibilityService.scansInProgress.delete(userId);
     }
+  }
+
+  async getSyncStatus(userId: string) {
+    const [user, lastScan] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { updated_at: true, family_profile: { select: { updated_at: true } } },
+      }),
+      prisma.eligibilityResult.findFirst({
+        where: { user_id: userId },
+        orderBy: { checked_at: 'desc' },
+        select: { checked_at: true },
+      }),
+    ]);
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const status = computeEligibilitySyncStatus(
+      user,
+      user.family_profile,
+      lastScan?.checked_at ?? null
+    );
+    return serializeEligibilitySyncStatus(status);
   }
 
   private async executeScan(userId: string) {
@@ -290,6 +324,20 @@ export class EligibilityService {
     // True if any result is still waiting for background AI explanations
     const aiProcessing = results.some((r) => !r.ai_processed);
 
+    const lastEligibilityScanAt =
+      results.length > 0
+        ? results.reduce(
+            (latest, r) => (r.checked_at > latest ? r.checked_at : latest),
+            results[0].checked_at
+          )
+        : null;
+
+    const syncStatus = computeEligibilitySyncStatus(
+      user ?? { updated_at: new Date(0) },
+      user?.family_profile,
+      lastEligibilityScanAt
+    );
+
     return {
       results: enrichedResults,
       summary,
@@ -298,6 +346,7 @@ export class EligibilityService {
       availableYears,
       profileState: profileState ?? null,
       aiProcessing,
+      sync: serializeEligibilitySyncStatus(syncStatus),
     };
   }
 

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { TopBar } from "@/components/layout/TopBar";
-import { StatusBadge, PlanBadge, RoleBadge } from "@/components/ui/Badge";
+import { StatusBadge, RoleBadge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
 import { formatUserName, userInitials } from "@/lib/name";
 
@@ -97,7 +97,6 @@ export default function UsersPage() {
                 <tr>
                   <th>User</th>
                   <th>Role</th>
-                  <th>Plan</th>
                   <th>Status</th>
                   <th>Joined</th>
                   <th className="text-right">Actions</th>
@@ -116,7 +115,6 @@ export default function UsersPage() {
                             </div>
                           </div>
                         </td>
-                        <td><div className="skeleton h-5 w-16 rounded-full" /></td>
                         <td><div className="skeleton h-5 w-16 rounded-full" /></td>
                         <td><div className="skeleton h-5 w-20 rounded-full" /></td>
                         <td><div className="skeleton h-3.5 w-24" /></td>
@@ -141,7 +139,6 @@ export default function UsersPage() {
                           </div>
                         </td>
                         <td><RoleBadge role={user.role} /></td>
-                        <td><PlanBadge plan={user.plan} /></td>
                         <td><StatusBadge status={user.status} /></td>
                         <td className="text-slate-500 text-xs">{formatDate(user.created_at)}</td>
                         <td>

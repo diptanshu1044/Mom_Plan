@@ -13,7 +13,7 @@ import { getSubscriptionStatus, PLAN_LABELS, type OrgPlan } from "@/lib/billing"
 
 export default function BillingSuccessClient() {
   const searchParams = useSearchParams();
-  const { user, refreshSession, updateUser } = useAuthStore();
+  const { refreshSession } = useAuthStore();
   const [billing, setBilling] = useState<{
     plan: OrgPlan;
     status: string;
@@ -35,7 +35,6 @@ export default function BillingSuccessClient() {
           status: status.status,
           next_billing_date: status.next_billing_date,
         });
-        updateUser({ plan: status.plan });
       } catch {
         if (queryPlan) {
           setBilling({
@@ -43,7 +42,6 @@ export default function BillingSuccessClient() {
             status: "active",
             next_billing_date: null,
           });
-          updateUser({ plan: queryPlan });
         } else {
           setError("We couldn't load your subscription details. Your payment may still be processing.");
         }
@@ -52,9 +50,9 @@ export default function BillingSuccessClient() {
       }
     }
     load();
-  }, [queryPlan, refreshSession, updateUser]);
+  }, [queryPlan, refreshSession]);
 
-  const plan = billing?.plan ?? user?.plan ?? "community";
+  const plan = billing?.plan ?? queryPlan ?? "community";
 
   return (
     <div className="max-w-lg mx-auto">

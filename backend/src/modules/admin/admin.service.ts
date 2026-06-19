@@ -44,7 +44,6 @@ export class AdminService {
           ...userNameSelect,
           phone: true,
           role: true,
-          plan: true,
           status: true,
           created_at: true,
           last_active_at: true,

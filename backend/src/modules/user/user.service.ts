@@ -3,7 +3,6 @@ import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { zipValidationService, isZipValidationEnabled } from '../../services/zipValidation.service';
 import { MotherOrgEnrollmentService } from '../partner/mother-org-enrollment.service';
 import { joinFullName, userNameSelect } from '../../utils/name.utils';
-import { EligibilityService } from '../eligibility/eligibility.service';
 import {
   buildFamilyProfilePatch,
   buildUserProfilePatch,
@@ -13,8 +12,6 @@ import {
 } from './profile-update.utils';
 import { decimalToNumberOrNull } from '../../utils/decimal.utils';
 import { toPublicOrganizationSummary } from '../../utils/organization.utils';
-
-const eligibilityService = new EligibilityService();
 
 const motherOrgEnrollment = new MotherOrgEnrollmentService();
 
@@ -65,7 +62,6 @@ export class UserService {
         ...userNameSelect,
         phone: true,
         role: true,
-        plan: true,
         state: true,
         zip_code: true,
         created_at: true,
@@ -86,7 +82,14 @@ export class UserService {
       throw new NotFoundError('User profile not found');
     }
 
-    return serializeProfile(user);
+    const { EligibilityService } = await import('../eligibility/eligibility.service');
+    const eligibilityService = new EligibilityService();
+    const sync = await eligibilityService.getSyncStatus(userId);
+
+    return {
+      ...serializeProfile(user),
+      eligibilitySync: sync,
+    };
   }
 
   async updateProfile(
@@ -101,7 +104,7 @@ export class UserService {
 
       needs_childcare, monthly_rent, monthly_utilities, eviction_risk, domestic_violence,
       chronic_illness, immigration_status, date_of_birth, ssn_last_four, preferred_language,
-      marital_status, other_adults, income_sources, work_situation, employer_name,
+      marital_status, other_adults, other_household_income, income_sources, work_situation, employer_name,
       health_insurance, savings_assets, child_support_status,
       monthly_childcare_cost, childcare_preference, childcare_provider, legal_issues, urgency,
       children_dobs,
@@ -272,13 +275,16 @@ export class UserService {
       mergeProfileResponse(existingProfile, userUpdate, familyUpdate, organization)
     );
 
-    if (shouldRescanEligibility && profile.family_profile) {
-      void eligibilityService.runScan(userId).catch((err) => {
-        console.error('[UserService] Eligibility rescan failed:', err);
-      });
-    }
+    const { EligibilityService } = await import('../eligibility/eligibility.service');
+    const eligibilityService = new EligibilityService();
+    const sync = await eligibilityService.getSyncStatus(userId);
+    const eligibilityFieldsChanged = shouldRescanEligibility;
 
-    return profile;
+    return {
+      ...profile,
+      eligibilitySync: sync,
+      eligibilityFieldsChanged,
+    };
   }
 
   async getFamilyProfile(userId: string) {

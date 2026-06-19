@@ -31,6 +31,9 @@ import { CardSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { filterStatesByCodes, mergeStateCodes, normalizeStateCodesFromApi, resolveStateCode } from "@/lib/us-states";
+import { EligibilityStaleBanner } from "@/components/eligibility/EligibilityStaleBanner";
+import { RescanPromptModal } from "@/components/eligibility/RescanPromptModal";
+import { isRescanPromptDismissed } from "@/lib/profile-sync";
 import {
   buildYearFilterOptions,
   formatCurrency,
@@ -58,6 +61,7 @@ export default function BenefitsPage() {
   const [quarterFilter, setQuarterFilter] = useState<string>(() => getCurrentQuarterYear().quarter);
   const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState<any>(null);
+  const [showRescanPrompt, setShowRescanPrompt] = useState(false);
   const [availableStateCodes, setAvailableStateCodes] = useState<string[]>([]);
   const hasAutoSelectedProfileState = useRef(false);
   const userChoseAllStates = useRef(false);
@@ -120,6 +124,8 @@ export default function BenefitsPage() {
   const scanTotalCount = data?.scanTotalCount ?? 0;
   const hasScanResults = scanTotalCount > 0 || results.length > 0;
   const aiProcessing: boolean = data?.aiProcessing ?? false;
+  const isStale: boolean = data?.sync?.isStale ?? false;
+  const hasScan: boolean = data?.sync?.hasScan ?? hasScanResults;
   const filteredStats = useMemo(() => {
     const qualified = results.filter(
       (result: { status: string }) =>
@@ -185,6 +191,12 @@ export default function BenefitsPage() {
     prevProfileStateRef.current = nextProfileState;
   }, [profileState, authProfileState]);
 
+  useEffect(() => {
+    if (isStale && hasScan && !isRescanPromptDismissed()) {
+      setShowRescanPrompt(true);
+    }
+  }, [isStale, hasScan]);
+
   const scanMutation = useMutation({
     mutationFn: () => api.post("/api/eligibility/scan"),
     onSuccess: () => {
@@ -192,26 +204,45 @@ export default function BenefitsPage() {
     },
   });
 
+  const handleRescan = () => {
+    if (isStale) {
+      router.push("/eligibility");
+      return;
+    }
+    scanMutation.mutate();
+  };
+
   return (
     <div>
+      <RescanPromptModal open={showRescanPrompt} onClose={() => setShowRescanPrompt(false)} />
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="font-display font-bold text-2xl lg:text-3xl text-on-surface mb-1">
-            My Benefits & Eligibility
-          </h1>
+          <div className="flex flex-wrap items-center gap-3 mb-1">
+            <h1 className="font-display font-bold text-2xl lg:text-3xl text-on-surface">
+              My Benefits & Eligibility
+            </h1>
+            {isStale && hasScan && <EligibilityStaleBanner variant="compact" showActions={false} />}
+          </div>
           <p className="text-sm text-on-surface-variant">
             AI-powered matching across 200+ government programs
           </p>
         </div>
         <Button
-          onClick={() => scanMutation.mutate()}
+          onClick={handleRescan}
           loading={scanMutation.isPending}
           size="md"
         >
           <RefreshCw className="w-4 h-4" />
-          {scanMutation.isPending ? "Scanning..." : "Re-run AI Scan"}
+          {scanMutation.isPending ? "Scanning..." : isStale ? "Review & Rescan" : "Re-run AI Scan"}
         </Button>
       </div>
+
+      {isStale && hasScan && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <EligibilityStaleBanner onRescanNow={() => router.push("/eligibility")} />
+        </motion.div>
+      )}
 
       {/* Total value banner */}
       {hasScanResults && (

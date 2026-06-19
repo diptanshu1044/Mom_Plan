@@ -148,7 +148,6 @@ export class StripeService {
             await prisma.user.update({
               where: { id: userId },
               data: {
-                plan: planEnum,
                 stripe_customer_id: customerId,
                 stripe_subscription_id: subscriptionId,
               },
@@ -169,7 +168,6 @@ export class StripeService {
             await prisma.user.updateMany({
               where: { stripe_customer_id: customerId },
               data: {
-                plan: UserPlan.community,
                 stripe_subscription_id: null,
               },
             });
@@ -186,7 +184,6 @@ export class StripeService {
           await prisma.user.updateMany({
             where: { stripe_customer_id: customerId },
             data: {
-              plan: UserPlan.community,
               stripe_subscription_id: null,
             },
           });

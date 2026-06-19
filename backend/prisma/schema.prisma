@@ -14,7 +14,6 @@ model User {
   password_hash          String               @default("")
   phone                  String?
   role                   UserRole             @default(user)
-  plan                   UserPlan             @default(community)
   stripe_customer_id     String?
   stripe_subscription_id String?
   state                  String?

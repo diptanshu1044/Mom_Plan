@@ -49,7 +49,6 @@ async function main() {
         last_name: user.last_name ?? '',
         phone: user.phone,
         role: user.role,
-        plan: user.plan,
         stripe_customer_id: user.stripe_customer_id,
         stripe_subscription_id: user.stripe_subscription_id,
         state: user.state,

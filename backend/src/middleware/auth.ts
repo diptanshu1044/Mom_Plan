@@ -2,13 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors';
-import { UserRole, UserPlan } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 
 interface AccessTokenPayload {
   userId: string;
   email: string;
   role: UserRole;
-  plan: UserPlan;
 }
 
 export const authenticate = (req: Request, res: Response, next: NextFunction): void => {
@@ -29,7 +28,6 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
       id: decoded.userId,
       email: decoded.email,
       role: decoded.role,
-      plan: decoded.plan,
     };
     return next();
   } catch (err) {
@@ -58,7 +56,6 @@ export const optionalAuthenticate = (req: Request, res: Response, next: NextFunc
       id: decoded.userId,
       email: decoded.email,
       role: decoded.role,
-      plan: decoded.plan,
     };
   } catch {
     // Ignore invalid tokens for optional auth routes (e.g. logout)

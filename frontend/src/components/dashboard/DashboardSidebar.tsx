@@ -22,7 +22,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import { formatUserName, userInitials } from "@/lib/name";
-import { PlanBadge } from "@/components/ui/Badge";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
 import { useState } from "react";
@@ -185,15 +184,8 @@ export function DashboardSidebar() {
         ))}
       </nav>
 
-      {/* User Profile Footer */}
+        {/* User Profile Footer */}
       <div className="p-3 border-t border-outline-variant/10">
-        {/* Plan Badge */}
-        {!collapsed && user && (
-          <div className="mb-2 px-2">
-            <PlanBadge plan={user.plan} />
-          </div>
-        )}
-
         {/* User info */}
         <div className={cn(
           "flex items-center rounded-xl p-2 hover:bg-surface-container transition-colors cursor-pointer",

@@ -25,6 +25,13 @@ export interface EligibilityResultsSummary {
   totalCount: number;
 }
 
+export interface EligibilitySyncMeta {
+  isStale: boolean;
+  hasScan: boolean;
+  lastProfileUpdateAt: string | null;
+  lastEligibilityScanAt: string | null;
+}
+
 export interface EligibilityResultsResponse {
   results: unknown[];
   summary: EligibilityResultsSummary;
@@ -35,6 +42,8 @@ export interface EligibilityResultsResponse {
   profileState: string | null;
   /** True while at least one result is still awaiting AI explanation generation. */
   aiProcessing: boolean;
+  /** Profile ↔ scan synchronization metadata. */
+  sync: EligibilitySyncMeta;
 }
 
 const US_STATES = [

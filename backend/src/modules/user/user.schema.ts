@@ -96,6 +96,7 @@ export const updateProfileSchema = z.object({
     preferred_language: z.string().nullable().or(z.literal('')).optional(),
     marital_status: z.string().nullable().or(z.literal('')).optional(),
     other_adults: z.boolean().optional(),
+    other_household_income: z.boolean().optional(),
     income_sources: z.array(z.string()).optional(),
     work_situation: z.string().nullable().or(z.literal('')).optional(),
     employer_name: z.string().nullable().or(z.literal('')).optional(),

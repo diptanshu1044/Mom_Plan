@@ -14,31 +14,41 @@ export const runSubscriptionSyncTask = async () => {
       return;
     }
 
-    const users = await prisma.user.findMany({
+    const subscriptions = await prisma.subscription.findMany({
       where: {
         plan: { in: ['partner', 'network'] },
+        status: { in: ['active', 'past_due', 'trialing'] },
         stripe_subscription_id: { not: null },
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            middle_name: true,
+            last_name: true,
+          },
+        },
       },
     });
 
-    for (const user of users) {
-      if (!user.stripe_subscription_id) continue;
+    for (const record of subscriptions) {
+      const user = record.user;
+      if (!record.stripe_subscription_id) continue;
 
       try {
-        const subscription = await stripe.subscriptions.retrieve(user.stripe_subscription_id);
+        const subscription = await stripe.subscriptions.retrieve(record.stripe_subscription_id);
 
         if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
           await prisma.subscription.updateMany({
-            where: { stripe_subscription_id: user.stripe_subscription_id },
+            where: { stripe_subscription_id: record.stripe_subscription_id },
             data: { status: 'canceled' },
           });
 
           await prisma.user.update({
             where: { id: user.id },
-            data: {
-              plan: 'community',
-              stripe_subscription_id: null,
-            },
+            data: { stripe_subscription_id: null },
           });
 
           await prisma.notification.create({
@@ -61,7 +71,7 @@ export const runSubscriptionSyncTask = async () => {
           });
         } else {
           await prisma.subscription.updateMany({
-            where: { stripe_subscription_id: user.stripe_subscription_id },
+            where: { stripe_subscription_id: record.stripe_subscription_id },
             data: {
               status: subscription.status === 'past_due' ? 'past_due' : 'active',
               current_period_end: new Date(subscription.current_period_end * 1000),

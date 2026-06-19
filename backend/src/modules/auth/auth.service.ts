@@ -5,7 +5,7 @@ import { prisma } from '../../config/prisma';
 import { env, refreshTokenTtlMs } from '../../config/env';
 import { BadRequestError, UnauthorizedError, NotFoundError } from '../../utils/errors';
 import { sendEmail } from '../../config/email';
-import { UserRole, UserPlan } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { MotherOrgEnrollmentService } from '../partner/mother-org-enrollment.service';
 import { joinFullName } from '../../utils/name.utils';
 import {
@@ -15,13 +15,23 @@ import {
 
 const motherOrgEnrollment = new MotherOrgEnrollmentService();
 
+const authUserSelect = {
+  id: true,
+  email: true,
+  first_name: true,
+  middle_name: true,
+  last_name: true,
+  role: true,
+  password_hash: true,
+  status: true,
+} as const;
+
 const resetTokensCache = new Map<string, string>();
 
 interface AccessTokenPayload {
   userId: string;
   email: string;
   role: UserRole;
-  plan: UserPlan;
 }
 
 interface AuthUserSummary {
@@ -31,7 +41,6 @@ interface AuthUserSummary {
   middle_name: string | null;
   last_name: string;
   role: UserRole;
-  plan: UserPlan;
 }
 
 function hashToken(token: string): string {
@@ -49,7 +58,6 @@ function toAuthUser(user: {
   middle_name: string | null;
   last_name: string;
   role: UserRole;
-  plan: UserPlan;
 }): AuthUserSummary {
   return {
     id: user.id,
@@ -58,7 +66,6 @@ function toAuthUser(user: {
     middle_name: user.middle_name,
     last_name: user.last_name,
     role: user.role,
-    plan: user.plan,
   };
 }
 
@@ -69,7 +76,6 @@ export class AuthService {
         userId: user.userId,
         email: user.email,
         role: user.role,
-        plan: user.plan,
       },
       env.JWT_SECRET,
       { expiresIn: env.JWT_ACCESS_TOKEN_EXPIRES_IN as jwt.SignOptions['expiresIn'] }
@@ -106,13 +112,11 @@ export class AuthService {
     middle_name: string | null;
     last_name: string;
     role: UserRole;
-    plan: UserPlan;
   }) {
     const accessToken = this.generateAccessToken({
       userId: user.id,
       email: user.email,
       role: user.role,
-      plan: user.plan,
     });
     const refreshToken = await this.createRefreshToken(user.id);
 
@@ -211,6 +215,7 @@ export class AuthService {
   async login(data: { email: string; password: string }) {
     const user = await prisma.user.findUnique({
       where: { email: data.email },
+      select: authUserSelect,
     });
 
     if (!user || user.status === 'inactive') {
@@ -249,7 +254,19 @@ export class AuthService {
 
     const storedToken = await prisma.refreshToken.findUnique({
       where: { token: tokenHash },
-      include: { user: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            middle_name: true,
+            last_name: true,
+            role: true,
+            status: true,
+          },
+        },
+      },
     });
 
     if (!storedToken) {
@@ -285,7 +302,6 @@ export class AuthService {
       userId: user.id,
       email: user.email,
       role: user.role,
-      plan: user.plan,
     });
     const newRefreshToken = await this.createRefreshToken(user.id);
 

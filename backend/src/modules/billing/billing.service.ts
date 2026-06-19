@@ -59,6 +59,11 @@ function mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionStatus
 
 
 export class BillingService {
+  private async getCurrentPlan(userId: string): Promise<UserPlan> {
+    const subscription = await this.getActiveSubscription(userId);
+    return subscription?.plan ?? 'community';
+  }
+
   private async getUserOrThrow(userId: string) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundError('User not found');
@@ -176,7 +181,6 @@ export class BillingService {
     await prisma.user.update({
       where: { id: userId },
       data: {
-        plan,
         stripe_customer_id: stripeCustomerId ?? user.stripe_customer_id,
         stripe_subscription_id: stripeSubscriptionId ?? user.stripe_subscription_id,
       },
@@ -236,7 +240,6 @@ export class BillingService {
     await prisma.user.update({
       where: { id: userId },
       data: {
-        plan: 'community',
         stripe_subscription_id: null,
       },
     });
@@ -319,7 +322,9 @@ export class BillingService {
     const stripePriceId = getStripePriceId(planId, interval);
     const amountCents = getAmountCents(planId, interval);
 
-    if (!isUpgrade(user.plan, target)) {
+    const currentPlan = await this.getCurrentPlan(userId);
+
+    if (!isUpgrade(currentPlan, target)) {
       throw new BadRequestError('Target plan must be higher than your current plan');
     }
 
@@ -373,7 +378,9 @@ export class BillingService {
     const user = await this.getUserOrThrow(userId);
     const target = toUserPlan(targetPlan);
 
-    if (!isDowngrade(user.plan, target)) {
+    const currentPlan = await this.getCurrentPlan(userId);
+
+    if (!isDowngrade(currentPlan, target)) {
       throw new BadRequestError('Target plan must be lower than your current plan');
     }
 
@@ -404,12 +411,13 @@ export class BillingService {
     userId: string,
     user: {
       id: string;
-      plan: UserPlan;
       stripe_customer_id: string | null;
       stripe_subscription_id: string | null;
     }
   ) {
-    if (user.plan === 'community') {
+    const currentPlan = await this.getCurrentPlan(userId);
+
+    if (currentPlan === 'community') {
       throw new BadRequestError('No active paid subscription to cancel');
     }
 
@@ -557,7 +565,6 @@ export class BillingService {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
-        plan: true,
         stripe_customer_id: true,
         stripe_subscription_id: true,
       },
@@ -586,7 +593,7 @@ export class BillingService {
     }
 
     return {
-      plan: user.plan,
+      plan: subscription?.plan ?? 'community',
       status,
       current_period_end: currentPeriodEnd,
       next_billing_date: currentPeriodEnd,
@@ -597,10 +604,11 @@ export class BillingService {
   }
 
   private async syncSubscriptionFromStripe(stripeSub: Stripe.Subscription, userId: string, plan?: UserPlan) {
+    const activeSubscription = await this.getActiveSubscription(userId);
     const resolvedPlan =
       plan ??
       (stripeSub.metadata?.plan as UserPlan | undefined) ??
-      (await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } }))?.plan ??
+      activeSubscription?.plan ??
       'community';
 
     await this.activateSubscription({
@@ -722,7 +730,9 @@ export class BillingService {
     const user = await prisma.user.findFirst({ where: { stripe_customer_id: customerId } });
     if (!user) return;
 
-    const plan = (subscription.metadata?.plan as UserPlan) || user.plan;
+    const plan =
+      (subscription.metadata?.plan as UserPlan | undefined) ??
+      (await this.getCurrentPlan(user.id));
 
     if (subscription.status === 'canceled' || subscription.status === 'unpaid') {
       await this.downgradeUser(user.id, user.email, formatUserName(user));
@@ -851,7 +861,7 @@ export class BillingService {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { plan: 'community', stripe_subscription_id: null },
+      data: { stripe_subscription_id: null },
     });
 
     await sendEmail({

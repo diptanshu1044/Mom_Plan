@@ -18,6 +18,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { StatCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
+import { EligibilityStaleBanner } from "@/components/eligibility/EligibilityStaleBanner";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
 import { queryKeys } from "@/lib/query-keys";
@@ -49,6 +50,8 @@ export default function DashboardPage() {
   });
 
   const eligibilityResults = eligibilityData?.results ?? [];
+  const isStale = eligibilityData?.sync?.isStale ?? false;
+  const hasScan = eligibilityData?.sync?.hasScan ?? eligibilityResults.length > 0;
 
   const { data: applications, isLoading: loadingApps } = useQuery({
     queryKey: ["applications"],
@@ -145,6 +148,18 @@ export default function DashboardPage() {
           })}
         </p>
       </motion.div>
+
+      {isStale && hasScan && (
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          custom={0.3}
+          className="mb-8"
+        >
+          <EligibilityStaleBanner />
+        </motion.div>
+      )}
 
       {/* No eligibility scan banner */}
       {!loadingEligibility && (eligibilityData?.summary?.totalCount ?? eligibilityResults.length) === 0 && (

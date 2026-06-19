@@ -161,7 +161,6 @@ export class PartnerAuthService {
           first_name: nameParts.first_name,
           middle_name: nameParts.middle_name,
           last_name: nameParts.last_name,
-          plan: 'community',
           org_id: org.id,
         },
       });

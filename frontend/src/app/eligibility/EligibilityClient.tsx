@@ -40,36 +40,26 @@ import {
   validateDateOfBirth,
 } from "@/lib/date-of-birth";
 import {
-  formatPhoneForApi,
   isValidUsPhoneDigits,
   normalizeUsPhoneDigits,
 } from "@/lib/phone";
 import { ProfileLocationDisplay } from "@/components/profile/ProfileLocationDisplay";
 import { getUserLocationDefaults } from "@/hooks/useUserLocationDefaults";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
+import {
+  clearRescanDismissal,
+  eligibilityFormToProfilePayload,
+  otherAdultsPossible,
+  profileToEligibilityForm,
+  type EligibilityFormData,
+} from "@/lib/profile-sync";
 
 /**
  * Safely converts a value that might be a Prisma Decimal object, number, or
  * string to a plain string for use in form inputs.
- * Handles the case where old Zustand-persisted state still has the raw
- * Decimal object shape { s, e, d } from before the backend serialization fix.
  */
 function normalizeSsnLastFour(value: string | null | undefined): string {
   return String(value ?? "").replace(/\D/g, "").slice(0, 4);
-}
-
-function parseDecimalToString(val: any): string {
-  if (val === null || val === undefined) return "";
-  if (typeof val === "number") return String(val);
-  if (typeof val === "string") return val;
-  // Handle Prisma Decimal objects which have a toJSON or toString method
-  if (typeof val.toJSON === "function") return String(val.toJSON());
-  if (typeof val.toString === "function") {
-    const str = val.toString();
-    // Only return if it looks like a number, not "[object Object]"
-    if (!isNaN(Number(str))) return str;
-  }
-  return "";
 }
 
 const SECTIONS = [
@@ -218,10 +208,6 @@ function PillButton({ active, onClick, children, className = "" }: {
       {children}
     </button>
   );
-}
-
-function otherAdultsPossible(householdSize: number, numChildren: number) {
-  return householdSize - 1 - numChildren > 0;
 }
 
 const WORK_HOURS_IDS = new Set(WORK_HOURS_OPTIONS.map((o) => o.id));
@@ -416,7 +402,7 @@ export default function EligibilityPage() {
     Boolean(profileLocation.state.trim()) &&
     Boolean(profileLocation.city.trim());
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<EligibilityFormData>({
     first_name: "",
     last_name: "",
     date_of_birth: "",
@@ -470,90 +456,12 @@ export default function EligibilityPage() {
     api.get("/api/user/profile")
       .then((res) => {
         const freshUser = res.data.data;
-        // Update Zustand store with fresh, properly serialized data
         updateUser(freshUser);
-
-        const fp = freshUser?.family_profile;
-
-        const dobStr = apiDateToIsoLocal(fp?.date_of_birth);
-
-        const householdSize = fp?.household_size || 1;
-        const numChildren = Math.min(fp?.num_children || 0, Math.max(0, householdSize - 1));
-        const initialDobs = [...(fp?.children_dobs || [])].map((dob) => apiDateToIsoLocal(dob));
-        while (initialDobs.length < numChildren) initialDobs.push("");
-
-        setFormData({
-          first_name: freshUser?.first_name || fp?.first_name || "",
-          last_name: freshUser?.last_name || fp?.last_name || "",
-          date_of_birth: dobStr,
-          ssn_last_four: normalizeSsnLastFour(fp?.ssn_last_four),
-          phone: normalizeUsPhoneDigits(freshUser?.phone || fp?.phone || ""),
-          email: freshUser?.email || fp?.email || "",
-          preferred_language: fp?.preferred_language || "English",
-          street_address: fp?.street_address || "",
-          monthly_income: parseDecimalToString(fp?.monthly_income),
-          income_sources: (fp?.income_sources as string[]) || [],
-          employment_status: fp?.employment_status || "full_time",
-          employer_name: fp?.employer_name || "",
-          other_earners: fp?.other_household_income ? "family" : "none",
-          savings_assets: fp?.savings_assets || "none",
-          child_support_status: fp?.child_support_status || "no_arrangement",
-          household_size: householdSize,
-          num_children: numChildren,
-          children_birthdates: initialDobs.slice(0, numChildren),
-          has_disability: numChildren > 0 ? (fp?.has_disability ?? null) : null,
-          is_pregnant: fp?.is_pregnant ?? null,
-          marital_status: fp?.marital_status || "single",
-          other_adults: otherAdultsPossible(householdSize, numChildren) ? (fp?.other_adults ?? null) : null,
-          housing_status: fp?.housing_status || "renting",
-          monthly_rent: parseDecimalToString(fp?.monthly_rent),
-          monthly_utilities: parseDecimalToString(fp?.monthly_utilities),
-          landlord_name: fp?.landlord_name || "",
-          eviction_risk: fp?.eviction_risk ?? null,
-          needs_childcare: fp?.needs_childcare ?? null,
-          childcare_preference: fp?.childcare_preference || "",
-          childcare_provider: fp?.childcare_provider || "",
-          monthly_childcare_cost: parseDecimalToString(fp?.monthly_childcare_cost),
-          work_hours: parseWorkHours(fp?.work_situation),
-          health_insurance: fp?.health_insurance || "none",
-          chronic_illness: fp?.chronic_illness ?? null,
-          er_visit: null,
-          immigration_status: fp?.immigration_status || "citizen",
-          legal_issues: (fp?.legal_issues as string[]) || [],
-          urgency: fp?.urgency || "not_urgent",
-          domestic_violence: fp?.domestic_violence ?? null,
-          org_type: freshUser?.org_type || "",
-          org_id: freshUser?.org_id || "",
-        });
+        setFormData((prev) => ({ ...prev, ...profileToEligibilityForm(freshUser) }));
       })
       .catch(() => {
-        // Fallback to Zustand state if API fetch fails
         if (user) {
-          const fp = user.family_profile;
-          const dobStr = apiDateToIsoLocal(fp?.date_of_birth);
-          const householdSize = fp?.household_size || 1;
-          const numChildren = Math.min(fp?.num_children || 0, Math.max(0, householdSize - 1));
-          const initialDobs = [...(fp?.children_dobs || [])].map((dob) => apiDateToIsoLocal(dob));
-          while (initialDobs.length < numChildren) initialDobs.push("");
-          setFormData(prev => ({
-            ...prev,
-            first_name: user.first_name || fp?.first_name || "",
-            last_name: user.last_name || fp?.last_name || "",
-            date_of_birth: dobStr,
-            phone: normalizeUsPhoneDigits(user.phone || fp?.phone || ""),
-            email: user.email || fp?.email || "",
-            monthly_income: parseDecimalToString(fp?.monthly_income),
-            monthly_rent: parseDecimalToString(fp?.monthly_rent),
-            monthly_utilities: parseDecimalToString(fp?.monthly_utilities),
-            monthly_childcare_cost: parseDecimalToString(fp?.monthly_childcare_cost),
-            household_size: householdSize,
-            num_children: numChildren,
-            children_birthdates: initialDobs.slice(0, numChildren),
-            has_disability: numChildren > 0 ? (fp?.has_disability ?? null) : null,
-            other_adults: otherAdultsPossible(householdSize, numChildren) ? (fp?.other_adults ?? null) : null,
-            org_type: user.org_type || "",
-            org_id: user.org_id || "",
-          }));
+          setFormData((prev) => ({ ...prev, ...profileToEligibilityForm(user) }));
         }
       })
       .finally(() => setIsFetchingProfile(false));
@@ -667,6 +575,7 @@ export default function EligibilityPage() {
     if (target > 1 && !validateStep1()) return;
     if (target > 2 && !validateStep2()) return;
     if (target > 4 && !validateStep4()) return;
+    void syncProfileFromForm(formData);
     setStep(target);
   };
 
@@ -687,7 +596,22 @@ export default function EligibilityPage() {
     if (step === 1 && !validateStep1()) return;
     if (step === 2 && !validateStep2()) return;
     if (step === 4 && !validateStep4()) return;
+    void syncProfileFromForm(formData);
     setStep((s) => s + 1);
+  };
+
+  const syncProfileFromForm = async (data: EligibilityFormData) => {
+    if (!isAuthenticated) return;
+    try {
+      const res = await api.put("/api/user/profile", eligibilityFormToProfilePayload(data));
+      updateUser(res.data.data);
+      queryClient.invalidateQueries({
+        queryKey: ["eligibility-results"],
+        refetchType: "none",
+      });
+    } catch (err) {
+      console.error("Profile sync failed:", err);
+    }
   };
 
   const maxNumChildren = Math.max(0, formData.household_size - 1);
@@ -772,60 +696,18 @@ export default function EligibilityPage() {
     }
     setIsScanning(true);
     try {
-      const ages = dataToSubmit.children_birthdates.map((dob) => {
-        if (!dob) return 2;
-        const birth = new Date(dob);
-        if (isNaN(birth.getTime())) return 2;
-        const diff = Date.now() - birth.getTime();
-        return Math.max(0, Math.abs(new Date(diff).getUTCFullYear() - 1970));
+      const scanRes = await api.post("/api/eligibility/scan", {
+        profile: eligibilityFormToProfilePayload(dataToSubmit),
       });
-
-      const profileRes = await api.put("/api/user/profile", {
-        first_name: dataToSubmit.first_name || null,
-        last_name: dataToSubmit.last_name || null,
-        phone: formatPhoneForApi(dataToSubmit.phone) || undefined,
-        email: dataToSubmit.email || undefined,
-        street_address: dataToSubmit.street_address || undefined,
-        household_size: dataToSubmit.household_size,
-        num_children: dataToSubmit.num_children,
-        children_ages: ages,
-        children_dobs: dataToSubmit.children_birthdates,
-        monthly_income: parseFloat(dataToSubmit.monthly_income) || 0,
-        employment_status: dataToSubmit.employment_status,
-        housing_status: dataToSubmit.housing_status,
-        is_pregnant: dataToSubmit.is_pregnant ?? false,
-        has_disability: dataToSubmit.has_disability ?? false,
-        needs_childcare: dataToSubmit.needs_childcare ?? false,
-        monthly_rent: parseFloat(dataToSubmit.monthly_rent) || 0,
-        monthly_utilities: parseFloat(dataToSubmit.monthly_utilities) || 0,
-        eviction_risk: dataToSubmit.eviction_risk ?? false,
-        domestic_violence: dataToSubmit.domestic_violence ?? false,
-        chronic_illness: dataToSubmit.chronic_illness ?? false,
-        immigration_status: dataToSubmit.immigration_status,
-        date_of_birth: dataToSubmit.date_of_birth,
-        ssn_last_four: normalizeSsnLastFour(dataToSubmit.ssn_last_four) || null,
-        preferred_language: dataToSubmit.preferred_language,
-        marital_status: dataToSubmit.marital_status,
-        other_adults: dataToSubmit.other_adults ?? false,
-        income_sources: dataToSubmit.income_sources,
-        work_situation: dataToSubmit.work_hours.length > 0 ? dataToSubmit.work_hours.join(",") : undefined,
-        employer_name: dataToSubmit.employer_name || undefined,
-        health_insurance: dataToSubmit.health_insurance,
-        savings_assets: dataToSubmit.savings_assets,
-        monthly_childcare_cost: dataToSubmit.needs_childcare ? (parseFloat(dataToSubmit.monthly_childcare_cost) || 0) : null,
-        childcare_preference: dataToSubmit.childcare_preference || undefined,
-        childcare_provider: dataToSubmit.childcare_provider || undefined,
-        legal_issues: dataToSubmit.legal_issues,
-        urgency: dataToSubmit.urgency,
-        org_type: dataToSubmit.org_type || null,
-        org_id: dataToSubmit.org_id || null,
-      });
-      updateUser(profileRes.data.data);
-
-      const scanRes = await api.post("/api/eligibility/scan");
-      // Response shape: { results: [...], aiStatus: "processing" }
       const scanData = scanRes.data.data;
+      if (scanData?.profile) {
+        updateUser(scanData.profile);
+      } else {
+        const profileRes = await api.get("/api/user/profile");
+        updateUser(profileRes.data.data);
+      }
       setResults(scanData?.results ?? scanData ?? []);
+      clearRescanDismissal();
       queryClient.invalidateQueries({ queryKey: ["eligibility-results"] });
       queryClient.invalidateQueries({ queryKey: ["applications"] });
       queryClient.invalidateQueries({ queryKey: ["deadlines"] });
