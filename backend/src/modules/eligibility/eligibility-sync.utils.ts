@@ -24,22 +24,27 @@ export function computeLastProfileUpdateAt(
 
 export function computeEligibilitySyncStatus(
   user: Pick<User, 'updated_at'>,
-  familyProfile: Pick<FamilyProfile, 'updated_at'> | null | undefined,
+  familyProfile:
+    | Pick<FamilyProfile, 'updated_at' | 'last_eligibility_scan_at'>
+    | null
+    | undefined,
   lastEligibilityScanAt: Date | null
 ): EligibilitySyncStatus {
   const lastProfileUpdateAt = computeLastProfileUpdateAt(user, familyProfile);
-  const hasScan = lastEligibilityScanAt !== null;
+  const resolvedScanAt = familyProfile?.last_eligibility_scan_at ?? lastEligibilityScanAt;
+  const hasScan = resolvedScanAt !== null;
 
   const isStale =
     hasScan &&
     lastProfileUpdateAt !== null &&
-    lastProfileUpdateAt.getTime() > lastEligibilityScanAt.getTime();
+    resolvedScanAt !== null &&
+    lastProfileUpdateAt.getTime() > resolvedScanAt.getTime();
 
   return {
     isStale,
     hasScan,
     lastProfileUpdateAt,
-    lastEligibilityScanAt,
+    lastEligibilityScanAt: resolvedScanAt,
   };
 }
 

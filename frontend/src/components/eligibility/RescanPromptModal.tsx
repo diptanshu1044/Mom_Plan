@@ -22,7 +22,7 @@ export function RescanPromptModal({ open, onClose }: RescanPromptModalProps) {
 
   const handleRescanNow = () => {
     onClose();
-    router.push("/eligibility");
+    router.push("/eligibility?rescan=1");
   };
 
   return (

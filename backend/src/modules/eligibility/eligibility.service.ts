@@ -55,7 +55,12 @@ export class EligibilityService {
     const [user, lastScan] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
-        select: { updated_at: true, family_profile: { select: { updated_at: true } } },
+        select: {
+          updated_at: true,
+          family_profile: {
+            select: { updated_at: true, last_eligibility_scan_at: true },
+          },
+        },
       }),
       prisma.eligibilityResult.findFirst({
         where: { user_id: userId },
@@ -157,12 +162,20 @@ export class EligibilityService {
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);
 
-    // 5. Replace prior results atomically, then return immediately
+    // 5. Replace prior results atomically and stamp the profile scan time so
+    // stale detection stays accurate even when profile fields were just updated.
+    const scannedAt = new Date();
     await prisma.$transaction(async (tx) => {
       await tx.eligibilityResult.deleteMany({ where: { user_id: userId } });
       if (eligibilityRows.length > 0) {
-        await tx.eligibilityResult.createMany({ data: eligibilityRows });
+        await tx.eligibilityResult.createMany({
+          data: eligibilityRows.map((row) => ({ ...row, checked_at: scannedAt })),
+        });
       }
+      await tx.familyProfile.update({
+        where: { user_id: userId },
+        data: { last_eligibility_scan_at: scannedAt },
+      });
     });
 
     // 6. Fire-and-forget: AI explanation generation happens after response is sent

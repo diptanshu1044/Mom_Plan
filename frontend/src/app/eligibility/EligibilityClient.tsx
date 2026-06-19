@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -33,6 +33,7 @@ import { Card } from "@/components/ui/Card";
 import { DateOfBirthPicker } from "@/components/ui/DateOfBirthPicker";
 import { useAuthStore } from "@/store/auth.store";
 import { api } from "@/lib/api";
+import { queryKeys } from "@/lib/query-keys";
 import {
   apiDateToIsoLocal,
   getAdultDobBounds,
@@ -395,6 +396,8 @@ export default function EligibilityPage() {
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isRescanMode = searchParams.get("rescan") === "1";
 
   const profileLocation = getUserLocationDefaults(user);
   const hasProfileLocation =
@@ -651,42 +654,6 @@ export default function EligibilityPage() {
     const dataToSubmit = overrideData || formData;
     setError(null);
 
-    const bounds = getAdultDobBounds();
-    const dobResult = validateDateOfBirth(
-      dataToSubmit.date_of_birth ? parseIsoDateLocal(dataToSubmit.date_of_birth) : null,
-      bounds,
-      { required: true }
-    );
-    if (!dobResult.valid) {
-      setDobError(dobResult.message);
-      setStep(1);
-      return;
-    }
-    setDobError(null);
-    if (!validatePhone(dataToSubmit.phone)) {
-      setStep(1);
-      return;
-    }
-    if (isAuthenticated && !hasProfileLocation) {
-      setLocationError(
-        "Your profile is missing location details. Add your ZIP code in Profile before running a scan."
-      );
-      setStep(1);
-      return;
-    }
-    setLocationError(null);
-    if (dataToSubmit.monthly_income === "") {
-      setMonthlyIncomeError("Please enter your monthly income (enter 0 if you have no income).");
-      setStep(2);
-      return;
-    }
-    setMonthlyIncomeError(null);
-    if (dataToSubmit.monthly_rent === "") {
-      setMonthlyRentError("Please enter your monthly rent (enter 0 if you pay nothing).");
-      setStep(4);
-      return;
-    }
-    setMonthlyRentError(null);
     if (!isAuthenticated) {
       if (typeof window !== "undefined") {
         localStorage.setItem("pending_eligibility_scan", JSON.stringify(dataToSubmit));
@@ -694,11 +661,52 @@ export default function EligibilityPage() {
       router.push("/signup/mother?redirect=eligibility");
       return;
     }
+    if (!hasProfileLocation) {
+      setLocationError(
+        "Your profile is missing location details. Add your ZIP code in Profile before running a scan."
+      );
+      setStep(1);
+      return;
+    }
+    setLocationError(null);
+
+    if (!isRescanMode) {
+      const bounds = getAdultDobBounds();
+      const dobResult = validateDateOfBirth(
+        dataToSubmit.date_of_birth ? parseIsoDateLocal(dataToSubmit.date_of_birth) : null,
+        bounds,
+        { required: true }
+      );
+      if (!dobResult.valid) {
+        setDobError(dobResult.message);
+        setStep(1);
+        return;
+      }
+      setDobError(null);
+      if (!validatePhone(dataToSubmit.phone)) {
+        setStep(1);
+        return;
+      }
+      if (dataToSubmit.monthly_income === "") {
+        setMonthlyIncomeError("Please enter your monthly income (enter 0 if you have no income).");
+        setStep(2);
+        return;
+      }
+      setMonthlyIncomeError(null);
+      if (dataToSubmit.monthly_rent === "") {
+        setMonthlyRentError("Please enter your monthly rent (enter 0 if you pay nothing).");
+        setStep(4);
+        return;
+      }
+      setMonthlyRentError(null);
+    }
+
     setIsScanning(true);
     try {
-      const scanRes = await api.post("/api/eligibility/scan", {
-        profile: eligibilityFormToProfilePayload(dataToSubmit),
-      });
+      const scanRes = await api.post(
+        "/api/eligibility/scan",
+        isRescanMode ? {} : { profile: eligibilityFormToProfilePayload(dataToSubmit) }
+      );
       const scanData = scanRes.data.data;
       if (scanData?.profile) {
         updateUser(scanData.profile);
@@ -709,6 +717,7 @@ export default function EligibilityPage() {
       setResults(scanData?.results ?? scanData ?? []);
       clearRescanDismissal();
       queryClient.invalidateQueries({ queryKey: ["eligibility-results"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.userProfile });
       queryClient.invalidateQueries({ queryKey: ["applications"] });
       queryClient.invalidateQueries({ queryKey: ["deadlines"] });
       setScanComplete(true);
@@ -850,6 +859,17 @@ export default function EligibilityPage() {
           />
         </div>
       </div>
+
+      {isRescanMode && (
+        <div className="max-w-2xl mx-auto px-4 mb-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <p className="font-semibold text-amber-950">Profile rescan</p>
+            <p className="mt-1 text-amber-800">
+              Review your saved profile below, then run the scan. Your saved profile details will be used — no need to re-enter everything.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-2xl mx-auto px-4 mb-6">
         <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-thin">
@@ -1420,7 +1440,7 @@ export default function EligibilityPage() {
                     disabled={isAuthenticated && !hasProfileLocation}
                     className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-md"
                   >
-                    See Results <Sparkles className="w-4 h-4" />
+                    {isRescanMode ? "Rescan with Saved Profile" : "See Results"} <Sparkles className="w-4 h-4" />
                   </button>
                 )}
               </div>

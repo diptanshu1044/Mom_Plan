@@ -31,6 +31,8 @@ import { CardSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { filterStatesByCodes, mergeStateCodes, normalizeStateCodesFromApi, resolveStateCode } from "@/lib/us-states";
+import { queryKeys } from "@/lib/query-keys";
+import { clearRescanDismissal } from "@/lib/profile-sync";
 import { EligibilityStaleBanner } from "@/components/eligibility/EligibilityStaleBanner";
 import { RescanPromptModal } from "@/components/eligibility/RescanPromptModal";
 import { isRescanPromptDismissed } from "@/lib/profile-sync";
@@ -200,13 +202,15 @@ export default function BenefitsPage() {
   const scanMutation = useMutation({
     mutationFn: () => api.post("/api/eligibility/scan"),
     onSuccess: () => {
+      clearRescanDismissal();
       queryClient.invalidateQueries({ queryKey: ["eligibility-results"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.userProfile });
     },
   });
 
   const handleRescan = () => {
     if (isStale) {
-      router.push("/eligibility");
+      router.push("/eligibility?rescan=1");
       return;
     }
     scanMutation.mutate();
@@ -240,7 +244,7 @@ export default function BenefitsPage() {
 
       {isStale && hasScan && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <EligibilityStaleBanner onRescanNow={() => router.push("/eligibility")} />
+          <EligibilityStaleBanner onRescanNow={() => router.push("/eligibility?rescan=1")} />
         </motion.div>
       )}
 

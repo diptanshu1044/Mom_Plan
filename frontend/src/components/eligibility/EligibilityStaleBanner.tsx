@@ -45,7 +45,7 @@ export function EligibilityStaleBanner({
               </Button>
             ) : (
               <Button asChild size="sm">
-                <Link href="/eligibility">Rescan Now</Link>
+                <Link href="/eligibility?rescan=1">Rescan Now</Link>
               </Button>
             )}
           </div>
