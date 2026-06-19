@@ -55,7 +55,7 @@ const STEPS = [
     id: "team",
     label: "Team Setup",
     icon: Users,
-    description: "Primary contact & invites",
+    description: "Primary contact",
   },
   {
     id: "preferences",
@@ -102,7 +102,6 @@ const teamSchema = z.object({
   contact_name: z.string().min(2),
   contact_title: z.string().optional(),
   contact_email: z.string().email(),
-  invite_emails: z.string().optional(),
 });
 
 const prefSchema = z.object({
@@ -346,7 +345,6 @@ export function OnboardingClient() {
       contact_name: user?.full_name ?? draft.team?.contact_name ?? "",
       contact_title: user?.title ?? draft.team?.contact_title ?? "",
       contact_email: user?.email ?? draft.team?.contact_email ?? "",
-      invite_emails: draft.team?.invite_emails ?? "",
     },
   });
 
@@ -588,7 +586,7 @@ export function OnboardingClient() {
                 <StepCard
                   icon={Users}
                   title="Team Setup 👥"
-                  description="Set your primary contact and invite team members."
+                  description="Set your primary contact."
                 >
                   <form onSubmit={teamForm.handleSubmit(handleTeam)} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -601,16 +599,6 @@ export function OnboardingClient() {
                     </div>
                     <FormField label="Contact Email" required error={teamForm.formState.errors.contact_email?.message}>
                       <Input {...teamForm.register("contact_email")} type="email" placeholder="jane@yourorg.com" />
-                    </FormField>
-                    <FormField
-                      label="Invite Team Members"
-                      hint="Enter email addresses separated by commas. They'll receive an invitation to join."
-                    >
-                      <Textarea
-                        {...teamForm.register("invite_emails")}
-                        rows={3}
-                        placeholder="colleague@yourorg.com, another@yourorg.com…"
-                      />
                     </FormField>
                     <StepButtons step={currentStep} onBack={goBack} isLast={false} isLoading={teamForm.formState.isSubmitting} />
                   </form>
