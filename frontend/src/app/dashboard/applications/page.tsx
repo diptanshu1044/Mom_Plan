@@ -210,7 +210,7 @@ export default function ApplicationsPage() {
                       <span>
                         Secure application sent
                         {app.submitted_at
-                          ? ` on ${formatDate(app.submitted_at, "MMM d, yyyy")}`
+                          ? ` on ${formatDate(app.submitted_at)}`
                           : ""}
                       </span>
                     </div>
