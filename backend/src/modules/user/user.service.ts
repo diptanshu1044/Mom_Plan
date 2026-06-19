@@ -205,7 +205,14 @@ export class UserService {
       }
     }
 
-    if (Object.keys(userUpdate).length > 0 || familyUpdate) {
+    // When eligibility-relevant fields change, clear the scan-fresh flag so the
+    // stale banner shows until the user runs a new scan.
+    const familyUpdateWithStaleMark =
+      shouldRescanEligibility && familyUpdate
+        ? { ...familyUpdate, last_eligibility_scan_at: null }
+        : familyUpdate;
+
+    if (Object.keys(userUpdate).length > 0 || familyUpdateWithStaleMark) {
       await prisma.$transaction(async (tx) => {
         if (Object.keys(userUpdate).length > 0) {
           await tx.user.update({
@@ -214,11 +221,11 @@ export class UserService {
           });
         }
 
-        if (familyUpdate) {
+        if (familyUpdateWithStaleMark) {
           if (existingProfile.family_profile) {
             await tx.familyProfile.update({
               where: { user_id: userId },
-              data: familyUpdate,
+              data: familyUpdateWithStaleMark,
             });
           } else {
             await tx.familyProfile.create({
@@ -263,16 +270,31 @@ export class UserService {
                 first_name: first_name || null,
                 last_name: last_name || null,
                 children_dobs: children_dobs || [],
-                ...familyUpdate,
+                ...familyUpdateWithStaleMark,
               },
             });
           }
         }
+
+        // Edge case: eligibility-relevant fields changed but all are on the user
+        // record, leaving familyUpdate null. Still need to clear the stale flag.
+        if (shouldRescanEligibility && !familyUpdateWithStaleMark && existingProfile.family_profile) {
+          await tx.familyProfile.update({
+            where: { user_id: userId },
+            data: { last_eligibility_scan_at: null },
+          });
+        }
+      });
+    } else if (shouldRescanEligibility && existingProfile.family_profile) {
+      // No DB writes were needed for the profile, but we still need to mark stale.
+      await prisma.familyProfile.update({
+        where: { user_id: userId },
+        data: { last_eligibility_scan_at: null },
       });
     }
 
     const profile = serializeProfile(
-      mergeProfileResponse(existingProfile, userUpdate, familyUpdate, organization)
+      mergeProfileResponse(existingProfile, userUpdate, familyUpdateWithStaleMark ?? familyUpdate, organization)
     );
 
     const { EligibilityService } = await import('../eligibility/eligibility.service');

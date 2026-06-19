@@ -1,7 +1,7 @@
 import { FamilyProfile, User } from '@prisma/client';
 
 export interface EligibilitySyncStatus {
-  /** True when profile was updated after the most recent eligibility scan. */
+  /** True when eligibility-relevant profile fields changed since the last scan. */
   isStale: boolean;
   /** True when the user has at least one eligibility scan result. */
   hasScan: boolean;
@@ -11,40 +11,37 @@ export interface EligibilitySyncStatus {
   lastEligibilityScanAt: Date | null;
 }
 
-export function computeLastProfileUpdateAt(
-  user: Pick<User, 'updated_at'>,
-  familyProfile: Pick<FamilyProfile, 'updated_at'> | null | undefined
-): Date | null {
-  const timestamps = [user.updated_at, familyProfile?.updated_at].filter(
-    (d): d is Date => d instanceof Date
-  );
-  if (timestamps.length === 0) return null;
-  return new Date(Math.max(...timestamps.map((d) => d.getTime())));
-}
-
+/**
+ * Stale detection is event-driven, not timestamp-based:
+ *  - `last_eligibility_scan_at` is set to now() when a scan completes.
+ *  - `last_eligibility_scan_at` is cleared to null when eligibility-relevant
+ *    profile fields are updated.
+ *
+ * This avoids false positives from Prisma @updatedAt being written by the
+ * scan itself, or user.updated_at being bumped by unrelated changes (login, etc).
+ */
 export function computeEligibilitySyncStatus(
   user: Pick<User, 'updated_at'>,
   familyProfile:
     | Pick<FamilyProfile, 'updated_at' | 'last_eligibility_scan_at'>
     | null
     | undefined,
-  lastEligibilityScanAt: Date | null
+  hasScanResults: boolean
 ): EligibilitySyncStatus {
-  const lastProfileUpdateAt = computeLastProfileUpdateAt(user, familyProfile);
-  const resolvedScanAt = familyProfile?.last_eligibility_scan_at ?? lastEligibilityScanAt;
-  const hasScan = resolvedScanAt !== null;
+  // A scan has been run if results exist OR last_eligibility_scan_at is set.
+  const hasScan = hasScanResults || familyProfile?.last_eligibility_scan_at != null;
 
-  const isStale =
-    hasScan &&
-    lastProfileUpdateAt !== null &&
-    resolvedScanAt !== null &&
-    lastProfileUpdateAt.getTime() > resolvedScanAt.getTime();
+  // Stale = has results but last_eligibility_scan_at was explicitly cleared
+  // because an eligibility-relevant profile field changed after the scan.
+  const isStale = hasScan && familyProfile?.last_eligibility_scan_at == null;
+
+  const lastEligibilityScanAt = familyProfile?.last_eligibility_scan_at ?? null;
 
   return {
     isStale,
     hasScan,
-    lastProfileUpdateAt,
-    lastEligibilityScanAt: resolvedScanAt,
+    lastProfileUpdateAt: null,
+    lastEligibilityScanAt,
   };
 }
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { dismissRescanPrompt } from "@/lib/profile-sync";
@@ -8,11 +7,11 @@ import { dismissRescanPrompt } from "@/lib/profile-sync";
 interface RescanPromptModalProps {
   open: boolean;
   onClose: () => void;
+  /** Called when the user clicks "Rescan Now". Defaults to closing the modal. */
+  onRescanNow?: () => void;
 }
 
-export function RescanPromptModal({ open, onClose }: RescanPromptModalProps) {
-  const router = useRouter();
-
+export function RescanPromptModal({ open, onClose, onRescanNow }: RescanPromptModalProps) {
   if (!open) return null;
 
   const handleLater = () => {
@@ -22,7 +21,7 @@ export function RescanPromptModal({ open, onClose }: RescanPromptModalProps) {
 
   const handleRescanNow = () => {
     onClose();
-    router.push("/eligibility?rescan=1");
+    onRescanNow?.();
   };
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
   Sparkles,
@@ -14,6 +14,7 @@ import {
   Calendar,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
@@ -43,10 +44,20 @@ const greeting = () => {
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+  const router = useRouter();
 
   const { data: eligibilityData, isLoading: loadingEligibility } = useQuery({
     queryKey: ["eligibility-results", {}],
     queryFn: () => api.get("/api/eligibility/results").then((r) => r.data.data),
+  });
+
+  const scanMutation = useMutation({
+    mutationFn: () => api.post("/api/eligibility/scan"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["eligibility-results"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.userProfile });
+    },
   });
 
   const eligibilityResults = eligibilityData?.results ?? [];
@@ -157,7 +168,10 @@ export default function DashboardPage() {
           custom={0.3}
           className="mb-8"
         >
-          <EligibilityStaleBanner />
+          <EligibilityStaleBanner
+            onRescanNow={() => scanMutation.mutate()}
+            onReviewAndRescan={() => router.push("/eligibility?rescan=1")}
+          />
         </motion.div>
       )}
 

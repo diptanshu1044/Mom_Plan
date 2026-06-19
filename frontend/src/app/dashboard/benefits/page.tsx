@@ -32,10 +32,9 @@ import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth.store";
 import { filterStatesByCodes, mergeStateCodes, normalizeStateCodesFromApi, resolveStateCode } from "@/lib/us-states";
 import { queryKeys } from "@/lib/query-keys";
-import { clearRescanDismissal } from "@/lib/profile-sync";
+import { isRescanPromptDismissed } from "@/lib/profile-sync";
 import { EligibilityStaleBanner } from "@/components/eligibility/EligibilityStaleBanner";
 import { RescanPromptModal } from "@/components/eligibility/RescanPromptModal";
-import { isRescanPromptDismissed } from "@/lib/profile-sync";
 import {
   buildYearFilterOptions,
   formatCurrency,
@@ -194,7 +193,12 @@ export default function BenefitsPage() {
   }, [profileState, authProfileState]);
 
   useEffect(() => {
-    if (isStale && hasScan && !isRescanPromptDismissed()) {
+    if (!isStale) {
+      // Scan just completed or was never needed — close any open modal.
+      setShowRescanPrompt(false);
+      return;
+    }
+    if (hasScan && !isRescanPromptDismissed()) {
       setShowRescanPrompt(true);
     }
   }, [isStale, hasScan]);
@@ -202,7 +206,6 @@ export default function BenefitsPage() {
   const scanMutation = useMutation({
     mutationFn: () => api.post("/api/eligibility/scan"),
     onSuccess: () => {
-      clearRescanDismissal();
       queryClient.invalidateQueries({ queryKey: ["eligibility-results"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.userProfile });
     },
@@ -218,7 +221,11 @@ export default function BenefitsPage() {
 
   return (
     <div>
-      <RescanPromptModal open={showRescanPrompt} onClose={() => setShowRescanPrompt(false)} />
+      <RescanPromptModal
+        open={showRescanPrompt}
+        onClose={() => setShowRescanPrompt(false)}
+        onRescanNow={() => scanMutation.mutate()}
+      />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
@@ -244,7 +251,9 @@ export default function BenefitsPage() {
 
       {isStale && hasScan && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-          <EligibilityStaleBanner onRescanNow={() => router.push("/eligibility?rescan=1")} />
+          <EligibilityStaleBanner
+            onRescanNow={() => scanMutation.mutate()}
+          />
         </motion.div>
       )}
 

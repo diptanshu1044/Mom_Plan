@@ -94,6 +94,17 @@ function ScrollingFileName({ text }: { text: string }) {
   );
 }
 
+function pdfMatchesQuarterYear(
+  pdf: { quarter?: string | null; year?: number | null },
+  quarter?: string,
+  year?: number
+): boolean {
+  if (!quarter) return true;
+  if (pdf.quarter !== quarter) return false;
+  if (year != null && pdf.year != null && pdf.year !== year) return false;
+  return true;
+}
+
 function isVaultDocumentForProgram(
   doc: {
     id?: string;
@@ -172,8 +183,13 @@ export default function ApplyModal({
 
   const matchedApp = (applications || []).find((a: any) => a.id === applicationId);
   const pdfPackage =
-    matchedApp?.generated_pdfs?.[0] ??
-    quarterPdfs?.find((p: any) => p.program_id === program?.id);
+    matchedApp?.generated_pdfs?.find((p: any) =>
+      pdfMatchesQuarterYear(p, pdfQuarter, pdfYear)
+    ) ??
+    quarterPdfs?.find(
+      (p: any) =>
+        p.program_id === program?.id && pdfMatchesQuarterYear(p, pdfQuarter, pdfYear)
+    );
 
   const packageVaultDoc = documents?.find(
     (d: any) =>

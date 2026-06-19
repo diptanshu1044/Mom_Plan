@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -48,7 +48,6 @@ import { ProfileLocationDisplay } from "@/components/profile/ProfileLocationDisp
 import { getUserLocationDefaults } from "@/hooks/useUserLocationDefaults";
 import { PartnerOrgSelect } from "@/components/profile/PartnerOrgSelect";
 import {
-  clearRescanDismissal,
   eligibilityFormToProfilePayload,
   otherAdultsPossible,
   profileToEligibilityForm,
@@ -396,8 +395,11 @@ export default function EligibilityPage() {
   const { isAuthenticated, user, updateUser } = useAuthStore();
   const queryClient = useQueryClient();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const isRescanMode = searchParams.get("rescan") === "1";
+  // Read rescan flag once on mount from the URL — avoids useSearchParams and its
+  // Suspense requirement, which can cause render-cycle issues with the step state.
+  const isRescanMode = useRef(
+    typeof window !== "undefined" && window.location.search.includes("rescan=1")
+  ).current;
 
   const profileLocation = getUserLocationDefaults(user);
   const hasProfileLocation =
@@ -715,7 +717,6 @@ export default function EligibilityPage() {
         updateUser(profileRes.data.data);
       }
       setResults(scanData?.results ?? scanData ?? []);
-      clearRescanDismissal();
       queryClient.invalidateQueries({ queryKey: ["eligibility-results"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.userProfile });
       queryClient.invalidateQueries({ queryKey: ["applications"] });

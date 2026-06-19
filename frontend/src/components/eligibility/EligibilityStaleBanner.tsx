@@ -6,13 +6,17 @@ import { Button } from "@/components/ui/Button";
 
 interface EligibilityStaleBannerProps {
   variant?: "banner" | "compact";
+  /** Called when the user clicks "Rescan Now" — runs the scan immediately. */
   onRescanNow?: () => void;
+  /** Called when the user clicks "Review & Rescan" — navigates to the form. */
+  onReviewAndRescan?: () => void;
   showActions?: boolean;
 }
 
 export function EligibilityStaleBanner({
   variant = "banner",
   onRescanNow,
+  onReviewAndRescan,
   showActions = true,
 }: EligibilityStaleBannerProps) {
   const message =
@@ -39,13 +43,18 @@ export function EligibilityStaleBanner({
         </div>
         {showActions && (
           <div className="flex shrink-0 gap-2">
+            {onReviewAndRescan && (
+              <Button size="sm" variant="outline" onClick={onReviewAndRescan}>
+                Review & Rescan
+              </Button>
+            )}
             {onRescanNow ? (
               <Button size="sm" onClick={onRescanNow}>
                 Rescan Now
               </Button>
             ) : (
               <Button asChild size="sm">
-                <Link href="/eligibility?rescan=1">Rescan Now</Link>
+                <Link href="/eligibility?rescan=1">Review & Rescan</Link>
               </Button>
             )}
           </div>

@@ -52,7 +52,7 @@ export class EligibilityService {
   }
 
   async getSyncStatus(userId: string) {
-    const [user, lastScan] = await Promise.all([
+    const [user, resultCount] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -62,11 +62,7 @@ export class EligibilityService {
           },
         },
       }),
-      prisma.eligibilityResult.findFirst({
-        where: { user_id: userId },
-        orderBy: { checked_at: 'desc' },
-        select: { checked_at: true },
-      }),
+      prisma.eligibilityResult.count({ where: { user_id: userId } }),
     ]);
 
     if (!user) {
@@ -76,7 +72,7 @@ export class EligibilityService {
     const status = computeEligibilitySyncStatus(
       user,
       user.family_profile,
-      lastScan?.checked_at ?? null
+      resultCount > 0
     );
     return serializeEligibilitySyncStatus(status);
   }
@@ -337,18 +333,10 @@ export class EligibilityService {
     // True if any result is still waiting for background AI explanations
     const aiProcessing = results.some((r) => !r.ai_processed);
 
-    const lastEligibilityScanAt =
-      results.length > 0
-        ? results.reduce(
-            (latest, r) => (r.checked_at > latest ? r.checked_at : latest),
-            results[0].checked_at
-          )
-        : null;
-
     const syncStatus = computeEligibilitySyncStatus(
       user ?? { updated_at: new Date(0) },
       user?.family_profile,
-      lastEligibilityScanAt
+      results.length > 0
     );
 
     return {
