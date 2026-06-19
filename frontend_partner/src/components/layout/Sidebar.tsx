@@ -8,7 +8,7 @@ import {
   ArrowLeftRight,
   FileText,
   BarChart3,
-  Settings,
+  User,
   Heart,
   LogOut,
   Building2,
@@ -47,7 +47,7 @@ const NAV = [
       { label: "Organization", href: "/organization", icon: Building2, adminOnly: true },
       { label: "Team", href: "/team", icon: Users, adminOnly: true },
       { label: "Notifications", href: "/notifications", icon: Bell, adminOnly: false },
-      { label: "Settings", href: "/settings", icon: Settings, adminOnly: false },
+      { label: "Account", href: "/settings", icon: User, adminOnly: false },
     ],
   },
 ];

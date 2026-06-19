@@ -7,6 +7,7 @@ export const organizationPublicSelect = {
   purpose: true,
   city: true,
   state: true,
+  county: true,
   counties_served: true,
   referral_notes: true,
 } as const;
@@ -19,6 +20,7 @@ export type OrganizationPublicRecord = {
   purpose: string | null;
   city: string | null;
   state: string | null;
+  county: string | null;
   counties_served: string[];
   referral_notes: string | null;
 };
@@ -79,7 +81,14 @@ export function organizationServesLocation(
   }
 
   const normalizedCounty = normalizeLocationLabel(county);
-  return org.counties_served.some((served) => {
+  const servedCounties =
+    org.counties_served.length > 0
+      ? org.counties_served
+      : org.county
+        ? [org.county]
+        : [];
+
+  return servedCounties.some((served) => {
     const normalized = normalizeLocationLabel(served);
     return normalized === normalizedCounty || normalized === 'statewide';
   });

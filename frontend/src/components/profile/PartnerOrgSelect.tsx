@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { Select } from "@/components/ui/Input";
 
 export interface PartnerOrgOption {
   id: string;
@@ -134,26 +135,21 @@ export function PartnerOrgSelect({
           No partner organizations serve your county yet. You can still create your account and check back later.
         </p>
       ) : showSelect ? (
-        <div className="relative">
-          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-on-surface-variant pointer-events-none" />
-          <select
-            value={value}
-            onChange={(e) => handleChange(e.target.value)}
-            className={`w-full pl-9 pr-3 py-2.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-              error ? "border-red-400" : "border-outline-variant/60"
-            }`}
-          >
-            <option value="">Select an organization…</option>
-            {displayOrgs.map((org) => (
-              <option key={org.id} value={org.id}>
-                {org.name}
-                {[org.city, org.state].filter(Boolean).length
-                  ? ` — ${[org.city, org.state].filter(Boolean).join(", ")}`
-                  : ""}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          error={error}
+          placeholder="Select an organization…"
+          allowEmpty
+          options={displayOrgs.map((org) => ({
+            value: org.id,
+            label: `${org.name}${
+              [org.city, org.state].filter(Boolean).length
+                ? ` — ${[org.city, org.state].filter(Boolean).join(", ")}`
+                : ""
+            }`,
+          }))}
+        />
       ) : null}
 
       {!canFetch && hasSavedSelection && (
@@ -170,7 +166,6 @@ export function PartnerOrgSelect({
         </p>
       )}
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
     </div>
   );
 }

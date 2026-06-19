@@ -64,6 +64,16 @@ async function buildLocationPatch(
   return patch;
 }
 
+/** Partner orgs store their home county; seed data uses counties_served. Keep both in sync. */
+function countiesServedPatch(
+  existing: { counties_served: string[] },
+  county: string | null | undefined
+): { counties_served?: string[] } {
+  const trimmed = county?.trim();
+  if (!trimmed || existing.counties_served.length > 0) return {};
+  return { counties_served: [trimmed] };
+}
+
 export class PartnerOrgService {
   async updateOrganization(
     orgId: string,
@@ -85,6 +95,10 @@ export class PartnerOrgService {
     if (!org) throw new NotFoundError('Organization not found');
 
     const locationPatch = await buildLocationPatch(org, data);
+    const countyPatch = countiesServedPatch(
+      org,
+      (locationPatch.county as string | undefined) ?? org.county
+    );
 
     const updated = await prisma.organization.update({
       where: { id: orgId },
@@ -101,6 +115,7 @@ export class PartnerOrgService {
           email: data.email || null,
         }),
         ...locationPatch,
+        ...countyPatch,
       },
     });
 
@@ -145,6 +160,10 @@ export class PartnerOrgService {
       data.country !== undefined;
 
     const locationPatch = hasLocationInput ? await buildLocationPatch(org, data) : {};
+    const countyPatch = countiesServedPatch(
+      org,
+      (locationPatch.county as string | undefined) ?? org.county
+    );
 
     const updated = await prisma.organization.update({
       where: { id: orgId },
@@ -159,6 +178,7 @@ export class PartnerOrgService {
         ...(data.linkedin      !== undefined && { linkedin:      data.linkedin || null }),
         ...(data.services      !== undefined && { services_offered: data.services || null }),
         ...locationPatch,
+        ...countyPatch,
         ...(data.email         !== undefined && {
           contact_email: data.email || null,
           email:         data.email || null,

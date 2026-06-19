@@ -148,6 +148,7 @@ export class PartnerAuthService {
           state:         resolvedLocation.state,
           zip_code:      resolvedLocation.zip_code,
           county:        county,
+          counties_served: [county],
           country:       data.country || null,
           contact_email: data.email,
           email:         data.email,
