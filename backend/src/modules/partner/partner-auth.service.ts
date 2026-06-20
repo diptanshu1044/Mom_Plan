@@ -11,6 +11,10 @@ import {
   toPartnerOrganization,
 } from '../../utils/partner-organization.utils';
 import { resolveLocationInput } from '../../utils/location-input.utils';
+import {
+  organizationPublicSelect,
+  organizationServesLocation,
+} from '../../utils/organization.utils';
 
 // ---- Token helpers ----
 
@@ -89,6 +93,7 @@ export class PartnerAuthService {
   async register(data: {
     orgName: string;
     orgType: string;
+    existingOrgId?: string;
     website?: string;
     description?: string;
     email: string;
@@ -132,32 +137,79 @@ export class PartnerAuthService {
       city: data.city,
     });
 
+    const locationFilters = {
+      state: resolvedLocation.state,
+      city: resolvedLocation.city,
+      county,
+    };
+
     // Create org + admin in a transaction
     const { org, adminUser } = await prisma.$transaction(async (tx) => {
-      const org = await tx.organization.create({
-        data: {
-          org_name:      data.orgName,
-          category:      ORG_TYPE_LABELS[orgType],
-          org_type:      orgTypeSlug(orgType),
-          website:       data.website || null,
-          description:   data.description || null,
-          purpose:       data.description || null,
-          phone:         data.phone || null,
-          address:       data.address,
-          city:          resolvedLocation.city,
-          state:         resolvedLocation.state,
-          zip_code:      resolvedLocation.zip_code,
-          county:        county,
-          counties_served: [county],
-          country:       data.country || null,
-          contact_email: data.email,
-          email:         data.email,
-          employees:     data.employees || null,
-          founded:       data.founded || null,
-          tax_id:        data.taxId || null,
-          linkedin:      data.linkedin || null,
-        },
-      });
+      let org;
+
+      if (data.existingOrgId) {
+        const existingOrg = await tx.organization.findUnique({
+          where: { id: data.existingOrgId },
+          select: { ...organizationPublicSelect, active: true },
+        });
+
+        if (!existingOrg?.active) {
+          throw new BadRequestError('Selected organization was not found.');
+        }
+
+        if (!organizationServesLocation(existingOrg, locationFilters)) {
+          throw new BadRequestError(
+            'Selected organization does not serve your county.'
+          );
+        }
+
+        org = await tx.organization.update({
+          where: { id: existingOrg.id },
+          data: {
+            phone: data.phone || undefined,
+            address: data.address,
+            city: resolvedLocation.city,
+            state: resolvedLocation.state,
+            zip_code: resolvedLocation.zip_code,
+            county,
+            country: data.country || undefined,
+            contact_email: data.email,
+            email: data.email,
+            website: data.website || undefined,
+            description: data.description || undefined,
+            purpose: data.description || undefined,
+            employees: data.employees || undefined,
+            founded: data.founded || undefined,
+            tax_id: data.taxId || undefined,
+            linkedin: data.linkedin || undefined,
+          },
+        });
+      } else {
+        org = await tx.organization.create({
+          data: {
+            org_name:      data.orgName,
+            category:      ORG_TYPE_LABELS[orgType],
+            org_type:      orgTypeSlug(orgType),
+            website:       data.website || null,
+            description:   data.description || null,
+            purpose:       data.description || null,
+            phone:         data.phone || null,
+            address:       data.address,
+            city:          resolvedLocation.city,
+            state:         resolvedLocation.state,
+            zip_code:      resolvedLocation.zip_code,
+            county:        county,
+            counties_served: [county],
+            country:       data.country || null,
+            contact_email: data.email,
+            email:         data.email,
+            employees:     data.employees || null,
+            founded:       data.founded || null,
+            tax_id:        data.taxId || null,
+            linkedin:      data.linkedin || null,
+          },
+        });
+      }
 
       const firstName = data.adminFirstName.trim();
       const middleName = data.adminMiddleName?.trim() || null;
@@ -176,20 +228,22 @@ export class PartnerAuthService {
         },
       });
 
-      const billingUser = await tx.user.create({
-        data: {
-          email: adminUser.email,
-          first_name: firstName,
-          middle_name: middleName,
-          last_name: lastName,
-          org_id: org.id,
-        },
-      });
+      if (!org.billing_user_id) {
+        const billingUser = await tx.user.create({
+          data: {
+            email: adminUser.email,
+            first_name: firstName,
+            middle_name: middleName,
+            last_name: lastName,
+            org_id: org.id,
+          },
+        });
 
-      await tx.organization.update({
-        where: { id: org.id },
-        data: { billing_user_id: billingUser.id },
-      });
+        org = await tx.organization.update({
+          where: { id: org.id },
+          data: { billing_user_id: billingUser.id },
+        });
+      }
 
       return { org, adminUser };
     });

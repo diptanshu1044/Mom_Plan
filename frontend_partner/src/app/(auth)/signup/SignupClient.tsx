@@ -22,6 +22,7 @@ import {
   LocationFields,
   type UseLocationFieldsResult,
 } from "@/components/location/LocationFields";
+import { ExistingOrgSelect } from "@/components/signup/ExistingOrgSelect";
 import { formatPhoneForApi, optionalUsPhoneFieldSchema } from "@/lib/phone";
 import { ORG_TYPES } from "@/lib/org-types";
 
@@ -39,8 +40,8 @@ const EMP_RANGES = [
 ] as const;
 
 const STEPS = [
-  { label: "About You", subtitle: "Name, type & mission" },
-  { label: "Contact & Location", subtitle: "Address & contact" },
+  { label: "Location & Organization", subtitle: "ZIP, county & org details" },
+  { label: "Contact Details", subtitle: "Address & contact info" },
   { label: "Account Setup", subtitle: "Login credentials" },
 ] as const;
 
@@ -49,6 +50,11 @@ const PROGRESS = [33, 67, 100];
 // ---- Schemas ----
 
 const step0Schema = z.object({
+  zip: z.string().trim().min(1, "ZIP code is required"),
+  city: z.string().trim().min(1, "City is required"),
+  state: z.string().trim().min(1, "State is required"),
+  county: z.string().trim().min(1, "County is required"),
+  existingOrgId: z.string().optional(),
   orgName: z.string().min(2, "Organization name is required"),
   orgType: z.string().min(1, "Please select an organization type"),
   website: z.string().url("Please enter a valid URL").or(z.literal("")),
@@ -59,10 +65,6 @@ const step1Schema = z.object({
   email: z.string().email("Please enter a valid email"),
   phone: optionalUsPhoneFieldSchema,
   address: z.string().min(3, "Street address is required"),
-  city: z.string().trim().min(1, "City is required"),
-  state: z.string().trim().min(1, "State is required"),
-  zip: z.string().trim().min(1, "ZIP code is required"),
-  county: z.string().trim().min(1, "County is required"),
   country: z.string().optional(),
 });
 
@@ -278,25 +280,24 @@ export function SignupClient() {
     setPreview((p) => ({ ...p, ...patch }));
 
   const handleStep0 = async (data: Step0Data) => {
-    setStep0Data(data);
-    setOrgName(data.orgName);
-    updatePreview({ orgName: data.orgName, orgType: data.orgType });
-    setStep(1);
-  };
-
-  const handleStep1 = async (data: Step1Data) => {
     if (!locationValidationRef.current?.validate()) {
       toast({
         variant: "destructive",
         title: "Location verification required",
         description:
           locationValidationRef.current?.getValidationError() ||
-          "Please verify your state, city, and ZIP code.",
+          "Please verify your ZIP code, state, city, and county.",
       });
       return;
     }
+    setStep0Data(data);
+    setOrgName(data.orgName);
+    updatePreview({ orgName: data.orgName, orgType: data.orgType, city: data.city, state: data.state ?? "" });
+    setStep(1);
+  };
+
+  const handleStep1 = async (data: Step1Data) => {
     setStep1Data(data);
-    updatePreview({ city: data.city, state: data.state ?? "" });
     setStep(2);
   };
 
@@ -307,16 +308,17 @@ export function SignupClient() {
         // org
         orgName: step0Data.orgName,
         orgType: step0Data.orgType,
+        existingOrgId: step0Data.existingOrgId || undefined,
         website: step0Data.website,
         description: step0Data.description,
         // contact
         email: step1Data.email,
         phone: formatPhoneForApi(step1Data.phone ?? ""),
         address: step1Data.address,
-        city: step1Data.city,
-        state: step1Data.state,
-        zip: step1Data.zip,
-        county: step1Data.county,
+        city: step0Data.city,
+        state: step0Data.state,
+        zip: step0Data.zip,
+        county: step0Data.county,
         country: step1Data.country,
         // admin account
         adminFirstName: data.adminFirstName,
@@ -518,11 +520,11 @@ export function SignupClient() {
             >
               {/* Step header */}
               <h2 className="text-[28px] font-extrabold text-text-dark mb-1.5">
-                {["Basic Information 🌷", "Contact & Location 🏡", "Account Setup 🌿"][step]}
+                {["Location & Organization 🏡", "Contact Details 📬", "Account Setup 🌿"][step]}
               </h2>
               <p className="text-text-mid text-sm leading-relaxed mb-7">
                 {[
-                  "Tell us about your organization's identity and what it stands for.",
+                  "Start with your ZIP code — we'll fill in your location, then help you find your organization.",
                   "How can your community reach you? Enter your primary contact details.",
                   "Create your admin account to access the partner portal.",
                 ][step]}
@@ -530,9 +532,71 @@ export function SignupClient() {
 
               <div className="h-0.5 bg-gradient-to-r from-partner-300/40 to-transparent rounded-full mb-7" />
 
-              {/* Step 0 — Basic Info */}
+              {/* Step 0 — Location & Organization */}
               {step === 0 && (
                 <form onSubmit={form0.handleSubmit(handleStep0)} className="space-y-0">
+                  <LocationFields
+                    sectionTitle="Where is your organization located?"
+                    values={{
+                      state: form0.watch("state") ?? "",
+                      city: form0.watch("city") ?? "",
+                      zip: form0.watch("zip") ?? "",
+                      county: form0.watch("county") ?? "",
+                    }}
+                    onChange={(field, value) => {
+                      form0.setValue(field, value, { shouldValidate: true });
+                      if (field === "city" || field === "state") {
+                        updatePreview({
+                          city: field === "city" ? value : form0.watch("city") ?? "",
+                          state: field === "state" ? value : form0.watch("state") ?? "",
+                        });
+                      }
+                      if (field === "county" || field === "zip") {
+                        form0.setValue("existingOrgId", "", { shouldValidate: true });
+                      }
+                    }}
+                    errors={{
+                      state: form0.formState.errors.state?.message,
+                      city: form0.formState.errors.city?.message,
+                      zip: form0.formState.errors.zip?.message,
+                      county: form0.formState.errors.county?.message,
+                    }}
+                    requireZip
+                    requireCounty
+                    lockDerivedFields
+                    validationRef={locationValidationRef}
+                    className="mb-4"
+                  />
+
+                  {form0.watch("county")?.trim() && (
+                    <div className="mb-4">
+                      <ExistingOrgSelect
+                        value={form0.watch("existingOrgId") ?? ""}
+                        locationFilters={{
+                          state: form0.watch("state") ?? "",
+                          city: form0.watch("city") ?? "",
+                          county: form0.watch("county") ?? "",
+                        }}
+                        onChange={(orgId, org) => {
+                          form0.setValue("existingOrgId", orgId, { shouldValidate: true });
+                          if (org) {
+                            form0.setValue("orgName", org.name, { shouldValidate: true });
+                            if (org.type) {
+                              form0.setValue("orgType", org.type, { shouldValidate: true });
+                            }
+                            if (org.description) {
+                              form0.setValue("description", org.description, { shouldValidate: true });
+                            }
+                            updatePreview({
+                              orgName: org.name,
+                              orgType: org.type ?? "",
+                            });
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+
                   <Field
                     label="Organization Name"
                     required
@@ -638,35 +702,6 @@ export function SignupClient() {
                       error={!!form1.formState.errors.address}
                     />
                   </Field>
-
-                  <LocationFields
-                    sectionTitle="Where is your organization located?"
-                    values={{
-                      state: form1.watch("state") ?? "",
-                      city: form1.watch("city") ?? "",
-                      zip: form1.watch("zip") ?? "",
-                      county: form1.watch("county") ?? "",
-                    }}
-                    onChange={(field, value) => {
-                      form1.setValue(field, value, { shouldValidate: true });
-                      if (field === "city" || field === "state" || field === "county") {
-                        updatePreview({
-                          city: field === "city" ? value : form1.watch("city") ?? "",
-                          state: field === "state" ? value : form1.watch("state") ?? "",
-                        });
-                      }
-                    }}
-                    errors={{
-                      state: form1.formState.errors.state?.message,
-                      city: form1.formState.errors.city?.message,
-                      zip: form1.formState.errors.zip?.message,
-                      county: form1.formState.errors.county?.message,
-                    }}
-                    requireZip
-                    requireCounty
-                    lockDerivedFields
-                    validationRef={locationValidationRef}
-                  />
 
                   <Field label="Country">
                     <Input {...form1.register("country")} placeholder="United States" />

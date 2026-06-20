@@ -4,10 +4,11 @@ import { optionalUsPhoneSchema } from '../../utils/phone.utils';
 export const partnerRegisterSchema = z.object({
   body: z.object({
     // Organization (step 0)
-    orgName:     z.string().min(2, 'Organization name is required'),
-    orgType:     z.string().min(1, 'Organization type is required'),
-    website:     z.string().url('Invalid URL').or(z.literal('')).optional(),
-    description: z.string().max(1000).optional(),
+    orgName:       z.string().min(2, 'Organization name is required'),
+    orgType:       z.string().min(1, 'Organization type is required'),
+    existingOrgId: z.string().uuid('Invalid organization id').optional(),
+    website:       z.string().url('Invalid URL').or(z.literal('')).optional(),
+    description:   z.string().max(1000).optional(),
 
     // Contact / location (step 1)
     email:   z.string().email('Invalid contact email'),
