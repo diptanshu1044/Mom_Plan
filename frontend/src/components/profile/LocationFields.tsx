@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type MutableRefObject } from "react";
+import { useCallback, useEffect, type MutableRefObject } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
@@ -60,14 +60,19 @@ export function LocationFields({
   countyHint,
   validationRef,
 }: LocationFieldsProps) {
-  const location = useLocationFields({
-    values,
-    onChange: (field, value) => {
+  const handleFieldChange = useCallback(
+    (field: keyof LocationFieldValues, value: string) => {
       onChange(field, value);
       if (field === "state" || field === "city" || field === "county") {
         onLocationChange?.();
       }
     },
+    [onChange, onLocationChange]
+  );
+
+  const location = useLocationFields({
+    values,
+    onChange: handleFieldChange,
     requireCity,
     requireZip,
     requireCounty,

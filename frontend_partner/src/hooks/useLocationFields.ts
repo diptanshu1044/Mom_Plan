@@ -43,6 +43,13 @@ export function useLocationFields({
   const zipAutofillRef = useRef(false);
   const lastResolvedZipRef = useRef<string | null>(null);
   const previousZip5Ref = useRef<string | null>(null);
+  // Tracks which resolved lookup (zip + result type) has already been applied
+  // to the form, so the apply/clear effect runs at most once per result and can
+  // never drive an infinite update loop.
+  const processedLookupRef = useRef<{ zip: string | null; sig: string | null }>({
+    zip: null,
+    sig: null,
+  });
 
   const zip5 = extractZip5(values.zip);
   const lookupZip5 = lookupTarget ? extractZip5(lookupTarget) : null;
@@ -84,14 +91,17 @@ export function useLocationFields({
   );
 
   const clearDerivedLocation = useCallback(() => {
+    const hasDerived = Boolean(values.state || values.city || values.county);
+    if (!hasDerived) return;
+
     zipAutofillRef.current = true;
-    onChange("state", "");
-    onChange("city", "");
-    onChange("county", "");
+    if (values.state) onChange("state", "");
+    if (values.city) onChange("city", "");
+    if (values.county) onChange("county", "");
     window.setTimeout(() => {
       zipAutofillRef.current = false;
     }, 0);
-  }, [onChange]);
+  }, [onChange, values.state, values.city, values.county]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -102,6 +112,7 @@ export function useLocationFields({
       }
       lastResolvedZipRef.current = null;
       previousZip5Ref.current = null;
+      processedLookupRef.current = { zip: null, sig: null };
       return;
     }
 
@@ -116,7 +127,19 @@ export function useLocationFields({
     if (!enabled || !lookupQuery.data || lookupQuery.isFetching) return;
     if (!lookupZip5) return;
 
-    if (lookupQuery.data.error || !lookupQuery.data.state || !lookupQuery.data.city) {
+    const data = lookupQuery.data;
+    const sig = data.error || !data.state || !data.city ? "error" : "ok";
+
+    // Apply (or clear) each resolved lookup result only once. Re-running the
+    // body on later renders (e.g. because `onChange` / form values changed
+    // identity) would otherwise let a failed lookup repeatedly clear the form,
+    // which freezes the page in an endless update loop.
+    if (processedLookupRef.current.zip === lookupZip5 && processedLookupRef.current.sig === sig) {
+      return;
+    }
+    processedLookupRef.current = { zip: lookupZip5, sig };
+
+    if (sig === "error") {
       clearDerivedLocation();
       lastResolvedZipRef.current = null;
       return;
@@ -125,15 +148,15 @@ export function useLocationFields({
     zipAutofillRef.current = true;
     lastResolvedZipRef.current = lookupZip5;
 
-    if (lookupQuery.data.state !== values.state) {
-      onChange("state", lookupQuery.data.state);
+    if (data.state !== values.state) {
+      onChange("state", data.state!);
     }
 
-    if (lookupQuery.data.city !== values.city) {
-      onChange("city", lookupQuery.data.city);
+    if (data.city !== values.city) {
+      onChange("city", data.city!);
     }
 
-    const counties = lookupQuery.data.counties;
+    const counties = data.counties;
     if (counties.length === 1) {
       if (values.county !== counties[0]) {
         onChange("county", counties[0]);
