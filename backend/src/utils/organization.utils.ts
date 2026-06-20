@@ -1,3 +1,9 @@
+import { Prisma } from '@prisma/client';
+import { isStatewideCountyLabel, normalizeCounty } from './county.utils';
+
+/** Canonical statewide value in normalized counties_served arrays. */
+export const STATEWIDE_COUNTIES_SERVED = 'statewide';
+
 /** Fields selected from the community organizations table for mother-facing APIs. */
 export const organizationPublicSelect = {
   id: true,
@@ -101,9 +107,43 @@ export type OrganizationLocationFilters = {
   state?: string;
   city?: string;
   county?: string;
+  /** When true, fall back to state-level orgs if no county matches exist. */
+  stateFallback?: boolean;
 };
 
-/** Whether an org serves the given county (and optional state/city context). */
+export type OrganizationListMatchLevel = 'county' | 'state' | null;
+
+function withActiveStateFilter(
+  state: string | undefined,
+  clause: Prisma.OrganizationWhereInput
+): Prisma.OrganizationWhereInput {
+  const where: Prisma.OrganizationWhereInput = { active: true, ...clause };
+  if (state?.trim()) {
+    where.state = { equals: state.trim(), mode: 'insensitive' };
+  }
+  return where;
+}
+
+/** Prisma where clause for orgs serving a county (exact match on normalized counties_served). */
+export function buildOrganizationCountyWhere(
+  county: string,
+  state?: string
+): Prisma.OrganizationWhereInput {
+  const normalizedCounty = normalizeCounty(county);
+
+  return withActiveStateFilter(state, {
+    OR: [
+      { counties_served: { has: normalizedCounty } },
+      { counties_served: { has: STATEWIDE_COUNTIES_SERVED } },
+    ],
+  });
+}
+
+export function buildOrganizationStateWhere(state?: string): Prisma.OrganizationWhereInput {
+  return withActiveStateFilter(state, {});
+}
+
+/** Whether an org serves the given county (and optional state context). */
 export function organizationServesLocation(
   org: OrganizationPublicRecord,
   filters: OrganizationLocationFilters
@@ -117,16 +157,9 @@ export function organizationServesLocation(
     if (orgState && orgState !== userState) return false;
   }
 
-  const normalizedCounty = normalizeLocationLabel(county);
-  const servedCounties =
-    org.counties_served.length > 0
-      ? org.counties_served
-      : org.county
-        ? [org.county]
-        : [];
-
-  return servedCounties.some((served) => {
-    const normalized = normalizeLocationLabel(served);
-    return normalized === normalizedCounty || normalized === 'statewide';
-  });
+  const normalizedCounty = normalizeCounty(county);
+  return org.counties_served.some(
+    (served) =>
+      isStatewideCountyLabel(served) || normalizeCounty(served) === normalizedCounty
+  );
 }

@@ -2,8 +2,10 @@ import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../utils/errors';
 import {
   organizationPublicSelect,
+  OrganizationListMatchLevel,
   OrganizationLocationFilters,
-  organizationServesLocation,
+  buildOrganizationCountyWhere,
+  buildOrganizationStateWhere,
   toPublicOrganization,
 } from '../../utils/organization.utils';
 
@@ -42,26 +44,54 @@ export async function pickCaseworker(orgId: string): Promise<string | null> {
 }
 
 export class MotherOrgEnrollmentService {
-  async listOrganizations(filters?: OrganizationLocationFilters) {
-    const where: { active: boolean; state?: { equals: string; mode: 'insensitive' } } = {
-      active: true,
-    };
+  async listOrganizations(filters?: OrganizationLocationFilters): Promise<{
+    organizations: ReturnType<typeof toPublicOrganization>[];
+    matchLevel: OrganizationListMatchLevel;
+  }> {
+    const state = filters?.state?.trim();
+    const county = filters?.county?.trim();
 
-    if (filters?.state?.trim()) {
-      where.state = { equals: filters.state.trim(), mode: 'insensitive' };
+    if (!county) {
+      const orgs = await prisma.organization.findMany({
+        where: buildOrganizationStateWhere(state),
+        select: organizationPublicSelect,
+        orderBy: { org_name: 'asc' },
+      });
+      return {
+        organizations: orgs.map(toPublicOrganization),
+        matchLevel: null,
+      };
     }
 
-    const orgs = await prisma.organization.findMany({
-      where,
+    const countyMatches = await prisma.organization.findMany({
+      where: buildOrganizationCountyWhere(county, state),
       select: organizationPublicSelect,
       orderBy: { org_name: 'asc' },
     });
 
-    const filtered = filters?.county?.trim()
-      ? orgs.filter((org) => organizationServesLocation(org, filters))
-      : orgs;
+    if (countyMatches.length > 0) {
+      return {
+        organizations: countyMatches.map(toPublicOrganization),
+        matchLevel: 'county',
+      };
+    }
 
-    return filtered.map(toPublicOrganization);
+    if (filters?.stateFallback && state) {
+      const stateOrgs = await prisma.organization.findMany({
+        where: buildOrganizationStateWhere(state),
+        select: organizationPublicSelect,
+        orderBy: { org_name: 'asc' },
+      });
+      return {
+        organizations: stateOrgs.map(toPublicOrganization),
+        matchLevel: 'state',
+      };
+    }
+
+    return {
+      organizations: [],
+      matchLevel: null,
+    };
   }
 
   async enrollUserInPartnerOrg(userId: string, orgId: string) {

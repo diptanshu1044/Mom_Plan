@@ -39,9 +39,15 @@ function buildOrganizationsUrl(filters?: PartnerOrgLocationFilters): string {
   if (filters?.state?.trim()) params.set("state", filters.state.trim());
   if (filters?.city?.trim()) params.set("city", filters.city.trim());
   if (filters?.county?.trim()) params.set("county", filters.county.trim());
+  params.set("stateFallback", "true");
   const qs = params.toString();
   return qs ? `/api/organizations?${qs}` : "/api/organizations";
 }
+
+type OrganizationsQueryResult = {
+  orgs: PartnerOrgOption[];
+  matchLevel: "county" | "state" | null;
+};
 
 function locationFiltersReady(
   filters: PartnerOrgLocationFilters | undefined,
@@ -65,15 +71,19 @@ export function PartnerOrgSelect({
 }: PartnerOrgSelectProps) {
   const canFetch = locationFiltersReady(locationFilters, requireLocation);
 
-  const { data: orgs = [], isLoading, isFetched } = useQuery({
+  const { data, isLoading, isFetched } = useQuery({
     queryKey: ["organizations", locationFilters],
     queryFn: () =>
-      api
-        .get(buildOrganizationsUrl(locationFilters))
-        .then((r) => r.data.data as PartnerOrgOption[]),
+      api.get(buildOrganizationsUrl(locationFilters)).then((r) => ({
+        orgs: r.data.data as PartnerOrgOption[],
+        matchLevel: (r.data.meta?.matchLevel ?? null) as OrganizationsQueryResult["matchLevel"],
+      })),
     staleTime: 5 * 60 * 1000,
     enabled: canFetch,
   });
+
+  const orgs = data?.orgs ?? [];
+  const matchLevel = data?.matchLevel ?? null;
 
   const displayOrgs = useMemo(() => {
     const list = [...orgs];
@@ -132,24 +142,32 @@ export function PartnerOrgSelect({
         </div>
       ) : canFetch && isFetched && !isLoading && orgs.length === 0 && !hasSavedSelection ? (
         <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          No partner organizations serve your county yet. You can still create your account and check back later.
+          No partner organizations serve your area yet. You can still create your account and check back later.
         </p>
       ) : showSelect ? (
-        <Select
-          value={value}
-          onChange={(e) => handleChange(e.target.value)}
-          error={error}
-          placeholder="Select an organization…"
-          allowEmpty
-          options={displayOrgs.map((org) => ({
-            value: org.id,
-            label: `${org.name}${
-              [org.city, org.state].filter(Boolean).length
-                ? ` — ${[org.city, org.state].filter(Boolean).join(", ")}`
-                : ""
-            }`,
-          }))}
-        />
+        <>
+          {matchLevel === "state" && locationFilters?.state?.trim() && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+              No organizations serve {locationFilters.county} County yet. Showing organizations in{" "}
+              {locationFilters.state.trim().toUpperCase()} instead.
+            </p>
+          )}
+          <Select
+            value={value}
+            onChange={(e) => handleChange(e.target.value)}
+            error={error}
+            placeholder="Select an organization…"
+            allowEmpty
+            options={displayOrgs.map((org) => ({
+              value: org.id,
+              label: `${org.name}${
+                [org.city, org.state].filter(Boolean).length
+                  ? ` — ${[org.city, org.state].filter(Boolean).join(", ")}`
+                  : ""
+              }`,
+            }))}
+          />
+        </>
       ) : null}
 
       {!canFetch && hasSavedSelection && (
