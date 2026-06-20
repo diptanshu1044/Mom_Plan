@@ -15,7 +15,10 @@ export async function getProgramsForEligibilityScan(
       is_active: true,
       OR: [
         { state_code: stateCode },
-        { federal_or_state: { contains: 'federal', mode: 'insensitive' } },
+        {
+          state_code: null,
+          federal_or_state: { contains: 'federal', mode: 'insensitive' },
+        },
       ],
     },
     orderBy: { name: 'asc' },

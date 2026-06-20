@@ -1,5 +1,6 @@
 import { prisma } from '../../config/prisma';
 import { NotFoundError } from '../../utils/errors';
+import { isFederalProgram, matchesProfileStateScope } from '../eligibility/eligibility.filters';
 import { clearActiveProgramsCache, getActivePrograms, readProgramStateCode } from './programs.cache';
 import { quarterDueDatesService } from './quarterDueDates.service';
 import { getProgramRequirements, getDocumentLabel } from '../pdf/program-requirements.data';
@@ -17,10 +18,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   tax: 'bg-blue-100 text-blue-700',
   legal: 'bg-slate-100 text-slate-700',
 };
-
-function isFederalProgram(federalOrState: string | null | undefined): boolean {
-  return (federalOrState || '').toLowerCase().includes('federal');
-}
 
 function getCategoryColor(category: string): string {
   const key = category.toLowerCase();
@@ -177,15 +174,12 @@ export class ProgramsService {
     const selectedLevel = filters.level || 'All levels';
 
     if (selectedState !== 'All') {
-      filtered = filtered.filter((p) => {
-        const isFederal = isFederalProgram(p.federal_or_state);
-        return isFederal || (p.state_code || '').toUpperCase() === selectedState;
-      });
+      filtered = filtered.filter((p) => matchesProfileStateScope(p, selectedState));
     }
 
     if (selectedLevel !== 'All levels') {
       filtered = filtered.filter((p) => {
-        const isFederal = isFederalProgram(p.federal_or_state);
+        const isFederal = isFederalProgram(p);
         if (selectedLevel === 'Federal') return isFederal;
         if (selectedLevel === 'State') return !isFederal;
         return true;
@@ -345,8 +339,8 @@ export class ProgramsService {
           shortName: program.also_known_as || program.name.split(/[—–-]/)[0].trim(),
           category,
           categoryColor: getCategoryColor(category),
-          level: isFederalProgram(program.federal_or_state) ? 'Federal' as const : 'State' as const,
-          isFederal: isFederalProgram(program.federal_or_state),
+          level: isFederalProgram(program) ? 'Federal' as const : 'State' as const,
+          isFederal: isFederalProgram(program),
           stateCode: program.state_code,
           description: program.description || '',
           eligibility: getEligibilityItems(program),

@@ -21,7 +21,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
-  MapPin,
 } from "lucide-react";
 import { usePdfGeneration } from "@/hooks/usePdfGeneration";
 import DocumentReadinessModal from "@/components/pdf/DocumentReadinessModal";
@@ -31,8 +30,6 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
-import { useAuthStore } from "@/store/auth.store";
-import { filterStatesByCodes, mergeStateCodes, normalizeStateCodesFromApi, resolveStateCode } from "@/lib/us-states";
 import { queryKeys } from "@/lib/query-keys";
 import { isRescanPromptDismissed } from "@/lib/profile-sync";
 import { EligibilityStaleBanner } from "@/components/eligibility/EligibilityStaleBanner";
@@ -92,27 +89,20 @@ function buildPaginationItems(currentPage: number, totalPages: number): Paginati
 
 export default function BenefitsPage() {
   const [programType, setProgramType] = useState<"all" | "federal" | "state">("all");
-  const [selectedState, setSelectedState] = useState("All");
   const [yearFilter, setYearFilter] = useState("all");
   const [quarterFilter, setQuarterFilter] = useState<string>(() => getCurrentQuarterYear().quarter);
   const [applyModalOpen, setApplyModalOpen] = useState(false);
   const [selectedProgram, setSelectedProgram] = useState<any>(null);
   const [showRescanPrompt, setShowRescanPrompt] = useState(false);
-  const [availableStateCodes, setAvailableStateCodes] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageInput, setPageInput] = useState("");
   const [openJumpGap, setOpenJumpGap] = useState<string | null>(null);
-  const hasAutoSelectedProfileState = useRef(false);
-  const userChoseAllStates = useRef(false);
-  const prevProfileStateRef = useRef<string | null>(null);
   const filtersKeyRef = useRef("");
   const totalPagesRef = useRef(1);
   const pageJumpInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { user } = useAuthStore();
-  const authProfileState = resolveStateCode(user?.state ?? null) ?? null;
 
   const {
     generatingPdfId,
@@ -131,8 +121,8 @@ export default function BenefitsPage() {
   } = usePdfGeneration();
 
   const filterKey = useMemo(
-    () => `${programType}|${selectedState}|${yearFilter}|${quarterFilter}`,
-    [programType, selectedState, yearFilter, quarterFilter]
+    () => `${programType}|${yearFilter}|${quarterFilter}`,
+    [programType, yearFilter, quarterFilter]
   );
 
   useEffect(() => {
@@ -155,16 +145,8 @@ export default function BenefitsPage() {
     if (programType === "federal") params.federal = "true";
     if (programType === "state") params.state_only = "true";
 
-    if (selectedState === "All") {
-      if (userChoseAllStates.current) {
-        params.state = "All";
-      }
-    } else {
-      params.state = selectedState;
-    }
-
     return params;
-  }, [programType, selectedState, yearFilter, quarterFilter, currentPage]);
+  }, [programType, yearFilter, quarterFilter, currentPage]);
 
   const pdfQuarterContext = useMemo(
     () => resolveQuarterYearForPdf(quarterFilter, yearFilter),
@@ -211,51 +193,6 @@ export default function BenefitsPage() {
     () => buildYearFilterOptions(availableYears),
     [availableYears]
   );
-  const profileState = resolveStateCode(data?.profileState ?? null) ?? null;
-  const codesFromResults = useMemo(
-    () =>
-      results
-        .map(
-          (result: { program?: { state_code?: string | null; state?: string | null } }) =>
-            resolveStateCode(result.program?.state_code ?? result.program?.state ?? undefined)
-        )
-        .filter((code: string | undefined): code is string => Boolean(code)),
-    [results]
-  );
-  const availableStates = useMemo(
-    () =>
-      filterStatesByCodes(
-        mergeStateCodes(availableStateCodes, codesFromResults, profileState ? [profileState] : [])
-      ),
-    [availableStateCodes, codesFromResults, profileState]
-  );
-
-  useEffect(() => {
-    const codes = normalizeStateCodesFromApi(data?.availableStates);
-    if (codes.length > 0) {
-      setAvailableStateCodes(codes);
-    }
-  }, [data?.availableStates]);
-
-  useEffect(() => {
-    const nextProfileState = profileState ?? authProfileState;
-    if (!nextProfileState) return;
-
-    const previousProfileState = prevProfileStateRef.current;
-    if (
-      previousProfileState &&
-      previousProfileState !== nextProfileState &&
-      !userChoseAllStates.current
-    ) {
-      setSelectedState(nextProfileState);
-    } else if (!hasAutoSelectedProfileState.current) {
-      setSelectedState(nextProfileState);
-      hasAutoSelectedProfileState.current = true;
-    }
-
-    prevProfileStateRef.current = nextProfileState;
-  }, [profileState, authProfileState]);
-
   useEffect(() => {
     if (!isStale) {
       // Scan just completed or was never needed — close any open modal.
@@ -477,36 +414,6 @@ export default function BenefitsPage() {
           </div>
         </div>
 
-        <div className="flex-1 min-w-[10rem]">
-          <label htmlFor="state-filter" className="block text-xs font-semibold text-on-surface-variant mb-1.5">
-            State
-          </label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant/60 pointer-events-none" />
-            <select
-              id="state-filter"
-              value={selectedState}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "All") {
-                  userChoseAllStates.current = true;
-                } else {
-                  userChoseAllStates.current = false;
-                }
-                setSelectedState(value);
-              }}
-              className={`${selectClassName} pl-9`}
-            >
-              <option value="All">All states</option>
-              {availableStates.map((state) => (
-                <option key={state.value} value={state.value}>
-                  {state.label}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-          </div>
-        </div>
       </div>
 
       {/* Results */}

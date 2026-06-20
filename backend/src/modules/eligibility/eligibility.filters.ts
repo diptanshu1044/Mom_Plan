@@ -104,7 +104,9 @@ export function normalizeStateCode(state: string | null | undefined): string | u
   return STATE_CODE_BY_LABEL[upper];
 }
 
+/** Nationwide programs with no state — not state implementations of federal programs. */
 export function isFederalProgram(program: ProgramLike | null | undefined): boolean {
+  if (getProgramStateCode(program)) return false;
   const fedOrState = (program?.federal_or_state ?? '').toLowerCase();
   return fedOrState === 'federal' || fedOrState.includes('federal');
 }
@@ -113,8 +115,9 @@ export function matchesProfileStateScope(
   program: ProgramLike | null | undefined,
   profileState: string
 ): boolean {
-  if (isFederalProgram(program)) return true;
-  return getProgramStateCode(program) === profileState;
+  const programState = getProgramStateCode(program);
+  if (programState) return programState === profileState;
+  return isFederalProgram(program);
 }
 
 export function stateMatchesQuery(stateCode: string, query: string): boolean {
@@ -160,7 +163,7 @@ export function applyEligibilityFilters<T extends ResultLike>(
     if (filters.state) {
       const targetState = filters.state.trim().toUpperCase();
       filtered = filtered.filter((result) =>
-        isFederalProgram(result.program) || getProgramStateCode(result.program) === targetState
+        matchesProfileStateScope(result.program, targetState)
       );
     } else if (filters.profileState) {
       filtered = filtered.filter((result) =>
