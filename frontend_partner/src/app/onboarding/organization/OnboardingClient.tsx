@@ -30,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { initials } from "@/lib/utils";
+import { parseEmailList } from "@/lib/auth-utils";
 import { formatPhoneForApi, normalizeUsPhoneDigits, optionalUsPhoneFieldSchema } from "@/lib/phone";
 import {
   LocationFields,
@@ -55,7 +56,7 @@ const STEPS = [
     id: "team",
     label: "Team Setup",
     icon: Users,
-    description: "Primary contact",
+    description: "Contact & caseworkers",
   },
   {
     id: "preferences",
@@ -102,6 +103,9 @@ const teamSchema = z.object({
   contact_name: z.string().min(2),
   contact_title: z.string().optional(),
   contact_email: z.string().email(),
+  caseworker_emails: z.string().optional(),
+  caseworker_password: z.string().optional(),
+  default_caseload_capacity: z.coerce.number().int().min(1).max(500).default(8),
 });
 
 const prefSchema = z.object({
@@ -181,6 +185,19 @@ function buildLaunchSummary(draft: DraftData): { label: string; items: SummaryIt
         { label: "Contact", value: reviewValue(draft.team?.contact_name) },
         { label: "Title", value: reviewValue(draft.team?.contact_title) },
         { label: "Email", value: reviewValue(draft.team?.contact_email) },
+        {
+          label: "Default capacity",
+          value:
+            draft.team?.default_caseload_capacity != null
+              ? String(draft.team.default_caseload_capacity)
+              : undefined,
+        },
+        {
+          label: "Caseworkers invited",
+          value: draft.team?.caseworker_emails
+            ? String(parseEmailList(draft.team.caseworker_emails).length)
+            : undefined,
+        },
       ],
     },
     {
@@ -422,6 +439,9 @@ export function OnboardingClient() {
       contact_name: user?.full_name ?? draft.team?.contact_name ?? "",
       contact_title: user?.title ?? draft.team?.contact_title ?? "",
       contact_email: user?.email ?? draft.team?.contact_email ?? "",
+      caseworker_emails: draft.team?.caseworker_emails ?? "",
+      caseworker_password: draft.team?.caseworker_password ?? "",
+      default_caseload_capacity: draft.team?.default_caseload_capacity ?? 8,
     },
   });
 
@@ -459,6 +479,15 @@ export function OnboardingClient() {
   };
 
   const handleTeam = async (data: TeamData) => {
+    const emails = data.caseworker_emails ? parseEmailList(data.caseworker_emails) : [];
+    if (emails.length > 0 && (!data.caseworker_password || data.caseworker_password.length < 8)) {
+      toast({
+        variant: "destructive",
+        title: "Password required",
+        description: "Enter a shared password (8+ characters) when inviting caseworkers.",
+      });
+      return;
+    }
     saveDraft({ team: data });
     markComplete(2);
     setCurrentStep(3);
@@ -473,12 +502,22 @@ export function OnboardingClient() {
   const handleLaunch = async () => {
     setIsSubmitting(true);
     try {
+      const teamEmails = draft.team?.caseworker_emails
+        ? parseEmailList(draft.team.caseworker_emails)
+        : [];
       await api.post("/api/partner/organization/onboarding/complete", {
         ...draft.profile,
         ...draft.location,
-        ...draft.team,
+        contact_name: draft.team?.contact_name,
+        contact_title: draft.team?.contact_title,
+        contact_email: draft.team?.contact_email,
         ...draft.pref,
         phone: formatPhoneForApi(draft.location?.phone ?? "") ?? undefined,
+        default_caseload_capacity: draft.team?.default_caseload_capacity ?? 8,
+        ...(teamEmails.length > 0 && {
+          caseworker_emails: teamEmails,
+          caseworker_password: draft.team?.caseworker_password,
+        }),
       });
       try {
         localStorage.removeItem(DRAFT_KEY);
@@ -658,7 +697,7 @@ export function OnboardingClient() {
                 <StepCard
                   icon={Users}
                   title="Team Setup 👥"
-                  description="Set your primary contact."
+                  description="Set your primary contact and optionally invite caseworkers with a caseload capacity."
                 >
                   <form onSubmit={teamForm.handleSubmit(handleTeam)} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -672,6 +711,42 @@ export function OnboardingClient() {
                     <FormField label="Contact Email" required error={teamForm.formState.errors.contact_email?.message}>
                       <Input {...teamForm.register("contact_email")} type="email" placeholder="jane@yourorg.com" />
                     </FormField>
+
+                    <div className="rounded-xl border border-surface-border bg-primary-subtle/30 p-4 space-y-4">
+                      <div>
+                        <div className="text-sm font-semibold text-text-dark">Invite caseworkers (optional)</div>
+                        <p className="text-xs text-text-soft mt-1">
+                          Add team emails now or skip and invite them later from the Team tab.
+                        </p>
+                      </div>
+                      <FormField
+                        label="Caseload capacity (cases per caseworker)"
+                        error={teamForm.formState.errors.default_caseload_capacity?.message}
+                      >
+                        <Input
+                          {...teamForm.register("default_caseload_capacity", { valueAsNumber: true })}
+                          type="number"
+                          min={1}
+                          max={500}
+                          placeholder="8"
+                        />
+                      </FormField>
+                      <FormField label="Caseworker emails">
+                        <Textarea
+                          {...teamForm.register("caseworker_emails")}
+                          rows={4}
+                          placeholder={"cw1@yourorg.com\ncw2@yourorg.com"}
+                        />
+                      </FormField>
+                      <FormField label="Shared password for new caseworkers">
+                        <Input
+                          {...teamForm.register("caseworker_password")}
+                          type="text"
+                          placeholder="Minimum 8 characters (required if inviting emails)"
+                        />
+                      </FormField>
+                    </div>
+
                     <StepButtons step={currentStep} onBack={goBack} isLast={false} isLoading={teamForm.formState.isSubmitting} />
                   </form>
                 </StepCard>

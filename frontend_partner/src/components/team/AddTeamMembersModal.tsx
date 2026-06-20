@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import type { BulkCreateMembersResult } from "@/types";
 
+const DEFAULT_CAPACITY = 8;
+
 interface AddTeamMembersModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,6 +32,7 @@ export function AddTeamMembersModal({ open, onOpenChange, onSuccess }: AddTeamMe
   const { toast } = useToast();
   const [emailsText, setEmailsText] = useState("");
   const [password, setPassword] = useState("");
+  const [caseloadCapacity, setCaseloadCapacity] = useState(String(DEFAULT_CAPACITY));
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -40,7 +43,15 @@ export function AddTeamMembersModal({ open, onOpenChange, onSuccess }: AddTeamMe
       if (!password || password.length < 8) {
         throw new Error("Password must be at least 8 characters");
       }
-      const res = await api.post("/api/team/members/bulk-create", { emails, password });
+      const capacity = Number(caseloadCapacity);
+      if (!Number.isInteger(capacity) || capacity < 1 || capacity > 500) {
+        throw new Error("Capacity must be a whole number between 1 and 500");
+      }
+      const res = await api.post("/api/team/members/bulk-create", {
+        emails,
+        password,
+        caseload_capacity: capacity,
+      });
       return res.data.data as BulkCreateMembersResult;
     },
     onSuccess: (result) => {
@@ -59,6 +70,7 @@ export function AddTeamMembersModal({ open, onOpenChange, onSuccess }: AddTeamMe
         onSuccess();
         setEmailsText("");
         setPassword("");
+        setCaseloadCapacity(String(DEFAULT_CAPACITY));
         onOpenChange(false);
       } else {
         toast({
@@ -88,7 +100,7 @@ export function AddTeamMembersModal({ open, onOpenChange, onSuccess }: AddTeamMe
           <DialogTitle>Add team members</DialogTitle>
           <DialogDescription>
             Enter one or more email addresses. All new members will be caseworkers and share the
-            password you set below.
+            password and caseload capacity you set below.
           </DialogDescription>
         </DialogHeader>
 
@@ -104,6 +116,22 @@ export function AddTeamMembersModal({ open, onOpenChange, onSuccess }: AddTeamMe
             />
             <p className="text-xs text-text-soft">
               Separate emails with new lines or commas.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="capacity">Caseload capacity (cases)</Label>
+            <Input
+              id="capacity"
+              type="number"
+              min={1}
+              max={500}
+              value={caseloadCapacity}
+              onChange={(e) => setCaseloadCapacity(e.target.value)}
+              placeholder="8"
+            />
+            <p className="text-xs text-text-soft">
+              Maximum active cases this caseworker should carry. Shown on workload reports.
             </p>
           </div>
 

@@ -27,6 +27,7 @@ export interface TeamMember {
   email: string;
   role: OrgUserRole;
   is_active: boolean;
+  caseload_capacity: number | null;
   created_at: string;
 }
 
@@ -321,6 +322,26 @@ export interface CasesByStatus {
   status: string;
   count: number;
   color?: string;
+}
+
+export type CaseworkerLoadStatus = "overloaded" | "at_risk" | "healthy";
+
+export interface CaseworkerCard {
+  id: string;
+  name: string;
+  full_name: string;
+  initials: string;
+  title: string;
+  status: CaseworkerLoadStatus;
+  active_cases: number;
+  capacity_limit: number;
+  utilization_pct: number;
+  completion_rate: number;
+  avg_response_hours: number | null;
+  programs: string[];
+  renewals_due: number;
+  docs_overdue: number;
+  alerts: string[];
 }
 
 // ---- API Helpers ----

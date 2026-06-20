@@ -18,8 +18,13 @@ export class TeamController {
   async bulkCreate(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.orgUser) throw new UnauthorizedError('Not authenticated');
-      const { emails, password } = req.body;
-      const result = await svc.bulkCreateMembers(req.orgUser.orgId, emails, password);
+      const { emails, password, caseload_capacity } = req.body;
+      const result = await svc.bulkCreateMembers(
+        req.orgUser.orgId,
+        emails,
+        password,
+        caseload_capacity
+      );
       res.status(201).json({ success: true, data: result });
     } catch (error) {
       next(error);
@@ -54,6 +59,20 @@ export class TeamController {
         req.params.id,
         req.body.is_active,
         req.orgUser.orgUserId
+      );
+      res.status(200).json({ success: true, data: member });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateCapacity(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.orgUser) throw new UnauthorizedError('Not authenticated');
+      const member = await svc.updateMemberCapacity(
+        req.orgUser.orgId,
+        req.params.id,
+        req.body.caseload_capacity
       );
       res.status(200).json({ success: true, data: member });
     } catch (error) {

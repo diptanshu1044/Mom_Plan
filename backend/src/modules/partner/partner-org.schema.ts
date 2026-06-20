@@ -37,5 +37,8 @@ export const partnerCompleteOnboardingSchema = z.object({
     primary_language: z.string().optional(),
     notification_frequency: z.string().optional(),
     case_numbering_prefix: z.string().max(8).optional(),
+    caseworker_emails: z.array(z.string().email()).optional(),
+    caseworker_password: z.string().min(8).optional(),
+    default_caseload_capacity: z.number().int().min(1).max(500).optional(),
   }),
 });

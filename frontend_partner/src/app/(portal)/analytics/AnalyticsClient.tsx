@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { CaseworkerCardsPanel } from "@/components/dashboard/CaseworkerCardsPanel";
 import { CasesAreaChart, CasesStatusChart } from "@/components/dashboard/CasesChart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -136,6 +137,8 @@ export function AnalyticsClient() {
           </motion.div>
         ))}
       </div>
+
+      <CaseworkerCardsPanel />
 
       {/* Trend charts */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

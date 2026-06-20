@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import {
@@ -11,13 +11,16 @@ import {
   Trash2,
   Users,
   Copy,
+  LayoutGrid,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { usePartnerAuthStore } from "@/store/auth.store";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatDate, pluralize } from "@/lib/utils";
 import { AddTeamMembersModal } from "@/components/team/AddTeamMembersModal";
+import { CaseworkerCardsPanel } from "@/components/dashboard/CaseworkerCardsPanel";
 import type { TeamMember } from "@/types";
 
 async function fetchTeamMembers(): Promise<TeamMember[]> {
@@ -49,6 +53,17 @@ export function TeamClient() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"members" | "cards">("members");
+  const [selectedCaseworkerId, setSelectedCaseworkerId] = useState<string | null>(null);
+
+  const openCaseworkerCard = useCallback((memberId: string) => {
+    setSelectedCaseworkerId(memberId);
+    setActiveTab("cards");
+  }, []);
+
+  const clearCaseworkerSelection = useCallback(() => {
+    setSelectedCaseworkerId(null);
+  }, []);
 
   const { data: members = [], isLoading } = useQuery({
     queryKey: ["team-members"],
@@ -56,7 +71,27 @@ export function TeamClient() {
     staleTime: 30 * 1000,
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["team-members"] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["team-members"] });
+    queryClient.invalidateQueries({ queryKey: ["caseworker-cards"] });
+  };
+
+  const updateCapacity = useMutation({
+    mutationFn: async ({ id, caseload_capacity }: { id: string; caseload_capacity: number }) => {
+      const res = await api.patch(`/api/team/members/${id}/capacity`, { caseload_capacity });
+      return res.data.data as TeamMember;
+    },
+    onSuccess: () => {
+      invalidate();
+      toast({ title: "Capacity updated", variant: "success" });
+    },
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data
+          ?.error?.message ?? "Failed to update capacity";
+      toast({ variant: "destructive", title: message });
+    },
+  });
 
   const resetPassword = useMutation({
     mutationFn: async (id: string) => {
@@ -141,19 +176,42 @@ export function TeamClient() {
 
   return (
     <div className="flex-1 p-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-        <div>
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          setActiveTab(value as "members" | "cards");
+          if (value === "members") {
+            setSelectedCaseworkerId(null);
+          }
+        }}
+        className="space-y-6"
+      >
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <TabsList>
+            <TabsTrigger value="members" className="gap-1.5">
+              <Users className="w-4 h-4" />
+              Members
+            </TabsTrigger>
+            <TabsTrigger value="cards" className="gap-1.5">
+              <LayoutGrid className="w-4 h-4" />
+              Caseworker cards
+            </TabsTrigger>
+          </TabsList>
+
+          {activeTab === "members" && (
+            <Button onClick={() => setAddModalOpen(true)} className="gap-1.5">
+              <UserPlus className="w-4 h-4" />
+              Add members
+            </Button>
+          )}
+        </div>
+
+        <TabsContent value="members" className="mt-0 space-y-4">
           {!isLoading && (
             <p className="text-sm text-text-soft">
               {pluralize(members.length, "team member")} in your organization
             </p>
           )}
-        </div>
-        <Button onClick={() => setAddModalOpen(true)} className="gap-1.5">
-          <UserPlus className="w-4 h-4" />
-          Add members
-        </Button>
-      </div>
 
       {isLoading ? (
         <div className="space-y-3">
@@ -184,6 +242,7 @@ export function TeamClient() {
                   <th className="text-left px-5 py-3.5 font-semibold text-text-mid">Name</th>
                   <th className="text-left px-5 py-3.5 font-semibold text-text-mid">Email</th>
                   <th className="text-left px-5 py-3.5 font-semibold text-text-mid">Role</th>
+                  <th className="text-left px-5 py-3.5 font-semibold text-text-mid">Capacity</th>
                   <th className="text-left px-5 py-3.5 font-semibold text-text-mid">Status</th>
                   <th className="text-left px-5 py-3.5 font-semibold text-text-mid">Created</th>
                   <th className="px-5 py-3.5 w-12" />
@@ -198,10 +257,49 @@ export function TeamClient() {
                     transition={{ delay: i * 0.03 }}
                     className="border-b border-surface-border last:border-0 hover:bg-primary-subtle/30 transition-colors"
                   >
-                    <td className="px-5 py-4 font-semibold text-text-dark">{member.full_name}</td>
+                    <td className="px-5 py-4 font-semibold text-text-dark">
+                      {member.role === "caseworker" ? (
+                        <button
+                          type="button"
+                          onClick={() => openCaseworkerCard(member.id)}
+                          className="text-left text-partner-700 hover:text-partner-900 hover:underline underline-offset-2 transition-colors"
+                          title="View caseworker card"
+                        >
+                          {member.full_name}
+                        </button>
+                      ) : (
+                        member.full_name
+                      )}
+                    </td>
                     <td className="px-5 py-4 text-text-mid">{member.email}</td>
                     <td className="px-5 py-4">
                       <Badge className={roleBadgeClass(member.role)}>{roleLabel(member.role)}</Badge>
+                    </td>
+                    <td className="px-5 py-4">
+                      {member.role === "caseworker" ? (
+                        <Input
+                          type="number"
+                          min={1}
+                          max={500}
+                          defaultValue={member.caseload_capacity ?? 8}
+                          className="w-20 h-8 text-sm"
+                          onBlur={(e) => {
+                            const next = Number(e.target.value);
+                            const current = member.caseload_capacity ?? 8;
+                            if (
+                              Number.isInteger(next) &&
+                              next >= 1 &&
+                              next <= 500 &&
+                              next !== current
+                            ) {
+                              updateCapacity.mutate({ id: member.id, caseload_capacity: next });
+                            }
+                          }}
+                          disabled={updateCapacity.isPending}
+                        />
+                      ) : (
+                        <span className="text-text-soft">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-4">
                       <Badge
@@ -223,6 +321,18 @@ export function TeamClient() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {member.role === "caseworker" && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => openCaseworkerCard(member.id)}
+                                className="gap-2"
+                              >
+                                <LayoutGrid className="w-4 h-4" />
+                                View caseworker card
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
                           <DropdownMenuItem
                             onClick={() => resetPassword.mutate(member.id)}
                             className="gap-2"
@@ -262,6 +372,17 @@ export function TeamClient() {
           </div>
         </div>
       )}
+
+        </TabsContent>
+
+        <TabsContent value="cards" className="mt-0">
+          <CaseworkerCardsPanel
+            selectedId={selectedCaseworkerId}
+            onClearSelection={clearCaseworkerSelection}
+            showHeader={!selectedCaseworkerId}
+          />
+        </TabsContent>
+      </Tabs>
 
       <AddTeamMembersModal
         open={addModalOpen}

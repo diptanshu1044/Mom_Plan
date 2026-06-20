@@ -19,12 +19,15 @@ export function generateSecurePassword(length = 16): string {
   return Array.from(bytes, (b) => chars[b % chars.length]).join('');
 }
 
+const DEFAULT_CASELOAD_CAPACITY = 8;
+
 function sanitizeMember(user: {
   id: string;
   full_name: string;
   email: string;
   role: OrgUserRole;
   is_active: boolean;
+  caseload_capacity: number | null;
   created_at: Date;
 }) {
   return {
@@ -33,6 +36,7 @@ function sanitizeMember(user: {
     email: user.email,
     role: user.role,
     is_active: user.is_active,
+    caseload_capacity: user.caseload_capacity,
     created_at: user.created_at,
   };
 }
@@ -47,6 +51,7 @@ export class TeamService {
         email: true,
         role: true,
         is_active: true,
+        caseload_capacity: true,
         created_at: true,
       },
       orderBy: [{ role: 'asc' }, { full_name: 'asc' }],
@@ -55,7 +60,12 @@ export class TeamService {
     return members.map(sanitizeMember);
   }
 
-  async bulkCreateMembers(orgId: string, emails: string[], password: string) {
+  async bulkCreateMembers(
+    orgId: string,
+    emails: string[],
+    password: string,
+    caseloadCapacity = DEFAULT_CASELOAD_CAPACITY
+  ) {
     const normalized = [...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean))];
     const password_hash = await bcrypt.hash(password, 10);
 
@@ -92,6 +102,7 @@ export class TeamService {
               must_change_password: true,
               is_active: true,
               org_id: orgId,
+              caseload_capacity: caseloadCapacity,
             },
             select: {
               id: true,
@@ -99,6 +110,7 @@ export class TeamService {
               email: true,
               role: true,
               is_active: true,
+              caseload_capacity: true,
               created_at: true,
             },
           })
@@ -186,10 +198,34 @@ export class TeamService {
         email: true,
         role: true,
         is_active: true,
+        caseload_capacity: true,
         created_at: true,
       },
     });
 
     return sanitizeMember(member);
+  }
+
+  async updateMemberCapacity(orgId: string, memberId: string, caseloadCapacity: number) {
+    const member = await this.getMemberInOrg(orgId, memberId);
+    if (member.role !== OrgUserRole.caseworker) {
+      throw new BadRequestError('Caseload capacity applies to caseworkers only');
+    }
+
+    const updated = await prisma.orgUser.update({
+      where: { id: memberId },
+      data: { caseload_capacity: caseloadCapacity },
+      select: {
+        id: true,
+        full_name: true,
+        email: true,
+        role: true,
+        is_active: true,
+        caseload_capacity: true,
+        created_at: true,
+      },
+    });
+
+    return sanitizeMember(updated);
   }
 }

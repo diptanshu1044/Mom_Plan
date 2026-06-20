@@ -2,6 +2,7 @@ import { prisma } from '../../config/prisma';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { toPartnerOrganization } from '../../utils/partner-organization.utils';
 import { resolveLocationInput } from '../../utils/location-input.utils';
+import { TeamService } from '../team/team.service';
 import {
   isZipValidationEnabled,
   zipValidationService,
@@ -153,6 +154,10 @@ export class PartnerOrgService {
       primary_language?: string;
       notification_frequency?: string;
       case_numbering_prefix?: string;
+      // team invites
+      caseworker_emails?: string[];
+      caseworker_password?: string;
+      default_caseload_capacity?: number;
     }
   ) {
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
@@ -199,7 +204,25 @@ export class PartnerOrgService {
       },
     });
 
-    return toPartnerOrganization(updated);
+    let teamInviteResult: Awaited<ReturnType<TeamService['bulkCreateMembers']>> | null = null;
+    const emails = data.caseworker_emails?.map((e) => e.trim().toLowerCase()).filter(Boolean) ?? [];
+    if (emails.length > 0) {
+      if (!data.caseworker_password) {
+        throw new BadRequestError('A password is required when inviting caseworkers during onboarding');
+      }
+      const teamSvc = new TeamService();
+      teamInviteResult = await teamSvc.bulkCreateMembers(
+        orgId,
+        emails,
+        data.caseworker_password,
+        data.default_caseload_capacity ?? 8
+      );
+    }
+
+    return {
+      organization: toPartnerOrganization(updated),
+      team_invites: teamInviteResult,
+    };
   }
 
   async getOrganization(orgId: string) {

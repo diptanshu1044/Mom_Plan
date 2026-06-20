@@ -8,8 +8,8 @@ export class PartnerOrgController {
   async completeOnboarding(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!req.orgUser) throw new UnauthorizedError('Not authenticated');
-      const org = await svc.completeOnboarding(req.orgUser.orgId, req.body);
-      res.status(200).json({ success: true, data: { organization: org } });
+      const result = await svc.completeOnboarding(req.orgUser.orgId, req.body);
+      res.status(200).json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

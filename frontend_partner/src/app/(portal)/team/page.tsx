@@ -13,7 +13,7 @@ export default function TeamPage() {
       <div className="flex flex-col min-h-full">
         <Header
           title="Team"
-          description="Manage caseworkers and organization access"
+          description="Manage caseworkers, capacity limits, and workload cards"
         />
         <TeamClient />
       </div>
