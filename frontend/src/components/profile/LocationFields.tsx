@@ -2,13 +2,15 @@
 
 import { useEffect, type MutableRefObject } from "react";
 import { Check, Loader2 } from "lucide-react";
-import { Input, Select } from "@/components/ui/Input";
+import { Input } from "@/components/ui/Input";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { US_STATES } from "@/lib/us-states";
 import {
   useLocationFields,
   type LocationFieldValues,
   type UseLocationFieldsResult,
 } from "@/hooks/useLocationFields";
+import { extractZip5 } from "@/services/zipValidation";
 import { cn } from "@/lib/utils";
 
 export type { LocationFieldValues, UseLocationFieldsResult };
@@ -20,15 +22,23 @@ export interface LocationFieldsProps {
   onLocationChange?: () => void;
   requireState?: boolean;
   requireCity?: boolean;
+  requireCounty?: boolean;
   requireZip?: boolean;
   showZip?: boolean;
+  showCounty?: boolean;
   /** When true, state and city are read-only (derived from ZIP lookup). */
   lockDerivedFields?: boolean;
   className?: string;
   sectionTitle?: string;
   zipHint?: string;
   cityHint?: string;
+  countyHint?: string;
   validationRef?: MutableRefObject<UseLocationFieldsResult | null>;
+}
+
+function formatStateLabel(stateCode: string): string {
+  const match = US_STATES.find((state) => state.value === stateCode);
+  return match ? `${match.label} (${stateCode})` : stateCode;
 }
 
 export function LocationFields({
@@ -38,25 +48,29 @@ export function LocationFields({
   onLocationChange,
   requireState = true,
   requireCity = true,
+  requireCounty = true,
   requireZip = false,
   showZip = true,
+  showCounty = true,
   lockDerivedFields = false,
   className,
   sectionTitle,
   zipHint,
   cityHint,
+  countyHint,
   validationRef,
 }: LocationFieldsProps) {
   const location = useLocationFields({
     values,
     onChange: (field, value) => {
       onChange(field, value);
-      if (field === "state" || field === "city") {
+      if (field === "state" || field === "city" || field === "county") {
         onLocationChange?.();
       }
     },
     requireCity,
     requireZip,
+    requireCounty,
   });
 
   useEffect(() => {
@@ -66,7 +80,8 @@ export function LocationFields({
   }, [location, validationRef]);
 
   const stateError = errors?.state;
-  const cityError = errors?.city || location.cityLookupError;
+  const cityError = errors?.city;
+  const countyError = errors?.county || location.countyError;
   const zipError =
     errors?.zip || location.zipFormatError || location.lookupError || location.validationError;
 
@@ -76,7 +91,7 @@ export function LocationFields({
         <div>
           <h3 className="text-sm font-semibold text-on-surface">{sectionTitle}</h3>
           <p className="text-xs text-on-surface-variant mt-0.5">
-            Enter your ZIP first — we use USPS data to auto-fill and verify your city.
+            Enter your ZIP first — we use USPS data to auto-fill your city, state, and county.
           </p>
         </div>
       )}
@@ -86,16 +101,18 @@ export function LocationFields({
           label="ZIP Code"
           required={requireZip}
           placeholder="30303"
-          maxLength={10}
+          maxLength={5}
           inputMode="numeric"
+          numericOnly
           value={values.zip}
           onChange={(event) => location.handleZipChange(event.target.value)}
+          onBlur={location.handleZipBlur}
           error={zipError ?? undefined}
           hint={
             zipHint ??
             (location.isVerified
-              ? "ZIP code verified for your city and state."
-              : "Start here — we'll auto-fill your state and city from USPS data.")
+              ? "ZIP code verified for your city, state, and county."
+              : "Enter your 5-digit ZIP — we'll auto-fill your location from USPS data.")
           }
           rightIcon={
             location.isLoading ? (
@@ -112,27 +129,13 @@ export function LocationFields({
         <Input
           label="State"
           required={requireState}
-          value={values.state}
+          value={values.state ? formatStateLabel(values.state) : ""}
           readOnly
           disabled
           hint="Auto-filled from your ZIP code."
           autoComplete="address-level1"
         />
-      ) : (
-        <Select
-          label="State"
-          required={requireState}
-          placeholder="Select your state…"
-          options={US_STATES.map((state) => ({
-            value: state.value,
-            label: `${state.label} (${state.value})`,
-          }))}
-          value={values.state}
-          onChange={(event) => location.handleStateChange(event.target.value)}
-          error={stateError}
-          autoComplete="address-level1"
-        />
-      )}
+      ) : null}
 
       {lockDerivedFields ? (
         <Input
@@ -144,37 +147,31 @@ export function LocationFields({
           hint="Auto-filled from your ZIP code."
           autoComplete="address-level2"
         />
-      ) : location.useZipCityDropdown ? (
-        <Select
-          label="City"
-          required={requireCity}
-          placeholder="Select your city…"
-          options={location.cityOptions}
-          value={values.city}
-          onChange={(event) => location.handleCityChange(event.target.value)}
-          error={cityError ?? undefined}
-          hint={
-            cityHint ??
-            "City options come from your ZIP code (USPS data)."
+      ) : null}
+
+      {showCounty && extractZip5(values.zip) && (
+        <SearchableSelect
+          label="County"
+          required={requireCounty}
+          placeholder={
+            location.isLoading && location.countyOptions.length === 0
+              ? "Loading counties…"
+              : "Select your county…"
           }
-          autoComplete="address-level2"
-        />
-      ) : (
-        <Input
-          label="City"
-          required={requireCity}
-          placeholder={values.state ? "Springfield" : "Select a state first…"}
-          value={values.city}
-          onChange={(event) => location.handleCityChange(event.target.value)}
-          disabled={!values.state}
-          error={cityError ?? undefined}
+          options={location.countyOptions}
+          value={values.county}
+          onChange={location.handleCountyChange}
+          error={countyError ?? undefined}
           hint={
-            cityHint ??
-            (values.state
-              ? "Enter your city name — we'll verify it against USPS data."
-              : "Choose your state first.")
+            countyHint ??
+            (location.requiresCountySelection
+              ? "This ZIP spans multiple counties — please select yours."
+              : location.countyOptions.length === 1
+                ? "Auto-filled from your ZIP code. Open the dropdown to confirm."
+                : "Select the county that matches your ZIP code.")
           }
-          autoComplete="address-level2"
+          disabled={location.isLoading && location.countyOptions.length === 0}
+          autoComplete="address-level3"
         />
       )}
     </div>

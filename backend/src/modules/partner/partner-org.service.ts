@@ -32,10 +32,14 @@ async function buildLocationPatch(
       zip: data.zip,
       state: data.state ?? existing.state ?? undefined,
       city: data.city ?? existing.city ?? undefined,
+      county: data.county ?? existing.county ?? undefined,
     });
     patch.zip_code = resolved.zip_code;
     patch.state = resolved.state;
     patch.city = resolved.city;
+    if (resolved.county) {
+      patch.county = resolved.county;
+    }
   } else {
     if (data.city !== undefined) patch.city = data.city || null;
     if (data.state !== undefined) patch.state = data.state || null;
@@ -45,16 +49,19 @@ async function buildLocationPatch(
   const effectiveState = (patch.state as string | undefined) ?? existing.state;
   const effectiveCity = (patch.city as string | undefined) ?? existing.city;
 
+  const effectiveCounty = (patch.county as string | undefined) ?? existing.county;
+
   if (
     zipChanging &&
     isZipValidationEnabled() &&
     effectiveZip &&
     effectiveState
   ) {
-    const zipResult = await zipValidationService.validateZip(
+    const zipResult = zipValidationService.validateZip(
       String(effectiveZip),
       String(effectiveState),
-      effectiveCity ? String(effectiveCity) : undefined
+      effectiveCity ? String(effectiveCity) : undefined,
+      effectiveCounty ? String(effectiveCounty) : undefined
     );
     if (!zipResult.valid) {
       throw new BadRequestError(zipResult.error || 'Invalid ZIP code.');

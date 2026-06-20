@@ -158,14 +158,14 @@ export class AuthService {
       throw new BadRequestError('ZIP code is required.');
     }
 
-    let resolvedLocation: { zip_code: string; state: string; city: string };
+    let resolvedLocation: { zip_code: string; state: string; city: string; county: string | null };
     if (isZipValidationEnabled()) {
-      resolvedLocation = await zipValidationService.resolveLocationFromZip(zip_code);
+      resolvedLocation = zipValidationService.resolveLocationFromZip(zip_code, county);
     } else {
       if (!state || !city) {
         throw new BadRequestError('State and city are required.');
       }
-      resolvedLocation = { zip_code, state, city };
+      resolvedLocation = { zip_code, state, city, county: county || null };
     }
 
     const password_hash = await bcrypt.hash(data.password, 10);
@@ -193,7 +193,7 @@ export class AuthService {
         first_name,
         last_name,
         city: resolvedLocation.city,
-        county: county || null,
+        county: resolvedLocation.county,
         state: resolvedLocation.state,
         zip_code: resolvedLocation.zip_code,
       },

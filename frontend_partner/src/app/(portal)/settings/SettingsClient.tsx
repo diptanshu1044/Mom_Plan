@@ -287,26 +287,20 @@ export function SettingsClient() {
                       <Input {...orgForm.register("address")} placeholder="123 Lavender Lane, Suite 200" />
                     </div>
                     <LocationFields
-                      values={{ state: watchState, city: watchCity, zip: watchZip }}
+                      values={{
+                        state: watchState,
+                        city: watchCity,
+                        zip: watchZip,
+                        county: watchCounty,
+                      }}
                       onChange={(field, value) => {
                         orgForm.setValue(field, value, { shouldValidate: true });
                       }}
                       requireZip
+                      requireCounty
                       lockDerivedFields
                       validationRef={locationValidationRef}
                     />
-                    <div className="space-y-1.5">
-                      <Label>County</Label>
-                      <Input
-                        value={watchCounty}
-                        readOnly
-                        disabled
-                        placeholder="Fulton"
-                      />
-                      <p className="text-xs text-text-soft">
-                        Set during signup — contact support to update your county.
-                      </p>
-                    </div>
                   </div>
 
                   <div className="flex justify-end">

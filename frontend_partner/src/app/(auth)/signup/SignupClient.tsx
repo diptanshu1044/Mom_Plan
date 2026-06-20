@@ -645,10 +645,11 @@ export function SignupClient() {
                       state: form1.watch("state") ?? "",
                       city: form1.watch("city") ?? "",
                       zip: form1.watch("zip") ?? "",
+                      county: form1.watch("county") ?? "",
                     }}
                     onChange={(field, value) => {
                       form1.setValue(field, value, { shouldValidate: true });
-                      if (field === "city" || field === "state") {
+                      if (field === "city" || field === "state" || field === "county") {
                         updatePreview({
                           city: field === "city" ? value : form1.watch("city") ?? "",
                           state: field === "state" ? value : form1.watch("state") ?? "",
@@ -659,24 +660,13 @@ export function SignupClient() {
                       state: form1.formState.errors.state?.message,
                       city: form1.formState.errors.city?.message,
                       zip: form1.formState.errors.zip?.message,
+                      county: form1.formState.errors.county?.message,
                     }}
                     requireZip
+                    requireCounty
                     lockDerivedFields
                     validationRef={locationValidationRef}
                   />
-
-                  <Field
-                    label="County"
-                    required
-                    hint="The county where your organization is located"
-                    error={form1.formState.errors.county?.message}
-                  >
-                    <Input
-                      {...form1.register("county")}
-                      placeholder="Fulton"
-                      error={!!form1.formState.errors.county}
-                    />
-                  </Field>
 
                   <Field label="Country">
                     <Input {...form1.register("country")} placeholder="United States" />

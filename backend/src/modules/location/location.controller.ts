@@ -4,8 +4,13 @@ import { zipValidationService } from '../../services/zipValidation.service';
 export class LocationController {
   async validateZip(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { zip, state, city } = req.body as { zip: string; state: string; city?: string };
-      const result = await zipValidationService.validateZip(zip, state, city);
+      const { zip, state, city, county } = req.body as {
+        zip: string;
+        state: string;
+        city?: string;
+        county?: string;
+      };
+      const result = await zipValidationService.validateZip(zip, state, city, county);
 
       res.status(200).json({
         success: true,
@@ -14,7 +19,8 @@ export class LocationController {
           city: result.city ?? null,
           state: result.state ?? null,
           zip: result.zip ?? null,
-          cities: result.cities ?? [],
+          counties: result.counties ?? [],
+          county: result.county ?? null,
           error: result.error ?? null,
         },
       });
@@ -32,8 +38,10 @@ export class LocationController {
         success: true,
         data: {
           zip: result.zip,
+          city: result.city,
           state: result.state,
-          cities: result.cities,
+          stateName: result.stateName,
+          counties: result.counties,
           error: result.error ?? null,
         },
       });

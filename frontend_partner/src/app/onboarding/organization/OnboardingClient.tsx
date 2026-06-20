@@ -531,6 +531,7 @@ export function OnboardingClient() {
                         state: locationForm.watch("state") ?? "",
                         city: locationForm.watch("city") ?? "",
                         zip: locationForm.watch("zip") ?? "",
+                        county: locationForm.watch("county") ?? "",
                       }}
                       onChange={(field, value) => {
                         locationForm.setValue(field, value, { shouldValidate: true });
@@ -539,19 +540,13 @@ export function OnboardingClient() {
                         state: locationForm.formState.errors.state?.message,
                         city: locationForm.formState.errors.city?.message,
                         zip: locationForm.formState.errors.zip?.message,
+                        county: locationForm.formState.errors.county?.message,
                       }}
                       requireZip
+                      requireCounty
                       lockDerivedFields
                       validationRef={locationValidationRef}
                     />
-                    <FormField
-                      label="County"
-                      required
-                      hint="The county where your organization is located"
-                      error={locationForm.formState.errors.county?.message}
-                    >
-                      <Input {...locationForm.register("county")} placeholder="Fulton" />
-                    </FormField>
                     <FormField label="Country">
                       <Input {...locationForm.register("country")} placeholder="United States" />
                     </FormField>

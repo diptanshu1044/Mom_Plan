@@ -254,11 +254,11 @@ function RegisterForm() {
 
               <LocationFields
                 sectionTitle="Where do you live?"
-                values={{ state, city, zip: zip_code }}
+                values={{ state, city, zip: zip_code, county }}
                 onChange={(field, value) => {
                   const formField = field === "zip" ? "zip_code" : field;
                   setValue(formField, value, { shouldValidate: true });
-                  if (field === "state" || field === "city") {
+                  if (field === "state" || field === "city" || field === "county") {
                     setValue("org_id", "");
                     setValue("org_type", "");
                   }
@@ -267,29 +267,16 @@ function RegisterForm() {
                   state: errors.state?.message,
                   city: errors.city?.message,
                   zip: errors.zip_code?.message,
+                  county: errors.county?.message,
                 }}
                 requireZip
+                requireCounty
                 lockDerivedFields
                 validationRef={locationValidationRef}
                 onLocationChange={() => {
                   setValue("org_id", "");
                   setValue("org_type", "");
                 }}
-              />
-
-              <Input
-                label="County"
-                type="text"
-                placeholder="Fulton"
-                required
-                hint="The county where you live"
-                error={errors.county?.message}
-                {...register("county", {
-                  onChange: () => {
-                    setValue("org_id", "");
-                    setValue("org_type", "");
-                  },
-                })}
               />
 
               <Controller

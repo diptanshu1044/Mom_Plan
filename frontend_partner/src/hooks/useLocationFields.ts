@@ -3,20 +3,18 @@ import { useQuery } from "@tanstack/react-query";
 import {
   extractZip5,
   isZipValidationEnabled,
-  lookupCity,
   lookupZip,
   normalizeZipInput,
   validateZip,
 } from "@/services/zipValidation";
 
 const ZIP_STALE_TIME_MS = 24 * 60 * 60 * 1000;
-const ZIP_DEBOUNCE_MS = 500;
-const CITY_DEBOUNCE_MS = 500;
 
 export interface LocationFieldValues {
   state: string;
   city: string;
   zip: string;
+  county: string;
 }
 
 interface UseLocationFieldsOptions {
@@ -24,10 +22,13 @@ interface UseLocationFieldsOptions {
   onChange: (field: keyof LocationFieldValues, value: string) => void;
   requireCity?: boolean;
   requireZip?: boolean;
+  requireCounty?: boolean;
 }
 
-function normalizeCity(value: string): string {
-  return value.trim().toLowerCase();
+function countiesMatch(selected: string, options: string[]): boolean {
+  if (!selected.trim()) return false;
+  const normalized = selected.trim().toUpperCase();
+  return options.some((county) => county.toUpperCase() === normalized);
 }
 
 export function useLocationFields({
@@ -35,142 +36,149 @@ export function useLocationFields({
   onChange,
   requireCity = true,
   requireZip = false,
+  requireCounty = true,
 }: UseLocationFieldsOptions) {
   const enabled = isZipValidationEnabled();
-  const [debouncedZip, setDebouncedZip] = useState(values.zip);
-  const [debouncedCity, setDebouncedCity] = useState(values.city);
+  const [lookupTarget, setLookupTarget] = useState<string | null>(null);
   const zipAutofillRef = useRef(false);
+  const lastResolvedZipRef = useRef<string | null>(null);
+  const previousZip5Ref = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (!enabled) return;
-    const timer = window.setTimeout(() => setDebouncedZip(values.zip), ZIP_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [values.zip, enabled]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    const timer = window.setTimeout(() => setDebouncedCity(values.city), CITY_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [values.city, enabled]);
-
-  const zip5 = extractZip5(enabled ? debouncedZip : values.zip);
-  const isDebouncingZip = enabled && values.zip !== debouncedZip;
-  const isDebouncingCity = enabled && values.city !== debouncedCity;
+  const zip5 = extractZip5(values.zip);
+  const lookupZip5 = lookupTarget ? extractZip5(lookupTarget) : null;
 
   const lookupQuery = useQuery({
-    queryKey: ["zip-lookup", zip5],
-    queryFn: () => lookupZip(debouncedZip),
-    enabled: enabled && Boolean(zip5),
+    queryKey: ["zip-lookup", lookupZip5],
+    queryFn: () => lookupZip(lookupZip5!),
+    enabled: enabled && Boolean(lookupZip5),
     staleTime: ZIP_STALE_TIME_MS,
     gcTime: ZIP_STALE_TIME_MS,
-    retry: (failureCount, error) => {
-      const message = error instanceof Error ? error.message : "";
-      if (message.includes("valid US ZIP") || message.includes("could not be verified")) {
-        return false;
-      }
-      return failureCount < 1;
-    },
-  });
-
-  const cityLookupQuery = useQuery({
-    queryKey: ["city-lookup", values.state, debouncedCity],
-    queryFn: () => lookupCity(values.state, debouncedCity),
-    enabled:
-      enabled &&
-      values.state.length === 2 &&
-      Boolean(debouncedCity.trim()) &&
-      !zip5,
-    staleTime: ZIP_STALE_TIME_MS,
-    gcTime: ZIP_STALE_TIME_MS,
+    retry: false,
   });
 
   const validationQuery = useQuery({
-    queryKey: ["zip-validation", zip5, values.state, values.city],
-    queryFn: () => validateZip(debouncedZip, values.state, values.city || undefined),
+    queryKey: ["zip-validation", zip5, values.state, values.city, values.county],
+    queryFn: () =>
+      validateZip(values.zip, values.state, values.city || undefined, values.county || undefined),
     enabled:
       enabled &&
-      Boolean(zip5 && values.state.length === 2 && (!requireCity || values.city.trim())),
+      Boolean(
+        zip5 &&
+          values.state.length === 2 &&
+          (!requireCity || values.city.trim()) &&
+          (!requireCounty || values.county.trim() || (lookupQuery.data?.counties.length ?? 0) <= 1)
+      ),
     staleTime: ZIP_STALE_TIME_MS,
     gcTime: ZIP_STALE_TIME_MS,
-    retry: (failureCount, error) => {
-      const message = error instanceof Error ? error.message : "";
-      if (
-        message.includes("valid US ZIP") ||
-        message.includes("is assigned to") ||
-        message.includes("does not belong") ||
-        message.includes("could not be verified")
-      ) {
-        return false;
-      }
-      return failureCount < 1;
-    },
+    retry: false,
   });
+
+  const triggerZipLookup = useCallback(
+    (rawZip: string) => {
+      const normalized = normalizeZipInput(rawZip);
+      if (extractZip5(normalized)) {
+        setLookupTarget(normalized);
+      }
+    },
+    []
+  );
+
+  const clearDerivedLocation = useCallback(() => {
+    zipAutofillRef.current = true;
+    onChange("state", "");
+    onChange("city", "");
+    onChange("county", "");
+    window.setTimeout(() => {
+      zipAutofillRef.current = false;
+    }, 0);
+  }, [onChange]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    if (!zip5) {
+      if (previousZip5Ref.current) {
+        clearDerivedLocation();
+      }
+      lastResolvedZipRef.current = null;
+      previousZip5Ref.current = null;
+      return;
+    }
+
+    previousZip5Ref.current = zip5;
+
+    if (zip5.length === 5) {
+      triggerZipLookup(values.zip);
+    }
+  }, [enabled, values.zip, zip5, triggerZipLookup, clearDerivedLocation]);
 
   useEffect(() => {
     if (!enabled || !lookupQuery.data || lookupQuery.isFetching) return;
-    if (!zip5 || lookupQuery.data.error) return;
+    if (!lookupZip5) return;
+
+    if (lookupQuery.data.error || !lookupQuery.data.state || !lookupQuery.data.city) {
+      clearDerivedLocation();
+      lastResolvedZipRef.current = null;
+      return;
+    }
 
     zipAutofillRef.current = true;
+    lastResolvedZipRef.current = lookupZip5;
 
-    if (lookupQuery.data.state && lookupQuery.data.state !== values.state) {
+    if (lookupQuery.data.state !== values.state) {
       onChange("state", lookupQuery.data.state);
     }
 
-    const zipCities = lookupQuery.data.cities;
-    if (zipCities.length >= 1) {
-      const canonicalCity =
-        zipCities.find((city) => normalizeCity(city) === normalizeCity(values.city)) ??
-        zipCities[0];
-      if (values.city !== canonicalCity) {
-        onChange("city", canonicalCity);
-      }
+    if (lookupQuery.data.city !== values.city) {
+      onChange("city", lookupQuery.data.city);
     }
 
-    const timer = window.setTimeout(() => {
+    const counties = lookupQuery.data.counties;
+    if (counties.length === 1) {
+      if (values.county !== counties[0]) {
+        onChange("county", counties[0]);
+      }
+    } else if (counties.length > 1) {
+      if (values.county && !countiesMatch(values.county, counties)) {
+        onChange("county", "");
+      }
+    } else if (values.county) {
+      onChange("county", "");
+    }
+
+    window.setTimeout(() => {
       zipAutofillRef.current = false;
     }, 0);
-    return () => window.clearTimeout(timer);
-  }, [enabled, lookupQuery.data, lookupQuery.isFetching, zip5, values.state, values.city, onChange]);
-
-  useEffect(() => {
-    if (!enabled || zip5 || !cityLookupQuery.data?.valid || cityLookupQuery.isFetching) return;
-    const canonicalCity = cityLookupQuery.data.city;
-    if (canonicalCity && values.city !== canonicalCity) {
-      onChange("city", canonicalCity);
-    }
   }, [
     enabled,
-    zip5,
-    cityLookupQuery.data,
-    cityLookupQuery.isFetching,
+    lookupQuery.data,
+    lookupQuery.isFetching,
+    lookupZip5,
+    values.state,
     values.city,
+    values.county,
     onChange,
+    clearDerivedLocation,
   ]);
 
-  const zipCityOptions = useMemo(() => {
-    const zipCities = lookupQuery.data?.cities ?? [];
-    const validationCities = validationQuery.data?.cities ?? [];
-    const merged = new Set<string>([...zipCities, ...validationCities]);
-    if (values.city.trim()) merged.add(values.city.trim());
-    return [...merged].sort((a, b) => a.localeCompare(b));
-  }, [lookupQuery.data?.cities, validationQuery.data?.cities, values.city]);
-
-  const useZipCityDropdown = Boolean(zip5 && zipCityOptions.length > 0);
-
-  const cityOptions = useMemo(
+  const countyOptions = useMemo(
     () =>
-      zipCityOptions.map((city) => ({
-        value: city,
-        label: city,
+      (lookupQuery.data?.counties ?? []).map((county) => ({
+        value: county,
+        label: county,
       })),
-    [zipCityOptions]
+    [lookupQuery.data?.counties]
   );
+
+  const showCountyDropdown = Boolean(zip5 && countyOptions.length > 0);
+  const requiresCountySelection = countyOptions.length > 1;
 
   const handleStateChange = useCallback(
     (state: string) => {
       onChange("state", state);
       if (!zipAutofillRef.current) {
         onChange("city", "");
+        onChange("county", "");
       }
     },
     [onChange]
@@ -183,12 +191,31 @@ export function useLocationFields({
     [onChange]
   );
 
-  const handleZipChange = useCallback(
-    (raw: string) => {
-      onChange("zip", normalizeZipInput(raw));
+  const handleCountyChange = useCallback(
+    (county: string) => {
+      onChange("county", county);
     },
     [onChange]
   );
+
+  const handleZipChange = useCallback(
+    (raw: string) => {
+      const normalized = normalizeZipInput(raw);
+      onChange("zip", normalized);
+
+      if (!extractZip5(normalized)) {
+        setLookupTarget(null);
+        lastResolvedZipRef.current = null;
+      }
+    },
+    [onChange]
+  );
+
+  const handleZipBlur = useCallback(() => {
+    if (zip5) {
+      triggerZipLookup(values.zip);
+    }
+  }, [zip5, triggerZipLookup, values.zip]);
 
   const zipFormatError = useMemo(() => {
     if (!enabled || !values.zip.trim()) return null;
@@ -197,20 +224,26 @@ export function useLocationFields({
   }, [enabled, values.zip, zip5]);
 
   const lookupError =
-    enabled && zip5 && lookupQuery.data?.error ? lookupQuery.data.error : null;
+    enabled && zip5 && lookupQuery.data?.error && !lookupQuery.isFetching
+      ? lookupQuery.data.error
+      : null;
 
-  const cityLookupError = useMemo(() => {
-    if (!enabled || zip5 || !values.state || !debouncedCity.trim()) return null;
-    if (isDebouncingCity || cityLookupQuery.isFetching) return null;
-    return cityLookupQuery.data?.error ?? null;
+  const countyError = useMemo(() => {
+    if (!enabled || !requiresCountySelection || !zip5 || lookupQuery.isFetching) return null;
+    if (lookupQuery.data?.error) return null;
+    if (!values.county.trim()) return "Please select a county for this ZIP code.";
+    if (!countiesMatch(values.county, countyOptions.map((option) => option.value))) {
+      return "Please select a valid county for this ZIP code.";
+    }
+    return null;
   }, [
     enabled,
+    requiresCountySelection,
     zip5,
-    values.state,
-    debouncedCity,
-    isDebouncingCity,
-    cityLookupQuery.isFetching,
-    cityLookupQuery.data?.error,
+    lookupQuery.isFetching,
+    lookupQuery.data?.error,
+    values.county,
+    countyOptions,
   ]);
 
   const validationError =
@@ -219,11 +252,13 @@ export function useLocationFields({
       : null;
 
   const isLoading =
-    isDebouncingZip ||
-    isDebouncingCity ||
     lookupQuery.isFetching ||
-    cityLookupQuery.isFetching ||
-    (Boolean(zip5 && values.state.length === 2 && values.city.trim()) &&
+    (Boolean(
+      zip5 &&
+        values.state.length === 2 &&
+        values.city.trim() &&
+        (values.county.trim() || !requiresCountySelection)
+    ) &&
       validationQuery.isFetching);
 
   const isVerified = Boolean(
@@ -231,7 +266,10 @@ export function useLocationFields({
       zip5 &&
       values.state.length === 2 &&
       (!requireCity || values.city.trim()) &&
+      (!requireCounty || !requiresCountySelection || values.county.trim()) &&
       !isLoading &&
+      !lookupError &&
+      !countyError &&
       validationQuery.data?.valid
   );
 
@@ -240,19 +278,17 @@ export function useLocationFields({
 
     if (requireZip && !values.zip.trim()) return false;
     if (values.zip.trim() && !zip5) return false;
+    if (zip5 && lookupError) return false;
     if (zip5 && values.state.length !== 2) return false;
     if (requireCity && !values.city.trim()) return false;
+    if (requireCounty && requiresCountySelection && !values.county.trim()) return false;
+    if (countyError) return false;
     if (isLoading) return false;
 
     if (zip5 && values.state.length === 2) {
-      if (lookupError) return false;
       if (requireCity && values.city.trim() && validationError) return false;
       if (requireCity && values.city.trim() && !validationQuery.data?.valid) return false;
       return true;
-    }
-
-    if (!zip5 && values.state.length === 2 && values.city.trim()) {
-      return Boolean(cityLookupQuery.data?.valid);
     }
 
     return true;
@@ -260,26 +296,29 @@ export function useLocationFields({
     enabled,
     requireZip,
     requireCity,
+    requireCounty,
     values.zip,
     values.state,
     values.city,
+    values.county,
     zip5,
-    isLoading,
     lookupError,
+    requiresCountySelection,
+    countyError,
+    isLoading,
     validationError,
     validationQuery.data?.valid,
-    cityLookupQuery.data?.valid,
   ]);
 
   const getValidationError = useCallback((): string | null => {
     if (!enabled) return null;
     if (requireZip && !values.zip.trim()) return "ZIP code is required.";
     if (zipFormatError) return zipFormatError;
+    if (isLoading) return "Looking up ZIP code…";
+    if (lookupError) return lookupError;
     if (zip5 && values.state.length !== 2) return "Please select a valid US state.";
     if (requireCity && !values.city.trim()) return "City is required.";
-    if (isLoading) return "Verifying location…";
-    if (lookupError) return lookupError;
-    if (cityLookupError) return cityLookupError;
+    if (countyError) return countyError;
     if (validationError) return validationError;
     if (
       zip5 &&
@@ -290,15 +329,6 @@ export function useLocationFields({
     ) {
       return validationQuery.data.error || "Please verify your ZIP code, state, and city.";
     }
-    if (
-      !zip5 &&
-      values.state.length === 2 &&
-      values.city.trim() &&
-      cityLookupQuery.data &&
-      !cityLookupQuery.data.valid
-    ) {
-      return cityLookupQuery.data.error || "Please enter a valid city for your state.";
-    }
     return null;
   }, [
     enabled,
@@ -311,25 +341,27 @@ export function useLocationFields({
     zipFormatError,
     isLoading,
     lookupError,
-    cityLookupError,
+    countyError,
     validationError,
     validationQuery.data,
-    cityLookupQuery.data,
   ]);
 
   return {
     isEnabled: enabled,
-    cityOptions,
-    useZipCityDropdown,
+    countyOptions,
+    showCountyDropdown,
+    requiresCountySelection,
     isLoading,
     isVerified,
     zipFormatError,
     lookupError,
-    cityLookupError,
+    countyError,
     validationError,
     handleStateChange,
     handleCityChange,
+    handleCountyChange,
     handleZipChange,
+    handleZipBlur,
     validate,
     getValidationError,
   };

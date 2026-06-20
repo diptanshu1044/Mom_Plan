@@ -1,5 +1,5 @@
 /**
- * Backfill user location fields from saved ZIP codes via Zippopotam.us.
+ * Backfill user location fields from saved ZIP codes via local USPS ZIP dataset.
  *
  * Usage: npx tsx src/scripts/backfill-user-locations.ts
  */
@@ -24,15 +24,19 @@ async function main() {
     }
 
     try {
-      const resolved = await zipValidationService.resolveLocationFromZip(zip);
       const fp = user.family_profile;
+      const resolved = zipValidationService.resolveLocationFromZip(
+        zip,
+        fp?.county ?? undefined
+      );
       const needsUserUpdate =
         user.state !== resolved.state || user.zip_code !== resolved.zip_code;
       const needsProfileUpdate =
         !fp ||
         fp.state !== resolved.state ||
         fp.zip_code !== resolved.zip_code ||
-        fp.city !== resolved.city;
+        fp.city !== resolved.city ||
+        (resolved.county && fp.county !== resolved.county);
 
       if (!needsUserUpdate && !needsProfileUpdate) {
         skipped++;
@@ -53,6 +57,7 @@ async function main() {
             state: resolved.state,
             zip_code: resolved.zip_code,
             city: resolved.city,
+            ...(resolved.county ? { county: resolved.county } : {}),
           },
         });
       } else {
@@ -62,6 +67,7 @@ async function main() {
             state: resolved.state,
             zip_code: resolved.zip_code,
             city: resolved.city,
+            county: resolved.county,
           },
         });
       }

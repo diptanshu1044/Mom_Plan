@@ -133,6 +133,7 @@ export class UserService {
     };
 
     // Location is authoritative from ZIP — ignore direct state/city/county edits.
+    const submittedCounty = county?.trim();
     delete normalizedData.state;
     delete normalizedData.city;
     delete normalizedData.county;
@@ -147,15 +148,41 @@ export class UserService {
         throw new BadRequestError('ZIP code is required.');
       }
       if (isZipValidationEnabled()) {
-        const resolved = await zipValidationService.resolveLocationFromZip(trimmedZip);
+        const resolved = zipValidationService.resolveLocationFromZip(
+          trimmedZip,
+          submittedCounty || existingProfile.family_profile?.county || undefined
+        );
         normalizedData.zip_code = resolved.zip_code;
         normalizedData.state = resolved.state;
         normalizedData.city = resolved.city;
+        normalizedData.county = resolved.county;
       } else {
         normalizedData.zip_code = trimmedZip;
       }
     } else if (zip_code !== undefined) {
       delete normalizedData.zip_code;
+    } else if (
+      county !== undefined &&
+      submittedCounty &&
+      isZipValidationEnabled() &&
+      existingProfile.zip_code &&
+      existingProfile.state
+    ) {
+      const countyValidation = zipValidationService.validateZip(
+        String(existingProfile.zip_code),
+        String(existingProfile.state),
+        existingProfile.family_profile?.city ?? undefined,
+        submittedCounty
+      );
+      if (!countyValidation.valid) {
+        throw new BadRequestError(countyValidation.error || 'Invalid county.');
+      }
+      if (
+        countyValidation.county &&
+        countyValidation.county !== existingProfile.family_profile?.county
+      ) {
+        normalizedData.county = countyValidation.county;
+      }
     }
 
     const shouldRescanEligibility = profileUpdateAffectsEligibility(existingProfile, normalizedData);
@@ -165,6 +192,8 @@ export class UserService {
       (normalizedData.state as string | undefined) ?? existingProfile.state;
     const effectiveCity =
       (normalizedData.city as string | undefined) ?? existingProfile.family_profile?.city;
+    const effectiveCounty =
+      (normalizedData.county as string | undefined) ?? existingProfile.family_profile?.county;
 
     if (
       zipChanging &&
@@ -172,10 +201,11 @@ export class UserService {
       effectiveZip &&
       effectiveState
     ) {
-      const zipResult = await zipValidationService.validateZip(
+      const zipResult = zipValidationService.validateZip(
         String(effectiveZip),
         String(effectiveState),
-        effectiveCity ? String(effectiveCity) : undefined
+        effectiveCity ? String(effectiveCity) : undefined,
+        effectiveCounty ? String(effectiveCounty) : undefined
       );
       if (!zipResult.valid) {
         throw new BadRequestError(zipResult.error || 'Invalid ZIP code.');

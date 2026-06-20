@@ -479,6 +479,7 @@ export default function ProfilePage() {
                     state: watchState,
                     city: watchCity,
                     zip: watchZipCode,
+                    county: watchCounty,
                   }}
                   onChange={(field, value) => {
                     const formField = field === "zip" ? "zip_code" : field;
@@ -488,22 +489,14 @@ export default function ProfilePage() {
                     state: profileForm.formState.errors.state?.message,
                     city: profileForm.formState.errors.city?.message,
                     zip: profileForm.formState.errors.zip_code?.message,
+                    county: profileForm.formState.errors.county?.message,
                   }}
                   requireZip
+                  requireCounty
                   lockDerivedFields
                   onLocationChange={clearPartnerOrgSelection}
                   validationRef={locationValidationRef}
                   className="sm:col-span-2"
-                />
-                <Input
-                  label="County"
-                  type="text"
-                  placeholder="Fulton"
-                  hint="Set during signup — update your ZIP in Profile to refresh location"
-                  readOnly
-                  disabled
-                  value={watchCounty}
-                  error={profileForm.formState.errors.county?.message}
                 />
                 <Input
                   label="Date of Birth"
