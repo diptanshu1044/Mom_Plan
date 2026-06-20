@@ -335,6 +335,8 @@ model ApplicationSubmission {
   generated_pdf_id String?       @db.Uuid
   document_ids     String[]      @default([])
   submitted_at     DateTime      @default(now()) @db.Timestamptz(6)
+  profile_snapshot    Json?
+  profile_snapshot_at DateTime?  @db.Timestamptz(6)
   application      Application   @relation(fields: [application_id], references: [id], onDelete: Cascade)
   generated_pdf    GeneratedPdf? @relation(fields: [generated_pdf_id], references: [id], onDelete: SetNull)
   user             User          @relation(fields: [user_id], references: [id], onDelete: Cascade)

@@ -1,7 +1,22 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { MotherOrgEnrollmentService } from './mother-org-enrollment.service';
 
 const motherOrgEnrollment = new MotherOrgEnrollmentService();
+
+/**
+ * Serialize a FamilyProfile into a JSON-safe snapshot. Prisma Decimal and Date
+ * values are not valid JSON, so normalize them to numbers / ISO strings.
+ */
+function serializeProfileSnapshot(profile: unknown): Prisma.InputJsonValue {
+  return JSON.parse(
+    JSON.stringify(profile, (_key, value) => {
+      if (value instanceof Prisma.Decimal) return value.toNumber();
+      if (value instanceof Date) return value.toISOString();
+      return value;
+    })
+  ) as Prisma.InputJsonValue;
+}
 
 function currentQuarter(): string {
   const m = new Date().getMonth();
@@ -46,7 +61,7 @@ export async function syncPartnerPortalOnSecureSubmission(params: {
     where: { id: params.applicationId },
     include: {
       program: true,
-      user: { include: { mother_profile: true } },
+      user: { include: { mother_profile: true, family_profile: true } },
     },
   });
 
@@ -63,6 +78,10 @@ export async function syncPartnerPortalOnSecureSubmission(params: {
   const quarter = currentQuarter();
   const resolvedDocIds = [...new Set(params.documentIds)];
 
+  const profileSnapshot = application.user.family_profile
+    ? serializeProfileSnapshot(application.user.family_profile)
+    : Prisma.JsonNull;
+
   const submission = await prisma.applicationSubmission.create({
     data: {
       application_id: params.applicationId,
@@ -70,6 +89,8 @@ export async function syncPartnerPortalOnSecureSubmission(params: {
       generated_pdf_id: params.generatedPdfId,
       document_ids: resolvedDocIds,
       submitted_at: submittedAt,
+      profile_snapshot: profileSnapshot,
+      profile_snapshot_at: application.user.family_profile ? submittedAt : null,
     },
   });
 

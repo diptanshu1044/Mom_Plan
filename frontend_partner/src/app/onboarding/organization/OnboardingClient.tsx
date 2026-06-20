@@ -122,6 +122,83 @@ type DraftData = {
   pref?: Partial<PrefData>;
 };
 
+type SummaryItem = {
+  label: string;
+  value: string | undefined;
+  multiline?: boolean;
+};
+
+const NOTIFICATION_LABELS: Record<PrefData["notification_frequency"], string> = {
+  realtime: "Real-time",
+  daily: "Daily",
+  weekly: "Weekly",
+};
+
+function reviewValue(value: string | undefined | null): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed || undefined;
+}
+
+function formatPhoneDisplay(digits: string | undefined): string | undefined {
+  if (!digits) return undefined;
+  const normalized = normalizeUsPhoneDigits(digits);
+  if (normalized.length !== 10) return digits;
+  return `(${normalized.slice(0, 3)}) ${normalized.slice(3, 6)}-${normalized.slice(6)}`;
+}
+
+function buildLaunchSummary(draft: DraftData): { label: string; items: SummaryItem[] }[] {
+  const loc = draft.location;
+  const cityState = [loc?.city, loc?.state].filter(Boolean).join(", ");
+
+  return [
+    {
+      label: "Organization",
+      items: [
+        { label: "Name", value: reviewValue(draft.profile?.name) },
+        { label: "Tagline", value: reviewValue(draft.profile?.tagline) },
+        { label: "Description", value: reviewValue(draft.profile?.description), multiline: true },
+        { label: "Website", value: reviewValue(draft.profile?.website) },
+        { label: "LinkedIn", value: reviewValue(draft.profile?.linkedin) },
+        { label: "Services", value: reviewValue(draft.profile?.services) },
+      ],
+    },
+    {
+      label: "Location",
+      items: [
+        { label: "Address", value: reviewValue(loc?.address) },
+        { label: "City", value: reviewValue(cityState) },
+        { label: "ZIP", value: reviewValue(loc?.zip) },
+        { label: "County", value: reviewValue(loc?.county) },
+        { label: "Country", value: reviewValue(loc?.country) },
+        { label: "Email", value: reviewValue(loc?.email) },
+        { label: "Phone", value: formatPhoneDisplay(loc?.phone) },
+        { label: "Service Area", value: reviewValue(loc?.service_area), multiline: true },
+      ],
+    },
+    {
+      label: "Team",
+      items: [
+        { label: "Contact", value: reviewValue(draft.team?.contact_name) },
+        { label: "Title", value: reviewValue(draft.team?.contact_title) },
+        { label: "Email", value: reviewValue(draft.team?.contact_email) },
+      ],
+    },
+    {
+      label: "Preferences",
+      items: [
+        { label: "Language", value: reviewValue(draft.pref?.primary_language) },
+        {
+          label: "Notifications",
+          value: draft.pref?.notification_frequency
+            ? NOTIFICATION_LABELS[draft.pref.notification_frequency]
+            : undefined,
+        },
+        { label: "Case Prefix", value: reviewValue(draft.pref?.case_numbering_prefix) },
+      ],
+    },
+  ];
+}
+
 // ---- Preview panel ----
 
 function PreviewPanel({
@@ -663,48 +740,37 @@ export function OnboardingClient() {
                   description="Review your setup and go live."
                 >
                   {/* Summary */}
-                  <div className="space-y-4 mb-6">
-                    {[
-                      {
-                        label: "Organization",
-                        items: [
-                          ["Name", draft.profile?.name],
-                          ["Tagline", draft.profile?.tagline],
-                          ["Website", draft.profile?.website],
-                        ],
-                      },
-                      {
-                        label: "Location",
-                        items: [
-                          ["City", [draft.location?.city, draft.location?.state].filter(Boolean).join(", ")],
-                          ["Email", draft.location?.email],
-                          ["Phone", draft.location?.phone],
-                        ],
-                      },
-                      {
-                        label: "Team",
-                        items: [
-                          ["Contact", draft.team?.contact_name],
-                          ["Title", draft.team?.contact_title],
-                        ],
-                      },
-                    ].map((section) => (
-                      <div key={section.label} className="bg-primary-subtle rounded-xl p-4 border border-surface-border">
-                        <div className="text-[10px] font-bold text-text-soft uppercase tracking-widest mb-3">
-                          {section.label}
-                        </div>
-                        <div className="space-y-1.5">
-                          {section.items
-                            .filter(([, v]) => v)
-                            .map(([k, v]) => (
-                              <div key={k} className="flex gap-3">
-                                <span className="text-xs text-text-soft w-16 shrink-0">{k}</span>
-                                <span className="text-xs font-semibold text-text-dark truncate">{v}</span>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="space-y-4 mb-6 max-h-[min(60vh,520px)] overflow-y-auto pr-1">
+                    {buildLaunchSummary(draft)
+                      .map((section) => {
+                        const items = section.items.filter((item) => item.value);
+                        if (items.length === 0) return null;
+
+                        return (
+                          <div
+                            key={section.label}
+                            className="bg-primary-subtle rounded-xl p-4 border border-surface-border"
+                          >
+                            <div className="text-[10px] font-bold text-text-soft uppercase tracking-widest mb-3">
+                              {section.label}
+                            </div>
+                            <div className="space-y-2">
+                              {items.map((item) => (
+                                <div key={item.label} className="flex gap-3">
+                                  <span className="text-xs text-text-soft w-28 shrink-0">{item.label}</span>
+                                  <span
+                                    className={`text-xs font-semibold text-text-dark min-w-0 flex-1 ${
+                                      item.multiline ? "whitespace-pre-wrap break-words" : "truncate"
+                                    }`}
+                                  >
+                                    {item.value}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
                   </div>
 
                   <div className="flex items-center gap-2 text-xs text-text-soft bg-partner-50 rounded-xl p-3 border border-partner-200 mb-6">

@@ -184,7 +184,7 @@ export function MothersClient() {
             {!isLoading && mothers.length === 0 && (
               <tr>
                 <td colSpan={6} className="py-16 text-center text-text-soft">
-                  {isAdmin ? "No mothers with submitted applications" : "No assigned mothers with submitted applications"}
+                  {isAdmin ? "No mothers in your organization yet" : "No mothers assigned to you yet"}
                 </td>
               </tr>
             )}

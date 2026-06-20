@@ -363,7 +363,26 @@ export class PartnerCasesService {
 
     const motherName = await resolveMotherName(c.mother);
     const motherNumber = formatMotherNumber(c.mother_id);
-    const fp = c.mother.user?.family_profile;
+
+    // Prefer the frozen profile snapshot captured at submission time so that
+    // later edits to the mom's live profile don't retroactively change what the
+    // org sees for this application. Fall back to the live profile for legacy
+    // cases submitted before snapshots existed.
+    const latestSubmission = c.application_id
+      ? await prisma.applicationSubmission.findFirst({
+          where: { application_id: c.application_id },
+          orderBy: { submitted_at: 'desc' },
+          select: { profile_snapshot: true },
+        })
+      : null;
+    const rawSnapshot = latestSubmission?.profile_snapshot;
+    const snapshot =
+      rawSnapshot && typeof rawSnapshot === 'object' && !Array.isArray(rawSnapshot)
+        ? (rawSnapshot as Record<string, any>)
+        : null;
+
+    const fp = snapshot ?? c.mother.user?.family_profile;
+    const fpUpdatedAt = fp?.updated_at ? new Date(fp.updated_at) : null;
 
     const nextDeadline = c.deadlines.find((d) => !d.is_resolved) ?? null;
     const days = nextDeadline ? daysUntil(nextDeadline.due_date) : null;
@@ -383,7 +402,7 @@ export class PartnerCasesService {
 
     const children: { name: string; age: string }[] = [];
     if (fp?.children_dobs?.length) {
-      fp.children_dobs.forEach((dob, i) => {
+      (fp.children_dobs as string[]).forEach((dob: string, i: number) => {
         const birth = new Date(dob);
         const months = Math.floor((Date.now() - birth.getTime()) / (30.44 * 24 * 60 * 60 * 1000));
         const ageStr = months < 12 ? `${months} mo` : `${Math.floor(months / 12)}`;
@@ -427,8 +446,8 @@ export class PartnerCasesService {
         monthly_income: decimalToNumberOrNull(fp?.monthly_income),
         income_threshold_pct: 185,
         eligible: true,
-        last_verified: fp?.updated_at?.toISOString() ?? null,
-        needs_update: fp?.updated_at ? daysUntil(fp.updated_at) > 180 : true,
+        last_verified: fpUpdatedAt?.toISOString() ?? null,
+        needs_update: fpUpdatedAt ? daysUntil(fpUpdatedAt) > 180 : true,
         proof_of_residency: c.documents.some((d) => d.doc_type.includes('residency') && d.review_status === 'approved')
           ? 'on_file'
           : 'not_on_file',

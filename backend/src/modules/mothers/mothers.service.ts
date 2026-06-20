@@ -63,15 +63,7 @@ const motherInclude = {
 export class MothersService {
   async listMothers(ctx: OrgAccessContext, filters: { caseworker?: string; search?: string }) {
     const mothers = await prisma.mother.findMany({
-      where: {
-        ...motherListWhere(ctx, filters.caseworker),
-        cases: {
-          some: {
-            ...orgCaseloadCaseWhere(ctx.orgId),
-            secure_submitted_at: { not: null },
-          },
-        },
-      },
+      where: motherListWhere(ctx, filters.caseworker),
       include: motherInclude,
       orderBy: { created_at: 'desc' },
     });
