@@ -33,9 +33,19 @@ export interface ExistingOrgLocationFilters {
   county?: string;
 }
 
+/** Sentinel dropdown value for "my organization isn't listed — create a new one". */
+export const NO_ORG_VALUE = "__no_org_found__";
+
+export type ExistingOrgSelectMode = "existing" | "new";
+
 interface ExistingOrgSelectProps {
+  /** Current dropdown selection: an org id, NO_ORG_VALUE, or "" (nothing chosen). */
   value: string;
-  onChange: (orgId: string, org: ExistingOrgOption | null) => void;
+  onChange: (
+    orgId: string,
+    org: ExistingOrgOption | null,
+    mode: ExistingOrgSelectMode
+  ) => void;
   locationFilters: ExistingOrgLocationFilters;
   error?: string;
 }
@@ -71,23 +81,26 @@ export function ExistingOrgSelect({
     enabled: canFetch,
   });
 
-  const handleChange = (orgId: string) => {
-    if (!orgId) {
-      onChange("", null);
+  const handleChange = (selected: string) => {
+    if (selected === NO_ORG_VALUE || !selected) {
+      onChange("", null, "new");
       return;
     }
-    const org = orgs.find((entry) => entry.id === orgId) ?? null;
-    onChange(orgId, org);
+    const org = orgs.find((entry) => entry.id === selected) ?? null;
+    onChange(selected, org, "existing");
   };
 
-  const options = orgs.map((org) => ({
-    value: org.id,
-    label: `${org.name}${
-      [org.city, org.state].filter(Boolean).length
-        ? ` — ${[org.city, org.state].filter(Boolean).join(", ")}`
-        : ""
-    }`,
-  }));
+  const options = [
+    ...orgs.map((org) => ({
+      value: org.id,
+      label: `${org.name}${
+        [org.city, org.state].filter(Boolean).length
+          ? ` — ${[org.city, org.state].filter(Boolean).join(", ")}`
+          : ""
+      }`,
+    })),
+    { value: NO_ORG_VALUE, label: "My organization isn't listed — add a new one" },
+  ];
 
   const selectedOrg = orgs.find((org) => org.id === value);
 
@@ -111,15 +124,19 @@ export function ExistingOrgSelect({
             value={value}
             onChange={handleChange}
             error={error}
-            hint="Choose your organization if it is already in our directory."
+            hint="Choose your organization if it is already in our directory, or pick “My organization isn't listed” to add a new one."
           />
-          {selectedOrg && (
+          {selectedOrg ? (
             <p className="text-xs text-text-soft">
               {selectedOrg.tagline ||
                 selectedOrg.service_area ||
-                "We will link your admin account to this organization."}
+                "We'll prefill the details below — review and edit anything that's out of date."}
             </p>
-          )}
+          ) : value === NO_ORG_VALUE ? (
+            <p className="text-xs text-text-soft">
+              Enter your organization details below to register a new one.
+            </p>
+          ) : null}
         </>
       ) : null}
     </div>

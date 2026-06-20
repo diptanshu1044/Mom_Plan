@@ -22,8 +22,8 @@ import {
   LocationFields,
   type UseLocationFieldsResult,
 } from "@/components/location/LocationFields";
-import { ExistingOrgSelect } from "@/components/signup/ExistingOrgSelect";
-import { applyExistingOrgPrefill } from "@/lib/signup-org-prefill";
+import { ExistingOrgSelect, NO_ORG_VALUE } from "@/components/signup/ExistingOrgSelect";
+import { applyExistingOrgPrefill, clearExistingOrgPrefill } from "@/lib/signup-org-prefill";
 import { formatPhoneForApi, optionalUsPhoneFieldSchema } from "@/lib/phone";
 import { ORG_TYPES } from "@/lib/org-types";
 
@@ -246,6 +246,9 @@ export function SignupClient() {
   const [step0Data, setStep0Data] = useState<Partial<Step0Data>>({});
   const [step1Data, setStep1Data] = useState<Partial<Step1Data>>({});
   const [step2Data, setStep2Data] = useState<Partial<Step2Data>>({});
+
+  // Current org dropdown selection: an org id, NO_ORG_VALUE, or "" (nothing chosen yet).
+  const [orgChoice, setOrgChoice] = useState("");
 
   const { setAuth } = usePartnerAuthStore();
   const { toast } = useToast();
@@ -559,6 +562,7 @@ export function SignupClient() {
                       }
                       if (field === "county" || field === "zip") {
                         form0.setValue("existingOrgId", "", { shouldValidate: true });
+                        setOrgChoice("");
                       }
                     }}
                     errors={{
@@ -577,24 +581,36 @@ export function SignupClient() {
                   {form0.watch("county")?.trim() && (
                     <div className="mb-4">
                       <ExistingOrgSelect
-                        value={form0.watch("existingOrgId") ?? ""}
+                        value={orgChoice}
                         locationFilters={{
                           state: form0.watch("state") ?? "",
                           city: form0.watch("city") ?? "",
                           county: form0.watch("county") ?? "",
                         }}
-                        onChange={(orgId, org) => {
-                          form0.setValue("existingOrgId", orgId, { shouldValidate: true });
-                          if (org) {
+                        onChange={(orgId, org, mode) => {
+                          if (mode === "existing" && org) {
+                            setOrgChoice(orgId);
+                            form0.setValue("existingOrgId", orgId, { shouldValidate: true });
                             applyExistingOrgPrefill(
                               org,
                               { form0, form1, form2 },
                               updatePreview
                             );
-                            setStep0Data((prev) => ({ ...prev, ...form0.getValues(), existingOrgId: orgId }));
-                            setStep1Data(form1.getValues());
-                            setStep2Data(form2.getValues());
+                          } else {
+                            // "My organization isn't listed" — start a fresh, brand-new org.
+                            setOrgChoice(NO_ORG_VALUE);
+                            form0.setValue("existingOrgId", "", { shouldValidate: true });
+                            clearExistingOrgPrefill(
+                              { form0, form1, form2 },
+                              updatePreview
+                            );
                           }
+                          setStep0Data((prev) => ({
+                            ...prev,
+                            ...form0.getValues(),
+                          }));
+                          setStep1Data(form1.getValues());
+                          setStep2Data(form2.getValues());
                         }}
                       />
                     </div>

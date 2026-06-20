@@ -96,3 +96,48 @@ export function applyExistingOrgPrefill(
     founded: org.founded?.trim() ?? "",
   });
 }
+
+/**
+ * Clear org-derived fields when the user switches to "create a new organization".
+ * Location fields (zip/city/state/county) are preserved since they drive the org search.
+ */
+export function clearExistingOrgPrefill(
+  forms: {
+    form0: UseFormReturn<Step0Data>;
+    form1: UseFormReturn<Step1Data>;
+    form2: UseFormReturn<Step2Data>;
+  },
+  onPreview?: (patch: {
+    orgName: string;
+    orgType: string;
+    city: string;
+    state: string;
+    employees: string;
+    founded: string;
+  }) => void
+) {
+  const { form0, form1, form2 } = forms;
+
+  form0.setValue("orgName", "", { shouldValidate: false });
+  form0.setValue("orgType", "", { shouldValidate: false });
+  form0.setValue("website", "", { shouldValidate: false });
+  form0.setValue("description", "", { shouldValidate: false });
+
+  form1.setValue("email", "", { shouldValidate: false });
+  form1.setValue("phone", "", { shouldValidate: false });
+  form1.setValue("address", "", { shouldValidate: false });
+
+  form2.setValue("employees", "", { shouldValidate: false });
+  form2.setValue("founded", "", { shouldValidate: false });
+  form2.setValue("taxId", "", { shouldValidate: false });
+  form2.setValue("linkedin", "", { shouldValidate: false });
+
+  onPreview?.({
+    orgName: "",
+    orgType: "",
+    city: form0.getValues("city") || "",
+    state: form0.getValues("state") || "",
+    employees: "",
+    founded: "",
+  });
+}

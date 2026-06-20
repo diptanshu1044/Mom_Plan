@@ -166,6 +166,9 @@ export class PartnerAuthService {
         org = await tx.organization.update({
           where: { id: existingOrg.id },
           data: {
+            org_name: data.orgName,
+            category: ORG_TYPE_LABELS[orgType],
+            org_type: orgTypeSlug(orgType),
             phone: data.phone || undefined,
             address: data.address,
             city: resolvedLocation.city,
