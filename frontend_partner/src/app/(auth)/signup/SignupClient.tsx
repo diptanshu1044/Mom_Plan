@@ -23,6 +23,7 @@ import {
   type UseLocationFieldsResult,
 } from "@/components/location/LocationFields";
 import { ExistingOrgSelect } from "@/components/signup/ExistingOrgSelect";
+import { applyExistingOrgPrefill } from "@/lib/signup-org-prefill";
 import { formatPhoneForApi, optionalUsPhoneFieldSchema } from "@/lib/phone";
 import { ORG_TYPES } from "@/lib/org-types";
 
@@ -244,6 +245,7 @@ export function SignupClient() {
   // Shared form state across steps
   const [step0Data, setStep0Data] = useState<Partial<Step0Data>>({});
   const [step1Data, setStep1Data] = useState<Partial<Step1Data>>({});
+  const [step2Data, setStep2Data] = useState<Partial<Step2Data>>({});
 
   const { setAuth } = usePartnerAuthStore();
   const { toast } = useToast();
@@ -262,7 +264,10 @@ export function SignupClient() {
   });
 
   // Step 2 form
-  const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema) });
+  const form2 = useForm<Step2Data>({
+    resolver: zodResolver(step2Schema),
+    defaultValues: step2Data,
+  });
 
   const locationValidationRef = useRef<UseLocationFieldsResult | null>(null);
 
@@ -302,6 +307,7 @@ export function SignupClient() {
   };
 
   const handleStep2 = async (data: Step2Data) => {
+    setStep2Data(data);
     updatePreview({ employees: data.employees ?? "", founded: data.founded ?? "" });
     try {
       const payload = {
@@ -580,17 +586,14 @@ export function SignupClient() {
                         onChange={(orgId, org) => {
                           form0.setValue("existingOrgId", orgId, { shouldValidate: true });
                           if (org) {
-                            form0.setValue("orgName", org.name, { shouldValidate: true });
-                            if (org.type) {
-                              form0.setValue("orgType", org.type, { shouldValidate: true });
-                            }
-                            if (org.description) {
-                              form0.setValue("description", org.description, { shouldValidate: true });
-                            }
-                            updatePreview({
-                              orgName: org.name,
-                              orgType: org.type ?? "",
-                            });
+                            applyExistingOrgPrefill(
+                              org,
+                              { form0, form1, form2 },
+                              updatePreview
+                            );
+                            setStep0Data((prev) => ({ ...prev, ...form0.getValues(), existingOrgId: orgId }));
+                            setStep1Data(form1.getValues());
+                            setStep2Data(form2.getValues());
                           }
                         }}
                       />

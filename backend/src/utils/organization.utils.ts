@@ -5,11 +5,24 @@ export const organizationPublicSelect = {
   org_type: true,
   category: true,
   purpose: true,
+  tagline: true,
+  description: true,
+  website: true,
+  email: true,
+  contact_email: true,
+  phone: true,
+  address: true,
   city: true,
   state: true,
+  zip_code: true,
   county: true,
+  country: true,
   counties_served: true,
   referral_notes: true,
+  employees: true,
+  founded: true,
+  tax_id: true,
+  linkedin: true,
 } as const;
 
 export type OrganizationPublicRecord = {
@@ -18,11 +31,24 @@ export type OrganizationPublicRecord = {
   org_type: string | null;
   category: string;
   purpose: string | null;
+  tagline: string | null;
+  description: string | null;
+  website: string | null;
+  email: string | null;
+  contact_email: string | null;
+  phone: string | null;
+  address: string | null;
   city: string | null;
   state: string | null;
+  zip_code: string | null;
   county: string | null;
+  country: string | null;
   counties_served: string[];
   referral_notes: string | null;
+  employees: string | null;
+  founded: string | null;
+  tax_id: string | null;
+  linkedin: string | null;
 };
 
 export function toPublicOrganization(org: OrganizationPublicRecord) {
@@ -34,10 +60,21 @@ export function toPublicOrganization(org: OrganizationPublicRecord) {
     id: org.id,
     name: org.org_name,
     type: org.category || org.org_type,
-    tagline: org.purpose,
-    description: org.purpose,
+    tagline: org.tagline || org.purpose,
+    description: org.description || org.purpose,
+    website: org.website,
+    email: org.contact_email || org.email,
+    phone: org.phone,
+    address: org.address,
     city: org.city,
     state: org.state,
+    zip: org.zip_code,
+    county: org.county,
+    country: org.country,
+    employees: org.employees,
+    founded: org.founded,
+    tax_id: org.tax_id,
+    linkedin: org.linkedin,
     service_area: serviceArea,
   };
 }

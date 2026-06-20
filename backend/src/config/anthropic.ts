@@ -40,6 +40,36 @@ export const callClaudeApi = async (systemPrompt: string, userPrompt: string): P
       });
     }
 
+    if (systemPrompt.includes('You are matching US county names')) {
+      const orgCountyMatch = userPrompt.match(/Organization county:\s*\n"([^"]+)"/);
+      const countiesMatch = userPrompt.match(/Available counties:\s*(\[[\s\S]*?\])\s*\n/);
+      const orgCounty = orgCountyMatch?.[1] ?? '';
+      const counties = countiesMatch ? (JSON.parse(countiesMatch[1]) as string[]) : [];
+      const normalizedOrgCounty = orgCounty
+        .trim()
+        .toUpperCase()
+        .replace(/\./g, '')
+        .replace(/'/g, '')
+        .replace(/\s+/g, ' ')
+        .replace(/\s+(CITY AND BOROUGH|CENSUS AREA|BOROUGH|PARISH|COUNTY)$/i, '')
+        .replace(/\bSAINT\b/g, 'ST')
+        .trim();
+
+      const exact = counties.find((county) => county === normalizedOrgCounty);
+      if (exact) {
+        return JSON.stringify({ match: exact, confidence: 0.99 });
+      }
+
+      const whitespaceMatch = counties.find(
+        (county) => county.replace(/\s+/g, '') === normalizedOrgCounty.replace(/\s+/g, '')
+      );
+      if (whitespaceMatch) {
+        return JSON.stringify({ match: whitespaceMatch, confidence: 0.95 });
+      }
+
+      return JSON.stringify({ match: counties[0] ?? '', confidence: 0.5 });
+    }
+
     // Determine if this is an email draft prompt or an eligibility scan prompt
     if (systemPrompt.includes('email') || systemPrompt.includes('automated government application')) {
       return `Dear Agency Representative,

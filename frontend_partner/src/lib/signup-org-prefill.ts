@@ -1,0 +1,98 @@
+import type { UseFormReturn } from "react-hook-form";
+import type { ExistingOrgOption } from "@/components/signup/ExistingOrgSelect";
+import { resolveOrgTypeLabel } from "@/lib/org-types";
+import { normalizeUsPhoneDigits } from "@/lib/phone";
+
+type Step0Data = {
+  zip: string;
+  city: string;
+  state: string;
+  county: string;
+  existingOrgId?: string;
+  orgName: string;
+  orgType: string;
+  website: string;
+  description?: string;
+};
+
+type Step1Data = {
+  email: string;
+  phone?: string;
+  address: string;
+  country?: string;
+};
+
+type Step2Data = {
+  adminFirstName: string;
+  adminMiddleName?: string;
+  adminLastName: string;
+  adminEmail: string;
+  adminPassword: string;
+  employees?: string;
+  founded?: string;
+  taxId?: string;
+  linkedin: string;
+};
+
+export function applyExistingOrgPrefill(
+  org: ExistingOrgOption,
+  forms: {
+    form0: UseFormReturn<Step0Data>;
+    form1: UseFormReturn<Step1Data>;
+    form2: UseFormReturn<Step2Data>;
+  },
+  onPreview?: (patch: {
+    orgName: string;
+    orgType: string;
+    city: string;
+    state: string;
+    employees: string;
+    founded: string;
+  }) => void
+) {
+  const { form0, form1, form2 } = forms;
+  const orgType = resolveOrgTypeLabel(org.type);
+
+  form0.setValue("orgName", org.name, { shouldValidate: true });
+  if (orgType) {
+    form0.setValue("orgType", orgType, { shouldValidate: true });
+  }
+  form0.setValue("website", org.website?.trim() ?? "", { shouldValidate: true });
+  form0.setValue(
+    "description",
+    (org.description || org.tagline || "").trim(),
+    { shouldValidate: true }
+  );
+
+  if (org.zip?.trim()) form0.setValue("zip", org.zip.trim(), { shouldValidate: true });
+  if (org.city?.trim()) form0.setValue("city", org.city.trim(), { shouldValidate: true });
+  if (org.state?.trim()) form0.setValue("state", org.state.trim(), { shouldValidate: true });
+  if (org.county?.trim()) form0.setValue("county", org.county.trim(), { shouldValidate: true });
+
+  if (org.email?.trim()) form1.setValue("email", org.email.trim(), { shouldValidate: true });
+  if (org.phone?.trim()) {
+    form1.setValue("phone", normalizeUsPhoneDigits(org.phone), { shouldValidate: true });
+  }
+  if (org.address?.trim()) form1.setValue("address", org.address.trim(), { shouldValidate: true });
+  if (org.country?.trim()) form1.setValue("country", org.country.trim(), { shouldValidate: true });
+
+  if (org.employees?.trim()) {
+    form2.setValue("employees", org.employees.trim(), { shouldValidate: true });
+  }
+  if (org.founded?.trim()) {
+    form2.setValue("founded", org.founded.trim(), { shouldValidate: true });
+  }
+  if (org.tax_id?.trim()) {
+    form2.setValue("taxId", org.tax_id.trim(), { shouldValidate: true });
+  }
+  form2.setValue("linkedin", org.linkedin?.trim() ?? "", { shouldValidate: true });
+
+  onPreview?.({
+    orgName: org.name,
+    orgType,
+    city: org.city?.trim() || form0.getValues("city") || "",
+    state: org.state?.trim() || form0.getValues("state") || "",
+    employees: org.employees?.trim() ?? "",
+    founded: org.founded?.trim() ?? "",
+  });
+}

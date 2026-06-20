@@ -11,8 +11,19 @@ export interface ExistingOrgOption {
   type?: string | null;
   tagline?: string | null;
   description?: string | null;
+  website?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
   city?: string | null;
   state?: string | null;
+  zip?: string | null;
+  county?: string | null;
+  country?: string | null;
+  employees?: string | null;
+  founded?: string | null;
+  tax_id?: string | null;
+  linkedin?: string | null;
   service_area?: string | null;
 }
 
